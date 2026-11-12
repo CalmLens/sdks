@@ -21,6 +21,10 @@ type EventsService struct{ c *ServerClient }
 
 // Search finds assets by keyword, semantic or hybrid search.
 func (s *AssetsService) Search(ctx context.Context, options SearchAssetsOptions) (*AssetSearchResponse, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -34,6 +38,10 @@ func (s *AssetsService) Search(ctx context.Context, options SearchAssetsOptions)
 
 // List returns one page of assets. Use ListAll to iterate over every page.
 func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*AssetPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -47,6 +55,10 @@ func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*A
 
 // Retrieve returns the current state of an asset.
 func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	path, err := resourcePath("assets", options.AssetID, "")
 	if err != nil {
 		return nil, err
@@ -62,6 +74,10 @@ func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*
 
 // Update patches an asset; see UpdateAssetOptions.
 func (s *AssetsService) Update(ctx context.Context, options UpdateAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.assetRequest(ctx, "PATCH", options.AssetID, "", options)
 }
 
@@ -69,6 +85,10 @@ func (s *AssetsService) Update(ctx context.Context, options UpdateAssetOptions) 
 // again: processing returns to ClassificationStatusProcessing and moderation to
 // ModerationStatusPending.
 func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.assetRequest(ctx, "POST", options.AssetID, "/retry", nil)
 }
 
@@ -78,6 +98,10 @@ func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Ass
 // blocked or purged. Purging needs ConfirmPurge and the assets:delete permission, and
 // permanently deletes the stored content.
 func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.assetRequest(ctx, "POST", options.AssetID, "/decision", options)
 }
 
@@ -89,6 +113,10 @@ func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) 
 // EventAssetClassified and asset.<status> events, and a failed re-run keeps it. A reviewed asset
 // fails with CodeAssetReviewed, and one whose content is gone with CodeAssetContentUnavailable.
 func (s *AssetsService) Explain(ctx context.Context, options ExplainAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	body := JSON{}
 	if options.Rerun {
 		body["rerun"] = true
@@ -106,7 +134,7 @@ const (
 )
 
 // WaitForDecision retrieves an asset until it is settled, its Classification.Status
-// ClassificationStatusCompleted (with its decision in Classification.Moderation.Status) or
+// ClassificationStatusCompleted (with its decision in Classification.Moderation.Decision) or
 // ClassificationStatusFailed, and returns that asset. A ClassificationStatusQueued or
 // ClassificationStatusProcessing asset is still waiting, even when a reviewer has already decided
 // it. It waits 0.5s before the
@@ -116,6 +144,10 @@ const (
 // statuses seen. Cancelling ctx
 // stops waiting with sdk/cancelled. Webhooks report decisions without polling.
 func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDecisionOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	timeout := DefaultDecisionTimeout
 	if options.Timeout != nil {
 		timeout = *options.Timeout
@@ -136,7 +168,7 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 		details := JSON{"assetId": options.AssetID, "classificationStatus": nil, "moderationStatus": nil}
 		if last != nil {
 			details["classificationStatus"] = last.Classification.Status
-			details["moderationStatus"] = last.Classification.Moderation.Status
+			details["moderationStatus"] = last.Classification.Moderation.Decision
 		}
 		return nil, &Error{Code: CodeSDKTimeout, Message: "Asset " + options.AssetID + " did not settle within " + timeout.String(), Details: details}
 	}
@@ -181,12 +213,20 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 // Content.Status ContentStatusRemoved with RemovalReason ContentRemovalReasonRequested, and the
 // CDN no longer serves its content.
 func (s *AssetsService) RemoveContent(ctx context.Context, options AssetIDOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.assetRequest(ctx, "DELETE", options.AssetID, "/content", nil)
 }
 
 // Delete removes the asset record together with its stored content. An asset extracted from
 // another (one with a ParentID) fails with CodeAssetChildNotDeletable: delete its parent instead.
 func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("assets", options.AssetID, "")
 	if err != nil {
 		return err
@@ -202,6 +242,10 @@ func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) erro
 // asset.deleted or asset.content-removed for each asset, with a FactBatchID fact naming BatchID.
 // Assets under a safety hold are skipped. It is not retried: it carries no Idempotency-Key.
 func (s *AssetsService) Batch(ctx context.Context, options BatchAssetsOptions) (*BatchAssetsResponse, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	if err := validateBatchAssetsOptions(options); err != nil {
 		return nil, err
 	}
@@ -232,6 +276,10 @@ func validateBatchAssetsOptions(options BatchAssetsOptions) error {
 
 // Move moves an asset into a folder, or to the root when FolderID is nil.
 func (s *AssetsService) Move(ctx context.Context, options MoveAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.assetRequest(ctx, "POST", options.AssetID, "/move", JSON{"folderId": options.FolderID})
 }
 
@@ -250,6 +298,10 @@ func (s *AssetsService) assetRequest(ctx context.Context, method, id, suffix str
 // ListChildren returns one page of an asset's children. Use ListChildrenAll to iterate
 // over every page.
 func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChildrenOptions) (*AssetPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	path, err := resourcePath("assets", options.AssetID, "/children")
 	if err != nil {
 		return nil, err
@@ -270,6 +322,10 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 // segments there are. Pass each page's NextCursor back unchanged; cursors are opaque. Use
 // ListTimelineAll to iterate over every page.
 func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimelineOptions) (*AssetTimelinePage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	asset, err := resourcePath("assets", options.AssetID, "/timeline")
 	if err != nil {
 		return nil, err
@@ -293,6 +349,10 @@ func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimel
 // Pass the page's NextCursor as Cursor for the next page, or use ListAll to iterate over every
 // page.
 func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -306,11 +366,19 @@ func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (
 
 // Retrieve returns a folder.
 func (s *FoldersService) Retrieve(ctx context.Context, options FolderIDOptions) (*Folder, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.folderRequest(ctx, "GET", options.FolderID, "", nil)
 }
 
 // Create creates a folder.
 func (s *FoldersService) Create(ctx context.Context, options CreateFolderOptions) (*Folder, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result Folder
 	if err := s.c.request(ctx, "POST", s.c.project("folders"), nil, options, &result); err != nil {
 		return nil, err
@@ -320,16 +388,28 @@ func (s *FoldersService) Create(ctx context.Context, options CreateFolderOptions
 
 // Update renames a folder.
 func (s *FoldersService) Update(ctx context.Context, options UpdateFolderOptions) (*Folder, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.folderRequest(ctx, "PATCH", options.FolderID, "", options)
 }
 
 // Move moves a folder under ParentID, or to the root when ParentID is nil.
 func (s *FoldersService) Move(ctx context.Context, options MoveFolderOptions) (*Folder, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.folderRequest(ctx, "POST", options.FolderID, "/move", JSON{"parentId": options.ParentID})
 }
 
 // Delete deletes an empty folder.
 func (s *FoldersService) Delete(ctx context.Context, options FolderIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("folders", options.FolderID, "")
 	if err != nil {
 		return err
@@ -351,6 +431,10 @@ func (s *FoldersService) folderRequest(ctx context.Context, method, id, suffix s
 
 // List returns one page of the event feed. Use ListAll to follow the cursor.
 func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*EventsPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -358,7 +442,11 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 	// The API takes the types as one comma-separated value.
 	params.Del("types")
 	if len(options.Types) > 0 {
-		params.Set("types", strings.Join(options.Types, ","))
+		types := make([]string, len(options.Types))
+		for i, eventType := range options.Types {
+			types[i] = string(eventType)
+		}
+		params.Set("types", strings.Join(types, ","))
 	}
 	var result EventsPage
 	if err = s.c.request(ctx, "GET", s.c.project("events"), params, nil, &result); err != nil {
@@ -369,13 +457,17 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 
 // Classify moderates plain text and waits for the decision.
 func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	if strings.TrimSpace(options.Text) == "" {
 		return nil, invalid(CodeSDKInvalidArgument, "Text to classify must be a non-empty string")
 	}
 	if options.Name == "" {
 		options.Name = "text"
 	}
-	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, Visibility: options.Visibility, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, Tags: options.Tags, AuthorID: options.AuthorID, Context: options.Context, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
+	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, Visibility: options.Visibility, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, Tags: options.Tags, AuthorID: options.AuthorID, Context: options.Context, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, Params: options.Params})
 }
 
 // HashListsService manages hash lists: perceptual hashes of images the project never wants
@@ -386,6 +478,10 @@ type HashListsService struct{ c *ServerClient }
 // List returns one page of the project's hash lists, newest first unless options.Sort says
 // otherwise. Use ListAll to iterate over every page.
 func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -399,11 +495,19 @@ func (s *HashListsService) List(ctx context.Context, options ListHashListsOption
 
 // Retrieve returns a hash list.
 func (s *HashListsService) Retrieve(ctx context.Context, options HashListIDOptions) (*HashList, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.listRequest(ctx, "GET", options.HashListID, nil)
 }
 
 // Create creates a hash list.
 func (s *HashListsService) Create(ctx context.Context, options CreateHashListOptions) (*HashList, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result HashList
 	if err := s.c.request(ctx, "POST", s.c.project("hash-lists"), nil, options, &result); err != nil {
 		return nil, err
@@ -413,11 +517,19 @@ func (s *HashListsService) Create(ctx context.Context, options CreateHashListOpt
 
 // Update renames a hash list or changes its action; the new action applies to later uploads.
 func (s *HashListsService) Update(ctx context.Context, options UpdateHashListOptions) (*HashList, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.listRequest(ctx, "PATCH", options.HashListID, options)
 }
 
 // Delete deletes a hash list and every entry in it.
 func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("hash-lists", options.HashListID, "")
 	if err != nil {
 		return err
@@ -428,6 +540,10 @@ func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions
 // ListEntries returns one page of a hash list's entries, newest first unless options.Sort says
 // otherwise. Use ListEntriesAll to iterate over every page.
 func (s *HashListsService) ListEntries(ctx context.Context, options ListHashListEntriesOptions) (*HashListEntryPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	path, err := resourcePath("hash-lists", options.HashListID, "/entries")
 	if err != nil {
 		return nil, err
@@ -446,6 +562,10 @@ func (s *HashListsService) ListEntries(ctx context.Context, options ListHashList
 // AddEntry adds a hash, or an image asset's hash, to a hash list. A hash already in the list
 // returns its existing entry.
 func (s *HashListsService) AddEntry(ctx context.Context, options AddHashListEntryOptions) (*HashListEntry, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	path, err := resourcePath("hash-lists", options.HashListID, "/entries")
 	if err != nil {
 		return nil, err
@@ -459,6 +579,10 @@ func (s *HashListsService) AddEntry(ctx context.Context, options AddHashListEntr
 
 // RemoveEntry removes an entry from its hash list.
 func (s *HashListsService) RemoveEntry(ctx context.Context, options HashListEntryIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("hash-list-entries", options.EntryID, "")
 	if err != nil {
 		return err

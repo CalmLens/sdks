@@ -23,14 +23,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"calmlens.com/go/calmlens"
 	"github.com/CalmLens/sdks/examples/voice-clips-go/demo"
-	calmlens "github.com/CalmLens/sdks/go"
 )
 
 const (
@@ -53,8 +54,6 @@ const (
 	// fewer; the page cap only bounds a misbehaving response.
 	timelinePageSize = 100
 	maxTimelinePages = 50
-	// uploadStatusUploading is Upload.Status while a multipart upload still receives parts.
-	uploadStatusUploading = "uploading"
 	// A segment category is shown as a finding from "possible" (0.4) upwards.
 	findingThreshold = 0.4
 	// A demo clip stays in processing this long before its selected outcome is written.
@@ -81,15 +80,15 @@ var clipTypes = map[string]bool{
 }
 
 var categoryLabels = map[string]string{
-	calmlens.CategorySexual: "Sexual content", calmlens.CategoryViolence: "Violence", calmlens.CategorySelfHarm: "Self-harm",
-	calmlens.CategoryHarassment: "Harassment", calmlens.CategoryHate: "Hate", calmlens.CategoryCriminalActivity: "Criminal activity",
+	string(calmlens.CategorySexual): "Sexual content", string(calmlens.CategoryViolence): "Violence", string(calmlens.CategorySelfHarm): "Self-harm",
+	string(calmlens.CategoryHarassment): "Harassment", string(calmlens.CategoryHate): "Hate", string(calmlens.CategoryCriminalActivity): "Criminal activity",
 }
 
 // Events that can change a clip's decision. There is one event per moderation status, sent for
 // automated moderation and reviewer decisions alike.
 var webhookEvents = map[string]bool{
-	calmlens.EventAssetAllowed: true, calmlens.EventAssetLimited: true, calmlens.EventAssetAgeRestricted: true,
-	calmlens.EventAssetBlocked: true, calmlens.EventAssetPurged: true, calmlens.EventAssetFailed: true,
+	string(calmlens.EventAssetAllowed): true, string(calmlens.EventAssetLimited): true, string(calmlens.EventAssetAgeRestricted): true,
+	string(calmlens.EventAssetBlocked): true, string(calmlens.EventAssetPurged): true, string(calmlens.EventAssetFailed): true,
 }
 
 //go:embed index.html
@@ -174,8 +173,8 @@ type lane struct {
 func (l lane) Fine() bool { return len(l.Segments) > 12 }
 
 var sourceLabels = map[string]string{
-	calmlens.SegmentSourceSpeech: "Speech", calmlens.SegmentSourceFrame: "Frames",
-	calmlens.SegmentSourceFrameText: "On-screen text", calmlens.SegmentSourceClip: "Clip",
+	string(calmlens.SegmentSourceSpeech): "Speech", string(calmlens.SegmentSourceFrame): "Frames",
+	string(calmlens.SegmentSourceFrameText): "On-screen text", string(calmlens.SegmentSourceClip): "Clip",
 }
 
 func sourceLabel(source string) string {
@@ -188,7 +187,7 @@ func sourceLabel(source string) string {
 // Lanes groups the segments by source, in a fixed order, so each source gets its own bar.
 func (e entry) Lanes() []lane {
 	lanes := []lane{}
-	for _, source := range []string{calmlens.SegmentSourceClip, calmlens.SegmentSourceSpeech, calmlens.SegmentSourceFrame, calmlens.SegmentSourceFrameText} {
+	for _, source := range []string{string(calmlens.SegmentSourceClip), string(calmlens.SegmentSourceSpeech), string(calmlens.SegmentSourceFrame), string(calmlens.SegmentSourceFrameText)} {
 		if rows := e.source(source); len(rows) > 0 {
 			lanes = append(lanes, lane{Label: sourceLabel(source), Segments: rows})
 		}
@@ -493,7 +492,9 @@ func (a *app) timelineSegments(ctx context.Context, asset *calmlens.Asset) ([]ca
 		if !result.HasMore {
 			break
 		}
-		options.Cursor = result.NextCursor
+		if result.NextCursor != nil {
+			options.Cursor = *result.NextCursor
+		}
 	}
 	return segments, nil
 }
@@ -511,24 +512,30 @@ const (
 
 // playable reports whether a clip with status may play.
 func playable(status string) bool {
-	return status == calmlens.ModerationStatusAllowed || status == calmlens.ModerationStatusLimited
+	return status == string(calmlens.ModerationDecisionAllowed) || status == string(calmlens.ModerationDecisionLimited)
 }
 
 // clipStatus reads the clip's state from the asset. Failed processing is final; a multipart
 // upload still receiving parts is uploading; statuses this app doesn't know count as still
 // pending, so the clip never plays before it is allowed.
 func clipStatus(asset *calmlens.Asset) string {
-	switch status := asset.Classification.Moderation.Status; {
+	decision := asset.Classification.Moderation.Decision
+	switch {
 	case asset.Classification.Status == calmlens.ClassificationStatusFailed:
 		return clipError
-	case status == calmlens.ModerationStatusAllowed, status == calmlens.ModerationStatusLimited,
-		status == calmlens.ModerationStatusAgeRestricted, status == calmlens.ModerationStatusBlocked, status == calmlens.ModerationStatusPurged:
-		return status
-	case asset.Upload.Status == uploadStatusUploading:
+	case decision != nil && slices.Contains(decisions, *decision):
+		return string(*decision)
+	case asset.Upload.Status == calmlens.UploadStatusUploading:
 		return clipUploading
 	default:
 		return clipPending
 	}
+}
+
+// decisions are the moderation decisions this app shows.
+var decisions = []calmlens.ModerationDecision{
+	calmlens.ModerationDecisionAllowed, calmlens.ModerationDecisionLimited, calmlens.ModerationDecisionAgeRestricted,
+	calmlens.ModerationDecisionBlocked, calmlens.ModerationDecisionPurged,
 }
 
 // timeline converts the findings timeline's segments into rows with the categories that scored
@@ -536,7 +543,7 @@ func clipStatus(asset *calmlens.Asset) string {
 func timeline(duration float64, segments []calmlens.MediaClassificationSegment) []segment {
 	rows := []segment{}
 	for _, s := range segments {
-		row := segment{Source: s.Source, Start: s.StartSeconds, End: s.EndSeconds}
+		row := segment{Source: string(s.Source), Start: s.StartSeconds, End: s.EndSeconds}
 		if duration > 0 {
 			row.Left = math.Max(0, math.Min(100, s.StartSeconds/duration*100))
 			row.Width = math.Max(0, math.Min(100-row.Left, (s.EndSeconds-s.StartSeconds)/duration*100))
@@ -546,11 +553,11 @@ func timeline(duration float64, segments []calmlens.MediaClassificationSegment) 
 			if (result.Status != calmlens.ResultEvaluated && result.Status != calmlens.ResultPartial) || result.Score == nil || *result.Score < findingThreshold {
 				continue
 			}
-			label := categoryLabels[id]
+			label := categoryLabels[string(id)]
 			if label == "" {
-				label = id
+				label = string(id)
 			}
-			row.Findings = append(row.Findings, finding{Category: id, Label: label, Likelihood: result.Likelihood, Score: *result.Score})
+			row.Findings = append(row.Findings, finding{Category: string(id), Label: label, Likelihood: string(result.Likelihood), Score: *result.Score})
 		}
 		sort.Slice(row.Findings, func(i, j int) bool { return row.Findings[i].Score > row.Findings[j].Score })
 		rows = append(rows, row)
@@ -576,9 +583,9 @@ func clock(seconds float64) string {
 // statusLabels name each clip state on the page.
 var statusLabels = map[string]string{
 	clipUploading: "Uploading", clipPending: "Checking", clipError: "Failed",
-	calmlens.ModerationStatusAllowed: "Approved", calmlens.ModerationStatusLimited: "Limited",
-	calmlens.ModerationStatusAgeRestricted: "Age-restricted", calmlens.ModerationStatusBlocked: "Blocked",
-	calmlens.ModerationStatusPurged: "Removed",
+	string(calmlens.ModerationDecisionAllowed): "Approved", string(calmlens.ModerationDecisionLimited): "Limited",
+	string(calmlens.ModerationDecisionAgeRestricted): "Age-restricted", string(calmlens.ModerationDecisionBlocked): "Blocked",
+	string(calmlens.ModerationDecisionPurged): "Removed",
 }
 
 func label(status string) string {
@@ -680,7 +687,7 @@ func (a *app) demoChoice(r *http.Request) (string, bool) {
 	}
 	choice := r.FormValue("demo_result")
 	switch choice {
-	case calmlens.ModerationStatusAllowed, calmlens.ModerationStatusLimited, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError:
+	case string(calmlens.ModerationDecisionAllowed), string(calmlens.ModerationDecisionLimited), string(calmlens.ModerationDecisionAgeRestricted), string(calmlens.ModerationDecisionBlocked), string(calmlens.ModerationDecisionPurged), clipError:
 		return choice, true
 	}
 	return "", false
@@ -902,7 +909,7 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 // it. The idempotency keys make those retries safe.
 func (a *app) send(ctx context.Context, key, name, contentType string, file io.ReaderAt, size int64) (*calmlens.Asset, int, error) {
 	options := calmlens.SubmitAssetOptions{
-		Name: name, Visibility: calmlens.VisibilityPrivate, ExternalID: &key, IdempotencyKey: key,
+		Name: name, Visibility: calmlens.VisibilityPrivate, ExternalID: &key, Params: calmlens.Params{IdempotencyKey: key},
 		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 	}
 	section := func(start, length int64) io.Reader { return io.NewSectionReader(file, start, length) }
@@ -925,7 +932,7 @@ func (a *app) send(ctx context.Context, key, name, contentType string, file io.R
 		return nil, 0, err
 	}
 	for n := 2; n <= total; n++ {
-		part := calmlens.UploadAssetPartOptions{AssetID: asset.ID, Part: chunk(n), IdempotencyKey: fmt.Sprintf("%s-part-%d", key, n)}
+		part := calmlens.UploadAssetPartOptions{AssetID: asset.ID, Part: chunk(n), Params: calmlens.Params{IdempotencyKey: fmt.Sprintf("%s-part-%d", key, n)}}
 		if asset, err = a.client.Assets.UploadPart(ctx, part); err != nil {
 			// The unfinished temporary upload is abandoned and expires on its own.
 			return nil, 0, err
@@ -995,7 +1002,7 @@ func (a *app) streamDemo(w http.ResponseWriter, r *http.Request, id, contentType
 	if value := r.Header.Get("Range"); value != "" {
 		headers.Set("Range", value)
 	}
-	res, err := a.client.CDN.Serve(r.Context(), calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: id, Resource: calmlens.ResourceRendered}, Headers: headers})
+	res, err := a.client.CDN.Serve(r.Context(), calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: id, Resource: calmlens.ResourceRendered}, Params: calmlens.Params{Headers: headers}})
 	if err != nil {
 		http.Error(w, "Playback unavailable", 502)
 		return
@@ -1127,7 +1134,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 	// Verify the exact raw bytes (read with a 1 MiB limit) before parsing anything.
 	event, err := calmlens.VerifyWebhookRequest(r, a.secret)
 	if err != nil {
-		if calmlens.ErrorCode(err) == calmlens.CodeSDKInvalidWebhookSignature {
+		if calmlens.CodeOf(err) == calmlens.CodeSDKInvalidWebhookSignature {
 			http.Error(w, "Invalid signature", 401)
 		} else {
 			http.Error(w, "Invalid webhook", 400)
@@ -1141,14 +1148,14 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if event.Facts.IsTest() {
-		a.record("", "test", event.Type)
+		a.record("", "test", string(event.Type))
 		a.markSeen(event.ID)
 		a.mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	var item *entry
-	if webhookEvents[event.Type] && event.AssetID != nil {
+	if webhookEvents[string(event.Type)] && event.AssetID != nil {
 		item = a.find(*event.AssetID)
 	}
 	a.mu.Unlock()
@@ -1162,7 +1169,7 @@ func (a *app) webhook(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if item != nil {
-		a.record(item.Name, item.Status, event.Type+" webhook")
+		a.record(item.Name, item.Status, string(event.Type)+" webhook")
 	}
 	a.markSeen(event.ID)
 	w.WriteHeader(http.StatusNoContent)

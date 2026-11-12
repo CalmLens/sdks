@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CalmLens/sdks/go/internal/fixtures"
+	"calmlens.com/go/calmlens/internal/fixtures"
 )
 
 // scriptedResponse is one canned answer of a fixture.
@@ -309,6 +309,7 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 			}
 		}
 		options := into[UploadAssetPartOptions](t, plain)
+		options.IdempotencyKey, _ = args["idempotencyKey"].(string)
 		if part := fixtureContent(t, args["part"]); part != nil {
 			options.Part = *part
 		}
@@ -378,7 +379,7 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	case "policies.list":
 		return one(c.Policies.List(ctx, into[ListPoliciesOptions](t, args)))
 	case "policies.retrieveAssigned":
-		return one(c.Policies.RetrieveAssigned(ctx))
+		return one(c.Policies.RetrieveAssigned(ctx, RetrieveAssignedPolicyOptions{}))
 	case "policies.retrieve":
 		return one(c.Policies.Retrieve(ctx, into[PolicyIDOptions](t, args)))
 	case "policies.create":
@@ -414,11 +415,11 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	case "uploadPresets.delete":
 		return fixtureCall{}, c.UploadPresets.Delete(ctx, into[UploadPresetIDOptions](t, args))
 	case "projectSettings.get":
-		return one(c.ProjectSettings.Get(ctx))
+		return one(c.ProjectSettings.Get(ctx, GetProjectSettingsOptions{}))
 	case "projectSettings.update":
 		return one(c.ProjectSettings.Update(ctx, into[UpdateProjectSettingsOptions](t, args)))
 	case "metadataFields.list":
-		return one(c.MetadataFields.List(ctx))
+		return one(c.MetadataFields.List(ctx, ListMetadataFieldsOptions{}))
 	case "metadataFields.ensure":
 		return one(c.MetadataFields.Ensure(ctx, into[EnsureMetadataFieldsOptions](t, args)))
 	case "metadataFields.delete":
@@ -494,8 +495,8 @@ func plain(t *testing.T, value any) any {
 	return out
 }
 
-// checkResult compares a typed result with the API JSON it should hold: the JSON decoded into
-// the result's own type (so Raw fields compare too) must equal it. A nil result is null.
+// checkResult compares a typed result with the API JSON it should hold: it must encode as the
+// JSON decoded into the result's own type does. A nil result is null.
 func checkResult(t *testing.T, label string, result any, want json.RawMessage) {
 	t.Helper()
 	value := reflect.ValueOf(result)
@@ -519,8 +520,8 @@ func checkResult(t *testing.T, label string, result any, want json.RawMessage) {
 	if typ.Kind() != reflect.Pointer {
 		expected = expected.Elem()
 	}
-	if !reflect.DeepEqual(result, expected.Interface()) {
-		got, _ := json.Marshal(result)
+	got, _ := json.Marshal(result)
+	if wantEncoded, _ := json.Marshal(expected.Interface()); !bytes.Equal(got, wantEncoded) {
 		t.Fatalf("%s: got %s\nwant %s", label, got, want)
 	}
 }
@@ -532,7 +533,7 @@ func errorFields(t *testing.T, err error) map[string]any {
 	if !errors.As(err, &e) {
 		t.Fatalf("got %v, want a *calmlens.Error", err)
 	}
-	fields := map[string]any{"code": e.Code, "status": nil, "requestId": nil, "retryAfter": nil, "details": nil}
+	fields := map[string]any{"code": string(e.Code), "status": nil, "requestId": nil, "retryAfter": nil, "details": nil}
 	if e.Status != 0 {
 		fields["status"] = float64(e.Status)
 	}
@@ -760,7 +761,7 @@ func TestPathFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, err = invoke(t, context.Background(), c, rejection.Operation, decodeArgs(t, rejection.Options))
-			if got := ErrorCode(err); got != rejection.Error || len(transport.received) != 0 {
+			if got := string(CodeOf(err)); got != rejection.Error || len(transport.received) != 0 {
 				t.Fatalf("got %q (%v) after %d requests; want %q before any request", got, err, len(transport.received), rejection.Error)
 			}
 		})
@@ -779,7 +780,7 @@ func TestPathFixtures(t *testing.T) {
 				}
 			}
 			got, err := c.CDN.GetAssetURL(fixtureCDN(t, args))
-			if got != cdn.URL || cdn.Error != "" && ErrorCode(err) != cdn.Error || cdn.Error == "" && err != nil {
+			if got != cdn.URL || cdn.Error != "" && string(CodeOf(err)) != cdn.Error || cdn.Error == "" && err != nil {
 				t.Errorf("%s: got %q, %v; want %q, %q", cdn.Options, got, err, cdn.URL, cdn.Error)
 			}
 		})
@@ -806,7 +807,7 @@ func TestAPIErrorFixtures(t *testing.T) {
 			_, err = invoke(t, context.Background(), c, fixture.Operation, decodeArgs(t, fixture.Args))
 			checkError(t, fixture.Code, err, fixture.Expected)
 			// The code constant and the status the SDK knows for it match the API's.
-			if status, ok := PublicErrorStatus(fixture.Code); !ok || float64(status) != fixture.Expected["status"] {
+			if status, ok := PublicErrorStatus(ErrorCode(fixture.Code)); !strings.HasPrefix(fixture.Code, "sdk/") && (!ok || float64(status) != fixture.Expected["status"]) {
 				t.Fatalf("PublicErrorStatus(%q) = %d, %v", fixture.Code, status, ok)
 			}
 		})

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // ---- Policies -------------------------------------------------------------------------------
@@ -16,10 +16,10 @@ import (
 
 // mockPresetNames are the built-in presets the mock knows, by display name.
 var mockPresetNames = map[string]string{
-	calmlens.PolicyPresetGeneral:            "General",
-	calmlens.PolicyPresetKids:               "Kids",
-	calmlens.PolicyPresetLearningAndSupport: "Learning and support",
-	calmlens.PolicyPresetTeenSafe:           "Teen-safe",
+	string(calmlens.PolicyPresetGeneral):            "General",
+	string(calmlens.PolicyPresetKids):               "Kids",
+	string(calmlens.PolicyPresetLearningAndSupport): "Learning and support",
+	string(calmlens.PolicyPresetTeenSafe):           "Teen-safe",
 }
 
 // mockPolicy is a stored policy: the API's fields without the derived ones, plus its reset
@@ -50,9 +50,9 @@ type policyStore struct {
 func mockPresetSettings() any {
 	categories := calmlens.JSON{}
 	for _, category := range mockCategories {
-		action := calmlens.ModerationActionBlock
-		if category == calmlens.CategoryPersonalInformation || category == calmlens.CategoryProfanity {
-			action = calmlens.ModerationActionAllow
+		action := string(calmlens.ModerationActionBlock)
+		if category == string(calmlens.CategoryPersonalInformation) || category == string(calmlens.CategoryProfanity) {
+			action = string(calmlens.ModerationActionAllow)
 		}
 		categories[category] = calmlens.JSON{"action": action, "allowances": []any{}, "restrictions": []any{}}
 	}
@@ -105,7 +105,7 @@ func (m *MockServerClient) ensurePolicies() {
 		return
 	}
 	m.policies.byID = map[string]*mockPolicy{}
-	general := m.newPolicy(mockPresetNames[calmlens.PolicyPresetGeneral], "", mockPresetSettings(), calmlens.PolicyPresetGeneral, true)
+	general := m.newPolicy(mockPresetNames[string(calmlens.PolicyPresetGeneral)], "", mockPresetSettings(), string(calmlens.PolicyPresetGeneral), true)
 	general.followsPreset = true
 	m.policies.projectPolicy = general.id
 }
@@ -120,12 +120,12 @@ func (m *MockServerClient) newPolicy(name, description string, settings any, pre
 func (m *MockServerClient) policyJSON(policy *mockPolicy) calmlens.JSON {
 	var preset any
 	if policy.presetID != "" {
-		mode := calmlens.PolicyPresetModeCopy
+		mode := string(calmlens.PolicyPresetModeCopy)
 		switch {
 		case policy.presetOwn && policy.followsPreset:
-			mode = calmlens.PolicyPresetModeLive
+			mode = string(calmlens.PolicyPresetModeLive)
 		case policy.presetOwn:
-			mode = calmlens.PolicyPresetModePinned
+			mode = string(calmlens.PolicyPresetModePinned)
 		}
 		preset = calmlens.JSON{"id": policy.presetID, "version": 1, "latestVersion": 1, "mode": mode}
 	}

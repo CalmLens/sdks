@@ -28,9 +28,9 @@ import (
 	"time"
 	"unicode/utf16"
 
-	calmlens "github.com/CalmLens/sdks/go"
-	"github.com/CalmLens/sdks/go/internal/clock"
-	"github.com/CalmLens/sdks/go/internal/contract"
+	"calmlens.com/go/calmlens"
+	"calmlens.com/go/calmlens/internal/clock"
+	"calmlens.com/go/calmlens/internal/contract"
 )
 
 // Grant is one permission grant encoded into a mock API key by CreateMockAPIKey.
@@ -60,7 +60,7 @@ type StoredContent struct {
 // API-shaped JSON maps. An asset's
 // processing, moderation and content objects are nested calmlens.JSON maps, so a test can change
 // them in place, such as
-// db.Assets[id]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = "blocked".
+// db.Assets[id]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = "blocked".
 type InMemoryDatabaseStorage struct {
 	Assets          map[string]calmlens.JSON
 	Folders         map[string]calmlens.JSON
@@ -192,16 +192,16 @@ type MockServerClient struct {
 // Failures for RequestFailure.Code besides API error codes.
 const (
 	// FailureTransportError fails the request as a reset connection would (sdk/transport-error).
-	FailureTransportError = "transport-error"
+	FailureTransportError calmlens.ErrorCode = "transport-error"
 	// FailureTimeout fails the request as an expired deadline would (sdk/timeout).
-	FailureTimeout = "timeout"
+	FailureTimeout calmlens.ErrorCode = "timeout"
 )
 
 // RequestFailure is how FailNextRequest fails a request.
 type RequestFailure struct {
 	// Code is FailureTransportError, FailureTimeout or an API error code, such as
 	// calmlens.CodeFreeUploadsExhausted, which the mock answers with its HTTP status.
-	Code string
+	Code calmlens.ErrorCode
 	// Err, instead of Code, is the transport error the request fails with: the client returns a
 	// *calmlens.Error with code sdk/transport-error wrapping it, or sdk/timeout for
 	// context.DeadlineExceeded or a net.Error whose Timeout() is true.
@@ -242,7 +242,7 @@ func checkFailure(failure RequestFailure) error {
 	case (failure.Code == "") == (failure.Err == nil):
 		return invalid("a request failure needs exactly one of Code and Err")
 	case failure.Code != "" && failure.Code != FailureTransportError && failure.Code != FailureTimeout && !apiCode:
-		return invalid("unknown request failure " + strconv.Quote(failure.Code))
+		return invalid("unknown request failure " + strconv.Quote(string(failure.Code)))
 	case failure.Operation != "" && !slices.Contains(mockOperations, failure.Operation):
 		return invalid("unknown operation " + strconv.Quote(failure.Operation))
 	case !apiCode && (failure.Details != nil || failure.RetryAfter != nil):
@@ -296,7 +296,7 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 }
 
 // EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
-// project IDs, actors (the mock's API key, which has no ID: calmlens.ActorAPIKey with a nil ID),
+// project IDs, actors (the mock's API key, which has no ID: string(calmlens.ActorAPIKey) with a nil ID),
 // severities (low), titles (the type), facts and creation times are filled in, each
 // event about an asset takes that asset's next AssetSequence like the API's (any given one is
 // ignored; events without an AssetID have none), and
@@ -312,7 +312,7 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 			event.Severity = calmlens.SeverityLow
 		}
 		if event.Title == "" {
-			event.Title = event.Type
+			event.Title = string(event.Type)
 		}
 		if event.ID == "" {
 			event.ID = m.options.CreateID("evt")
@@ -341,8 +341,8 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 			if a, err := m.asset(*event.AssetID); err == nil {
 				asset := snapshot(a)
 				// An asset.<status> event carries the moderation status it announces.
-				if status, ok := announcedStatus[event.Type]; ok {
-					section(asset, "classification")["moderation"] = calmlens.JSON{"status": status}
+				if status, ok := announcedStatus[string(event.Type)]; ok {
+					section(asset, "classification")["moderation"] = calmlens.JSON{"decision": status}
 				}
 				raw["asset"] = asset
 				data, _ = json.Marshal(raw)
@@ -356,11 +356,11 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 	return stored
 }
 
-// Decide applies a reviewer's decision (calmlens.ModerationStatusAllowed, ...Limited,
+// Decide applies a reviewer's decision (string(calmlens.ModerationStatusAllowed), ...Limited,
 // ...AgeRestricted, ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
 // changes (purged also removes the content with removal reason requested, recording an
 // asset.content-removed event first), the review joins manualReviews, and an "asset.<decision>"
-// event whose Actor is a calmlens.ActorUser joins the events feed. The moderation report stays as
+// event whose Actor is a string(calmlens.ActorUser) joins the events feed. The moderation report stays as
 // it was, except that a pending review is settled (Assets.Decide leaves it waiting, as with the
 // API). It returns a *calmlens.Error with code asset/not-found for an unknown asset, and
 // sdk/invalid-argument for another decision, such as OutcomePending or OutcomeFailed.
@@ -395,7 +395,7 @@ func (m *MockServerClient) CompleteProcessing(assetID string, decision *Decision
 		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
 	}
 	rerun := m.reruns[assetID]
-	if !rerun && section(a, "classification")["status"] != calmlens.ClassificationStatusProcessing {
+	if !rerun && text(section(a, "classification")["status"]) != string(calmlens.ClassificationStatusProcessing) {
 		return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Asset " + assetID + " isn't processing"}
 	}
 	if decision == nil {
@@ -432,31 +432,31 @@ func toAsset(a calmlens.JSON) (*calmlens.Asset, error) {
 func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note any) {
 	// Like the API: a queued re-run no longer replaces a reviewed decision.
 	delete(m.reruns, text(a["id"]))
-	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested, nil)
+	m.applyOutcome(a, decision, string(calmlens.ContentRemovalReasonRequested), nil)
 	now := m.options.Now()
 	moderation := section(section(a, "classification"), "moderation")
 	reviews, _ := moderation["manualReviews"].([]any)
 	moderation["manualReviews"] = append(reviews, calmlens.JSON{
 		"id": m.options.CreateID("rev"), "decision": decision, "note": note,
 		// The review is the mock API key's, and mock API keys have no ID.
-		"decidedBy": calmlens.JSON{"type": calmlens.ReviewActorAPIKey, "id": nil}, "reviewedAt": now, "applied": true,
+		"decidedBy": calmlens.JSON{"type": string(calmlens.ReviewActorAPIKey), "id": nil}, "reviewedAt": now, "applied": true,
 	})
 	actor := mockAPIKeyActor
 	if note == nil {
 		actor = mockReviewerActor
 	}
 	if decision == OutcomePurged {
-		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a, actor, "")
+		m.recordLifecycleEvent(string(calmlens.EventAssetContentRemoved), a, actor, "")
 	}
 	// Like the event catalog: only allowing and limiting are low severity.
-	severity := calmlens.SeverityHigh
+	severity := string(calmlens.SeverityHigh)
 	if decision == OutcomeAllowed || decision == OutcomeLimited {
-		severity = calmlens.SeverityLow
+		severity = string(calmlens.SeverityLow)
 	}
 	m.addEvent("asset."+decision, severity, a, actor, []any{
-		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
-		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])},
-		calmlens.JSON{"key": calmlens.FactNote, "value": note},
+		calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
+		calmlens.JSON{"key": string(calmlens.FactAssetName), "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])},
+		calmlens.JSON{"key": string(calmlens.FactNote), "value": note},
 	})
 }
 
@@ -494,11 +494,11 @@ func (m *MockServerClient) decideAsset(id string, body calmlens.JSON) (any, erro
 	if err != nil {
 		return nil, err
 	}
-	status := section(section(a, "classification"), "moderation")["status"]
+	status := section(section(a, "classification"), "moderation")["decision"]
 	switch {
-	case section(a, "upload")["status"] == "uploading" || section(a, "classification")["status"] == calmlens.ClassificationStatusProcessing:
+	case section(a, "upload")["status"] == "uploading" || text(section(a, "classification")["status"]) == string(calmlens.ClassificationStatusProcessing):
 		return nil, fail(calmlens.CodeAssetProcessing)
-	case status == calmlens.ModerationStatusPending && decision != OutcomeBlocked && decision != OutcomePurged:
+	case status == nil && decision != OutcomeBlocked && decision != OutcomePurged:
 		return nil, fail(calmlens.CodeAssetDecisionNotAllowed)
 	case status == decision:
 		return nil, fail(calmlens.CodeAssetDecisionUnchanged)
@@ -512,11 +512,11 @@ func (m *MockServerClient) decideAsset(id string, body calmlens.JSON) (any, erro
 // contentPurged is whether an asset's content was purged, like the API: it was purged by a
 // reviewer, or removed by policy.
 func contentPurged(a calmlens.JSON) bool {
-	if section(section(a, "classification"), "moderation")["status"] == calmlens.ModerationStatusPurged {
+	if text(section(section(a, "classification"), "moderation")["decision"]) == string(calmlens.ModerationStatusPurged) {
 		return true
 	}
 	content := section(a, "content")
-	if content["status"] == calmlens.ContentStatusRemoved && (content["removalReason"] == calmlens.ContentRemovalReasonPolicy || content["removalReason"] == calmlens.ContentRemovalReasonDisposed) {
+	if text(content["status"]) == string(calmlens.ContentStatusRemoved) && (text(content["removalReason"]) == string(calmlens.ContentRemovalReasonPolicy) || text(content["removalReason"]) == string(calmlens.ContentRemovalReasonDisposed)) {
 		return true
 	}
 	reviews, _ := section(section(a, "classification"), "moderation")["manualReviews"].([]any)
@@ -555,15 +555,15 @@ func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON,
 // by actor, like the API, with the batch-id fact when batchID is set. A deleted asset has no
 // portal page to link its name to.
 func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSON, actor calmlens.Actor, batchID string) {
-	name := calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"]}
-	if eventType != calmlens.EventAssetDeleted {
+	name := calmlens.JSON{"key": string(calmlens.FactAssetName), "value": a["name"]}
+	if eventType != string(calmlens.EventAssetDeleted) {
 		name["url"] = "https://calmlens.com/go/asset/" + text(a["id"])
 	}
-	facts := []any{name, calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]}}
+	facts := []any{name, calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]}}
 	if batchID != "" {
-		facts = append(facts, calmlens.JSON{"key": calmlens.FactBatchID, "value": batchID})
+		facts = append(facts, calmlens.JSON{"key": string(calmlens.FactBatchID), "value": batchID})
 	}
-	m.addEvent(eventType, calmlens.SeverityLow, a, actor, facts)
+	m.addEvent(eventType, string(calmlens.SeverityLow), a, actor, facts)
 }
 
 // snapshot is the asset summary events carry.
@@ -581,7 +581,7 @@ func snapshot(a calmlens.JSON) calmlens.JSON {
 		"classification": calmlens.JSON{
 			"status":     section(a, "classification")["status"],
 			"testInput":  section(a, "classification")["testInput"],
-			"moderation": calmlens.JSON{"status": section(section(a, "classification"), "moderation")["status"]},
+			"moderation": calmlens.JSON{"decision": section(section(a, "classification"), "moderation")["decision"]},
 		},
 	}
 }
@@ -723,14 +723,14 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // apiError is an API failure with the status the API uses for its code.
 type apiError struct {
-	code    string
+	code    calmlens.ErrorCode
 	status  int
 	details calmlens.JSON
 }
 
-func (e *apiError) Error() string { return e.code }
+func (e *apiError) Error() string { return string(e.code) }
 
-func fail(code string) error {
+func fail(code calmlens.ErrorCode) error {
 	status, ok := calmlens.PublicErrorStatus(code)
 	if !ok {
 		status = http.StatusBadRequest
@@ -1122,7 +1122,7 @@ func (m *MockServerClient) unique(name, parent, exclude any) error {
 }
 
 func text(value any) string {
-	if s, ok := value.(string); ok {
+	if s, ok := plain(value).(string); ok {
 		return s
 	}
 	return ""
@@ -1162,7 +1162,7 @@ func checkMetadata(metadata any) error {
 
 // validation is a request the API's schema refuses: validation/invalid-request with HTTP 400,
 // listing the field and its issue code (such as validation/too-big) in details.issues.
-func validation(code, path string) error {
+func validation(code calmlens.ErrorCode, path string) error {
 	issue := calmlens.JSON{"path": path, "message": "Invalid " + path, "code": code}
 	return &apiError{code: calmlens.CodeInvalidRequest, status: http.StatusBadRequest, details: calmlens.JSON{"issues": []any{issue}}}
 }
@@ -1584,9 +1584,9 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 		return nil, &apiError{code: calmlens.CodeUnsupportedUploadType, status: http.StatusUnsupportedMediaType, details: calmlens.JSON{"mimeType": mime, "source": "calmlens"}}
 	}
 	lower := strings.ToLower(mime)
-	kind := calmlens.AssetTypeFile
+	kind := string(calmlens.AssetTypeFile)
 	if options["url"] != nil {
-		kind = calmlens.AssetTypeWebsite
+		kind = string(calmlens.AssetTypeWebsite)
 	} else {
 		for _, prefix := range []string{"image", "video", "audio"} {
 			if strings.HasPrefix(lower, prefix+"/") {
@@ -1594,10 +1594,10 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 			}
 		}
 		if strings.HasPrefix(lower, "text/") {
-			kind = calmlens.AssetTypePlaintextDocument
+			kind = string(calmlens.AssetTypePlaintextDocument)
 		}
 		if strings.Contains(lower, "pdf") || strings.Contains(lower, "document") {
-			kind = calmlens.AssetTypeMultimediaDocument
+			kind = string(calmlens.AssetTypeMultimediaDocument)
 		}
 	}
 	// wait=false queues the asset; a multipart upload saves the choice for its final part.
@@ -1666,13 +1666,13 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	if asJSON(processingOptions)["retainContent"] == nil {
 		asJSON(processingOptions)["retainContent"] = asJSON(m.projectSettings()["settings"])["retainContent"]
 	}
-	contentStatus := calmlens.ContentStatusTemporary
+	contentStatus := string(calmlens.ContentStatusTemporary)
 	if keep, _ := asJSON(processingOptions)["retainContent"].(bool); keep {
-		contentStatus = calmlens.ContentStatusStored
+		contentStatus = string(calmlens.ContentStatusStored)
 	}
 	visibility := orNull("visibility")
 	if visibility == nil {
-		visibility = calmlens.VisibilityPrivate
+		visibility = string(calmlens.VisibilityPrivate)
 	}
 	externalURL := orNull("externalUrl")
 	if options["url"] != nil {
@@ -1704,8 +1704,8 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
-	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
-		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{},
+	classification := calmlens.JSON{"status": string(calmlens.ClassificationStatusProcessing), "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
+		"testInput": false, "moderation": calmlens.JSON{"decision": nil, "manualReviews": []any{},
 			// Like the API, moderation's findings are null until moderation decides.
 			"automatedStatus": nil, "policy": nil, "pendingReview": nil, "source": nil, "rule": nil, "explanationComplete": nil, "categories": nil, "raw": nil, "linkSafety": nil,
 			"flaggedCategories": []any{}, "regions": []any{}, "timeline": nil},
@@ -1714,7 +1714,7 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
-		classification["status"] = calmlens.ClassificationStatusQueued
+		classification["status"] = string(calmlens.ClassificationStatusQueued)
 	}
 	a["content"], a["upload"], a["classification"] = content, uploadState, classification
 	if options["url"] == nil {
@@ -1776,7 +1776,7 @@ func usedContext(value any) (any, error) {
 
 // imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, at any size below.
 func imageSizeError(kind string, size int64, final bool) error {
-	if kind == calmlens.AssetTypeImage && size > maxMultipartImage {
+	if kind == string(calmlens.AssetTypeImage) && size > maxMultipartImage {
 		return &apiError{code: calmlens.CodeUploadTooLarge, status: http.StatusRequestEntityTooLarge, details: calmlens.JSON{"limitBytes": maxMultipartImage, "source": "plan"}}
 	}
 	return nil
@@ -1803,7 +1803,7 @@ func totalSizeError(total *int64, received int64, final bool) error {
 // the decision's error when the decision is invalid.
 func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued bool, data []byte) (*Decision, error) {
 	if data == nil {
-		if stored := m.ImageStorage.Content[text(a["id"])]; stored != nil && section(a, "content")["status"] != calmlens.ContentStatusRemoved {
+		if stored := m.ImageStorage.Content[text(a["id"])]; stored != nil && text(section(a, "content")["status"]) != string(calmlens.ContentStatusRemoved) {
 			numbers := make([]int, 0, len(stored.Parts))
 			for number := range stored.Parts {
 				numbers = append(numbers, number)
@@ -1822,7 +1822,7 @@ func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued b
 	input := ModerationInput{Asset: asset, Trigger: trigger, Queued: queued}
 	if data != nil {
 		input.Content.Bytes = slices.Clone(data)
-		if a["type"] == calmlens.AssetTypePlaintextDocument {
+		if text(a["type"]) == string(calmlens.AssetTypePlaintextDocument) {
 			decoded := string(data)
 			input.Content.Text = &decoded
 		}
@@ -1842,23 +1842,23 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if decision.status == OutcomePending {
 		return
 	}
-	m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report(m.options.Now()))
+	m.applyOutcome(a, decision.status, string(calmlens.ContentRemovalReasonPolicy), decision.report(m.options.Now()))
 	classification := section(a, "classification")
-	if a["type"] != calmlens.AssetTypeImage || classification["status"] != calmlens.ClassificationStatusCompleted {
+	if text(a["type"]) != string(calmlens.AssetTypeImage) || text(classification["status"]) != string(calmlens.ClassificationStatusCompleted) {
 		return
 	}
 	features := asJSON(m.processingOptions[a["id"].(string)]["features"])
 	if enabled, _ := asJSON(features["ocr"])["enabled"].(bool); enabled {
-		classification["ocr"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "textRegions": []any{}}
+		classification["ocr"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "textRegions": []any{}}
 	}
 	if enabled, set := asJSON(features["linkDetection"])["enabled"].(bool); enabled || !set {
-		classification["linkDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "qrCodes": []any{}, "links": []any{}}
+		classification["linkDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "qrCodes": []any{}, "links": []any{}}
 	}
 	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
-		classification["personDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "people": []any{}}
+		classification["personDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "people": []any{}}
 	}
 	if enabled, _ := asJSON(features["faceDetection"])["enabled"].(bool); enabled {
-		classification["faceDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "faces": []any{}}
+		classification["faceDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "faces": []any{}}
 	}
 }
 
@@ -1896,10 +1896,10 @@ func (m *MockServerClient) moderateStored(a calmlens.JSON, trigger string) error
 // recordUploaded records asset.uploaded as the API does when an upload completes, with uploaded,
 // the asset's snapshot from before moderation.
 func (m *MockServerClient) recordUploaded(a, uploaded calmlens.JSON) {
-	m.addEvent(calmlens.EventAssetUploaded, calmlens.SeverityLow, a, mockAPIKeyActor, []any{
-		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+	m.addEvent(string(calmlens.EventAssetUploaded), string(calmlens.SeverityLow), a, mockAPIKeyActor, []any{
+		calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
 		assetNameFact(a),
-		calmlens.JSON{"key": calmlens.FactFileFormat, "value": section(a, "content")["format"]},
+		calmlens.JSON{"key": string(calmlens.FactFileFormat), "value": section(a, "content")["format"]},
 	})
 	m.events[len(m.events)-1]["asset"] = uploaded
 }
@@ -1913,38 +1913,38 @@ func (m *MockServerClient) recordProcessingEvents(a calmlens.JSON, decision *Dec
 	case OutcomeFailed:
 		reason := section(a, "classification")["failureReason"]
 		if reason == nil {
-			reason = calmlens.AssetFailureReasonProcessingError
+			reason = string(calmlens.AssetFailureReasonProcessingError)
 		}
-		m.addEvent(calmlens.EventAssetFailed, calmlens.SeverityHigh, a, automatedActor, []any{
+		m.addEvent(string(calmlens.EventAssetFailed), string(calmlens.SeverityHigh), a, automatedActor, []any{
 			assetNameFact(a),
-			calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
-			calmlens.JSON{"key": calmlens.FactPreviousStatus, "value": calmlens.ClassificationStatusProcessing},
-			calmlens.JSON{"key": calmlens.FactFailureReason, "value": reason},
+			calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
+			calmlens.JSON{"key": string(calmlens.FactPreviousStatus), "value": string(calmlens.ClassificationStatusProcessing)},
+			calmlens.JSON{"key": string(calmlens.FactFailureReason), "value": reason},
 		})
 		return
 	}
 	flagged := decision.flaggedCategories()
-	m.addEvent(calmlens.EventAssetClassified, calmlens.SeverityLow, a, automatedActor, []any{
-		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
-		calmlens.JSON{"key": calmlens.FactModerationStatus, "value": decision.status},
-		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+	m.addEvent(string(calmlens.EventAssetClassified), string(calmlens.SeverityLow), a, automatedActor, []any{
+		calmlens.JSON{"key": string(calmlens.FactFlaggedCategories), "value": flagged},
+		calmlens.JSON{"key": string(calmlens.FactModerationStatus), "value": decision.status},
+		calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
 		assetNameFact(a),
 	})
 	// Like the event catalog: only allowing and limiting are low severity.
-	severity := calmlens.SeverityHigh
+	severity := string(calmlens.SeverityHigh)
 	if decision.status == OutcomeAllowed || decision.status == OutcomeLimited {
-		severity = calmlens.SeverityLow
+		severity = string(calmlens.SeverityLow)
 	}
 	m.addEvent("asset."+decision.status, severity, a, automatedActor, []any{
-		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
-		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+		calmlens.JSON{"key": string(calmlens.FactFlaggedCategories), "value": flagged},
+		calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
 		assetNameFact(a),
 	})
 }
 
 // assetNameFact is the asset-name fact linking to the asset's portal page.
 func assetNameFact(a calmlens.JSON) calmlens.JSON {
-	return calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])}
+	return calmlens.JSON{"key": string(calmlens.FactAssetName), "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])}
 }
 
 // asJSON returns value as a JSON object, or an empty one when it is not an object.
@@ -2018,20 +2018,20 @@ func setRendering(a calmlens.JSON, processed bool) {
 	rendered := func(kind calmlens.AssetRenderedKind, format string) calmlens.JSON {
 		return calmlens.JSON{"kind": string(kind), "format": format, "width": nil, "height": nil}
 	}
-	rendersOnUpload := kind == calmlens.AssetTypeImage || mime == "application/pdf" ||
-		(kind == calmlens.AssetTypeVideo || kind == calmlens.AssetTypeAudio) && browserSafe
+	rendersOnUpload := kind == string(calmlens.AssetTypeImage) || mime == "application/pdf" ||
+		(kind == string(calmlens.AssetTypeVideo) || kind == string(calmlens.AssetTypeAudio)) && browserSafe
 	if !processed && !rendersOnUpload {
 		return
 	}
 	switch kind {
-	case calmlens.AssetTypeImage:
+	case string(calmlens.AssetTypeImage):
 		if format == "" {
 			format = "image/png"
 		}
 		content["rendered"], content["preview"] = rendered(calmlens.AssetRenderedKindImage, format), preview(nil, nil)
-	case calmlens.AssetTypeWebsite:
+	case string(calmlens.AssetTypeWebsite):
 		content["rendered"], content["preview"] = rendered(calmlens.AssetRenderedKindImage, "image/png"), preview(nil, nil)
-	case calmlens.AssetTypeMultimediaDocument:
+	case string(calmlens.AssetTypeMultimediaDocument):
 		if contains(spreadsheetMimeTypes, mime) {
 			return
 		}
@@ -2039,12 +2039,12 @@ func setRendering(a calmlens.JSON, processed bool) {
 		if processed {
 			content["preview"] = preview(nil, nil)
 		}
-	case calmlens.AssetTypeVideo:
+	case string(calmlens.AssetTypeVideo):
 		if !browserSafe {
 			format = "video/mp4"
 		}
 		content["rendered"] = rendered(calmlens.AssetRenderedKindVideo, format)
-	case calmlens.AssetTypeAudio:
+	case string(calmlens.AssetTypeAudio):
 		if !browserSafe {
 			format = "audio/mp4"
 		}
@@ -2066,16 +2066,16 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	now := m.options.Now()
 	decided := outcome != OutcomePending && outcome != OutcomeFailed
 	processing, moderation, content := section(a, "classification"), section(section(a, "classification"), "moderation"), section(a, "content")
-	removed := content["status"] == calmlens.ContentStatusRemoved
+	removed := text(content["status"]) == string(calmlens.ContentStatusRemoved)
 	purge := outcome == OutcomePurged && !removed
-	removeContent := purge || decided && content["status"] == calmlens.ContentStatusTemporary
+	removeContent := purge || decided && text(content["status"]) == string(calmlens.ContentStatusTemporary)
 	if !removed && !purge && content["safetyHold"] == nil {
 		setRendering(a, decided)
 	} else {
 		clearRendering(content)
 	}
 	if removeContent {
-		reason := calmlens.ContentRemovalReasonRetention
+		reason := string(calmlens.ContentRemovalReasonRetention)
 		if purge {
 			reason = purgeReason
 		}
@@ -2086,21 +2086,21 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	processing["updatedAt"] = now
 	processing["completedAt"] = nil
 	processing["failureReason"] = nil
-	moderation["status"] = calmlens.ModerationStatusPending
+	moderation["decision"] = nil
 	for key, value := range report {
 		moderation[key] = value
 	}
 	switch {
 	case decided:
-		processing["status"] = calmlens.ClassificationStatusCompleted
-		moderation["status"] = outcome
+		processing["status"] = string(calmlens.ClassificationStatusCompleted)
+		moderation["decision"] = outcome
 		processing["completedAt"] = now
 	case outcome == OutcomeFailed:
-		processing["status"] = calmlens.ClassificationStatusFailed
+		processing["status"] = string(calmlens.ClassificationStatusFailed)
 		// The mock has no content checks, so a failure is always a processing error.
-		processing["failureReason"] = calmlens.AssetFailureReasonProcessingError
+		processing["failureReason"] = string(calmlens.AssetFailureReasonProcessingError)
 	default:
-		processing["status"] = calmlens.ClassificationStatusProcessing
+		processing["status"] = string(calmlens.ClassificationStatusProcessing)
 	}
 	a["updatedAt"] = now
 }
@@ -2111,10 +2111,10 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 	delete(m.ImageStorage.Content, text(a["id"]))
 	a["context"] = nil
 	content := section(a, "content")
-	if content["status"] == calmlens.ContentStatusRemoved {
+	if text(content["status"]) == string(calmlens.ContentStatusRemoved) {
 		return
 	}
-	content["status"] = calmlens.ContentStatusRemoved
+	content["status"] = string(calmlens.ContentStatusRemoved)
 	content["removalReason"] = reason
 	content["updatedAt"] = now
 	content["extractedText"] = nil
@@ -2128,14 +2128,14 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 // with the batch-id fact when batchID is set.
 func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64, batchID string) {
 	content := section(a, "content")
-	if content["status"] == calmlens.ContentStatusRemoved {
+	if text(content["status"]) == string(calmlens.ContentStatusRemoved) {
 		delete(m.ImageStorage.Content, text(a["id"]))
 		clearRendering(content)
 	} else {
-		m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
+		m.removeContent(a, string(calmlens.ContentRemovalReasonRequested), now)
 		a["updatedAt"] = now
 	}
-	m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a, mockAPIKeyActor, batchID)
+	m.recordLifecycleEvent(string(calmlens.EventAssetContentRemoved), a, mockAPIKeyActor, batchID)
 }
 
 // assetIDPattern is the asset ID form the API's schema accepts.
@@ -2211,13 +2211,13 @@ func (m *MockServerClient) batchAssets(body calmlens.JSON, now int64) (any, erro
 	batchID := m.options.CreateID("batch")
 	for _, a := range assets {
 		if operation == calmlens.AssetBatchOperationDelete {
-			m.recordLifecycleEvent(calmlens.EventAssetDeleted, a, mockAPIKeyActor, batchID)
+			m.recordLifecycleEvent(string(calmlens.EventAssetDeleted), a, mockAPIKeyActor, batchID)
 			m.deleteAssetTree(text(a["id"]))
 		} else {
 			m.requestContentRemoval(a, now, batchID)
 		}
 	}
-	return calmlens.JSON{"batchId": batchID, "status": calmlens.BatchStatusQueued, "assetCount": len(assets)}, nil
+	return calmlens.JSON{"batchId": batchID, "status": string(calmlens.BatchStatusQueued), "assetCount": len(assets)}, nil
 }
 
 // deleteAssetTree deletes an asset, its stored child assets and their content.
@@ -2257,7 +2257,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 	switch {
 	case method == "GET" && suffix == "":
 	case method == "DELETE" && suffix == "":
-		m.recordLifecycleEvent(calmlens.EventAssetDeleted, a, mockAPIKeyActor, "")
+		m.recordLifecycleEvent(string(calmlens.EventAssetDeleted), a, mockAPIKeyActor, "")
 		delete(m.ImageStorage.Content, id)
 		delete(m.DatabaseStorage.Assets, id)
 		delete(m.uploads, id)
@@ -2281,21 +2281,21 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
 	case method == "POST" && suffix == "retry":
 		classification := section(a, "classification")
-		if classification["status"] != calmlens.ClassificationStatusFailed || section(classification, "moderation")["status"] != calmlens.ModerationStatusPending {
+		if text(classification["status"]) != string(calmlens.ClassificationStatusFailed) || section(classification, "moderation")["decision"] != nil {
 			return nil, fail(calmlens.CodeAssetNotRetryable)
 		}
-		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
+		if text(section(a, "content")["status"]) == string(calmlens.ContentStatusRemoved) {
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
 		// Like the API: back to processing, to be moderated again, with an asset.retried event.
-		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
-		m.recordLifecycleEvent(calmlens.EventAssetRetried, a, mockAPIKeyActor, "")
+		m.applyOutcome(a, OutcomePending, string(calmlens.ContentRemovalReasonPolicy), nil)
+		m.recordLifecycleEvent(string(calmlens.EventAssetRetried), a, mockAPIKeyActor, "")
 		if err := m.moderateStored(a, TriggerRetry); err != nil {
 			return nil, err
 		}
 	case method == "POST" && suffix == "explain":
 		classification := section(a, "classification")
-		if classification["status"] != calmlens.ClassificationStatusCompleted {
+		if text(classification["status"]) != string(calmlens.ClassificationStatusCompleted) {
 			return nil, fail(calmlens.CodeAssetNotDecided)
 		}
 		moderation := section(classification, "moderation")
@@ -2310,15 +2310,15 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		if reviews, _ := moderation["manualReviews"].([]any); len(reviews) > 0 {
 			return nil, fail(calmlens.CodeAssetReviewed)
 		}
-		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
+		if text(section(a, "content")["status"]) == string(calmlens.ContentStatusRemoved) {
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
 		// Like the API: the request is recorded, and the asset returns as it was. It keeps its
 		// decision while it's moderated again under the current policy.
-		m.addEvent(calmlens.EventAssetRerunRequested, calmlens.SeverityLow, a, mockAPIKeyActor, []any{
+		m.addEvent(string(calmlens.EventAssetRerunRequested), string(calmlens.SeverityLow), a, mockAPIKeyActor, []any{
 			assetNameFact(a),
-			calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
-			calmlens.JSON{"key": calmlens.FactModerationStatus, "value": moderation["status"]},
+			calmlens.JSON{"key": string(calmlens.FactAssetType), "value": a["type"]},
+			calmlens.JSON{"key": string(calmlens.FactModerationStatus), "value": moderation["decision"]},
 		})
 		response := cloneJSON(a).(calmlens.JSON)
 		decision, err := m.decisionFor(a, TriggerRerun, true, nil)
@@ -2394,7 +2394,7 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 		queue = override == "false"
 	}
 	delete(m.uploads, id)
-	m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
+	m.applyOutcome(a, OutcomePending, string(calmlens.ContentRemovalReasonPolicy), nil)
 	decision, err := m.decisionFor(a, TriggerUpload, queue, nil)
 	if err != nil {
 		return err
@@ -2696,7 +2696,7 @@ func keysetPage(items []calmlens.JSON, ordering []sortRule, encoded, scope strin
 const maxSearchTokens = 8
 
 // searchFields are the keyword fields the API searches, in the order it reports matches.
-var searchFields = []string{"name", "id", "externalId", "description", "tags", "type", "content.format", "content.extension", "classification.moderation.status"}
+var searchFields = []string{"name", "id", "externalId", "description", "tags", "type", "content.format", "content.extension", "classification.moderation.decision"}
 
 // search runs keyword search as the API does: the trimmed, lowercased query is split on
 // whitespace into at most 8 distinct words, and an asset matches when every word appears in
@@ -2835,7 +2835,7 @@ const mockEmbedHTML = `<!doctype html><html lang="en"><head><meta charset="utf-8
 // a private asset fetched without a grant or download permission is always 404 asset/not-found,
 // including its placeholder and /info.
 func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, header http.Header) (int, []byte, string) {
-	errorBody := func(status int, code, message string) (int, []byte, string) {
+	errorBody := func(status int, code calmlens.ErrorCode, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
 		return status, data, "application/json"
 	}
@@ -2913,14 +2913,14 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	// Like the CDN, a private asset answers anyone without a grant or the project's API key as an
 	// unknown asset does, whatever its state. Its placeholder requires download access.
-	if asset["visibility"] != calmlens.VisibilityPublic && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
+	if text(asset["visibility"]) != string(calmlens.VisibilityPublic) && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
 		resource != calmlens.ResourceInfo {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
 	if resource == calmlens.ResourceInfo {
 		return m.serveInfo(req, asset, canDownload(), header)
 	}
-	moderation := section(section(asset, "classification"), "moderation")["status"]
+	moderation := text(section(section(asset, "classification"), "moderation")["decision"])
 	tag := "asset-" + text(asset["id"])
 	content := section(asset, "content")
 	rendered, preview := asJSON(content["rendered"]), asJSON(content["preview"])
@@ -2929,15 +2929,15 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		return notAvailable()
 	}
 	if resource == calmlens.ResourcePlaceholder {
-		if asset["visibility"] != calmlens.VisibilityPublic && !canDownload() {
+		if text(asset["visibility"]) != string(calmlens.VisibilityPublic) && !canDownload() {
 			return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 		}
-		if moderation == calmlens.ModerationStatusBlocked && !canDownload() {
+		if moderation == string(calmlens.ModerationStatusBlocked) && !canDownload() {
 			return notAvailable()
 		}
 		// A preview requires access for private or blocked assets and disappears with its content.
 		thumbhash := text(preview["thumbhash"])
-		if thumbhash == "" || moderation == calmlens.ModerationStatusPurged {
+		if thumbhash == "" || moderation == string(calmlens.ModerationStatusPurged) {
 			return notAvailable()
 		}
 		png, err := placeholderPNG(thumbhash)
@@ -2945,7 +2945,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 			return notAvailable()
 		}
 		header.Set("Cache-Control", "public, no-cache")
-		if asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusBlocked {
+		if text(asset["visibility"]) != string(calmlens.VisibilityPublic) || moderation == string(calmlens.ModerationStatusBlocked) {
 			header.Set("Cache-Control", "private, no-store")
 		}
 		header.Set("Cache-Tag", tag)
@@ -2956,19 +2956,19 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// blocked or purged, failed processing or removed content, and an original with no bytes.
 	stored := m.ImageStorage.Content[text(asset["id"])]
 	if resource == calmlens.ResourceOriginal && stored == nil || section(asset, "upload")["status"] == "uploading" ||
-		moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged ||
-		section(asset, "classification")["status"] == calmlens.ClassificationStatusFailed ||
-		content["status"] == calmlens.ContentStatusRemoved {
+		moderation == string(calmlens.ModerationStatusBlocked) || moderation == string(calmlens.ModerationStatusPurged) ||
+		text(section(asset, "classification")["status"]) == string(calmlens.ClassificationStatusFailed) ||
+		text(content["status"]) == string(calmlens.ContentStatusRemoved) {
 		return notAvailable()
 	}
 	// Then access: an age-restricted asset needs viewerClaims.ageConfirmed=true whatever the key,
 	// and a private asset needs the download permission for its folder.
 	claims := map[string]any{}
 	_ = json.Unmarshal([]byte(req.URL.Query().Get("viewerClaims")), &claims)
-	if moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true {
+	if moderation == string(calmlens.ModerationStatusAgeRestricted) && claims["ageConfirmed"] != true {
 		return errorBody(403, "viewer/age-confirmation-required", "Age confirmation required")
 	}
-	restricted := asset["visibility"] != calmlens.VisibilityPublic
+	restricted := text(asset["visibility"]) != string(calmlens.VisibilityPublic)
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, calmlens.CodePermissionDenied, "This API key needs assets:download permission for this asset's folder.")
 	}
@@ -2993,7 +2993,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		!contains([]string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview}, resource) {
 		return noRenderedVersion()
 	}
-	renderedImage := rendered["kind"] == string(calmlens.AssetRenderedKindImage)
+	renderedImage := text(rendered["kind"]) == string(calmlens.AssetRenderedKindImage)
 	still := resource == calmlens.ResourcePreview || resource == calmlens.ResourceRendered && renderedImage
 	if !still && hasSelector {
 		return invalidTransform()
@@ -3008,7 +3008,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// The bytes: the upload, which stands in for its own rendered file and an image's preview,
 	// or the placeholder PNG for a still the mock doesn't make.
 	servesUpload := resource == calmlens.ResourceOriginal || resource == calmlens.ResourceRendered && !renderedImage ||
-		asset["type"] == calmlens.AssetTypeImage
+		text(asset["type"]) == string(calmlens.AssetTypeImage)
 	var data []byte
 	var contentType string
 	if servesUpload {
@@ -3047,7 +3047,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if restricted {
 		access = "private"
 	}
-	if still || resource == calmlens.ResourceOriginal && asset["type"] == calmlens.AssetTypeImage {
+	if still || resource == calmlens.ResourceOriginal && text(asset["type"]) == string(calmlens.AssetTypeImage) {
 		lifetime = fmt.Sprintf("max-age=%d, immutable", imageCacheLifetime)
 		header.Set("ETag", strconv.Quote(text(asset["id"])))
 		header.Set("Expires", time.UnixMilli(m.options.Now()).Add(imageCacheLifetime*time.Second).UTC().Format(http.TimeFormat))
@@ -3070,11 +3070,11 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 // viewer the claims describe can see the content, decided as the other resources decide it. A
 // private asset's info needs a grant or an API key with assets:download.
 func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, authorised bool, header http.Header) (int, []byte, string) {
-	errorBody := func(status int, code, message string) (int, []byte, string) {
+	errorBody := func(status int, code calmlens.ErrorCode, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
 		return status, data, "application/json"
 	}
-	private := asset["visibility"] != calmlens.VisibilityPublic
+	private := text(asset["visibility"]) != string(calmlens.VisibilityPublic)
 	if private && !authorised {
 		return errorBody(http.StatusNotFound, "asset/not-found", "Asset not found")
 	}
@@ -3084,19 +3084,19 @@ func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, aut
 	}
 	content := section(asset, "content")
 	classification := section(asset, "classification")
-	moderation := section(classification, "moderation")["status"]
-	restricted := private || moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged
+	moderation := text(section(classification, "moderation")["decision"])
+	restricted := private || moderation == string(calmlens.ModerationStatusBlocked) || moderation == string(calmlens.ModerationStatusPurged)
 	if restricted && !authorised {
 		return errorBody(http.StatusForbidden, "asset/not-available", "Asset is not available")
 	}
-	availability := calmlens.AssetAvailabilityAvailable
+	availability := string(calmlens.AssetAvailabilityAvailable)
 	switch {
 	case content["safetyHold"] != nil, section(asset, "upload")["status"] == "uploading",
-		moderation == calmlens.ModerationStatusBlocked, moderation == calmlens.ModerationStatusPurged,
-		classification["status"] == calmlens.ClassificationStatusFailed, content["status"] == calmlens.ContentStatusRemoved:
-		availability = calmlens.AssetAvailabilityUnavailable
-	case moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true:
-		availability = calmlens.AssetAvailabilityAgeRestricted
+		moderation == string(calmlens.ModerationStatusBlocked), moderation == string(calmlens.ModerationStatusPurged),
+		text(classification["status"]) == string(calmlens.ClassificationStatusFailed), text(content["status"]) == string(calmlens.ContentStatusRemoved):
+		availability = string(calmlens.AssetAvailabilityUnavailable)
+	case moderation == string(calmlens.ModerationStatusAgeRestricted) && claims["ageConfirmed"] != true:
+		availability = string(calmlens.AssetAvailabilityAgeRestricted)
 	}
 	info := calmlens.JSON{
 		"id": asset["id"], "projectId": asset["projectId"], "type": asset["type"], "externalUrl": asset["externalUrl"],
@@ -3196,7 +3196,7 @@ func (m *MockServerClient) listHashLists(q url.Values) (any, error) {
 }
 
 func validHashListAction(value any) bool {
-	return value == calmlens.HashListActionFlag || value == calmlens.HashListActionBlock
+	return value == string(calmlens.HashListActionFlag) || value == string(calmlens.HashListActionBlock)
 }
 
 func (m *MockServerClient) createHashList(body calmlens.JSON, now int64) (any, error) {

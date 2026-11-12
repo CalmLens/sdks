@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	calmlens "github.com/CalmLens/sdks/go"
-	"github.com/CalmLens/sdks/go/internal/fixtures"
+	"calmlens.com/go/calmlens"
+	"calmlens.com/go/calmlens/internal/fixtures"
 )
 
 // Every capability a server SDK must offer (testdata/surface.json, packages/sdk-contract/surface.ts)
@@ -52,17 +52,17 @@ var surfaceConstants = map[string]string{
 	"WebhookDeliveryHeader":          calmlens.WebhookDeliveryHeader,
 	"WebhookTimestampHeader":         calmlens.WebhookTimestampHeader,
 	"WebhookSignatureHeader":         calmlens.WebhookSignatureHeader,
-	"CodeAssetNotFound":              calmlens.CodeAssetNotFound,
-	"CodeSDKTransportError":          calmlens.CodeSDKTransportError,
-	"CodeSDKTimeout":                 calmlens.CodeSDKTimeout,
-	"CodeSDKCancelled":               calmlens.CodeSDKCancelled,
-	"CodeSDKInvalidResponse":         calmlens.CodeSDKInvalidResponse,
-	"CodeSDKHTTPError":               calmlens.CodeSDKHTTPError,
-	"CodeSDKResponseTooLarge":        calmlens.CodeSDKResponseTooLarge,
-	"CodeSDKInvalidArgument":         calmlens.CodeSDKInvalidArgument,
-	"CodeSDKInvalidConfig":           calmlens.CodeSDKInvalidConfig,
-	"CodeSDKInvalidWebhookSignature": calmlens.CodeSDKInvalidWebhookSignature,
-	"CodeSDKInvalidWebhookPayload":   calmlens.CodeSDKInvalidWebhookPayload,
+	"CodeAssetNotFound":              string(calmlens.CodeAssetNotFound),
+	"CodeSDKTransportError":          string(calmlens.CodeSDKTransportError),
+	"CodeSDKTimeout":                 string(calmlens.CodeSDKTimeout),
+	"CodeSDKCancelled":               string(calmlens.CodeSDKCancelled),
+	"CodeSDKInvalidResponse":         string(calmlens.CodeSDKInvalidResponse),
+	"CodeSDKHTTPError":               string(calmlens.CodeSDKHTTPError),
+	"CodeSDKResponseTooLarge":        string(calmlens.CodeSDKResponseTooLarge),
+	"CodeSDKInvalidArgument":         string(calmlens.CodeSDKInvalidArgument),
+	"CodeSDKInvalidConfig":           string(calmlens.CodeSDKInvalidConfig),
+	"CodeSDKInvalidWebhookSignature": string(calmlens.CodeSDKInvalidWebhookSignature),
+	"CodeSDKInvalidWebhookPayload":   string(calmlens.CodeSDKInvalidWebhookPayload),
 	"ResourceOriginal":               calmlens.ResourceOriginal,
 	"ResourceRendered":               calmlens.ResourceRendered,
 	"ResourcePlaceholder":            calmlens.ResourcePlaceholder,
@@ -148,7 +148,10 @@ func mockOutcome(t *testing.T, option string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return asset.Classification.Moderation.Status
+	if decision := asset.Classification.Moderation.Decision; decision != nil {
+		return string(*decision)
+	}
+	return ""
 }
 
 // TestRetryableContract replays surface.json's retryable cases: which error codes and HTTP
@@ -170,7 +173,7 @@ func TestRetryableContract(t *testing.T) {
 			status = *c.Status
 		}
 		t.Run(fmt.Sprintf("%s %d", c.Code, status), func(t *testing.T) {
-			e := &calmlens.Error{Code: c.Code, Status: status}
+			e := &calmlens.Error{Code: calmlens.ErrorCode(c.Code), Status: status}
 			if got := e.Retryable(); got != c.Retryable {
 				t.Fatalf("Retryable() = %v, want %v", got, c.Retryable)
 			}
@@ -203,7 +206,7 @@ func TestSurface(t *testing.T) {
 		t.Fatal("no API error", apiErr)
 	}
 	wantField := map[string]any{
-		"errors.code":       spec.Expected.Code,
+		"errors.code":       calmlens.ErrorCode(spec.Expected.Code),
 		"errors.status":     spec.Expected.Status,
 		"errors.requestId":  spec.Expected.RequestID,
 		"errors.retryAfter": calmlens.Ptr(time.Duration(spec.Expected.RetryAfterSeconds) * time.Second),
@@ -513,23 +516,23 @@ func normalize(t *testing.T, value any) any {
 	}
 	switch typed := value.(type) {
 	case *calmlens.Asset:
-		return normalize(t, typed.Raw)
+		return normalize(t, typed.RawJSON())
 	case []calmlens.Asset:
 		items := []any{}
 		for _, asset := range typed {
-			items = append(items, normalize(t, asset.Raw))
+			items = append(items, normalize(t, asset.RawJSON()))
 		}
 		return items
 	case *calmlens.AssetPage:
 		out.(map[string]any)["items"] = normalize(t, typed.Items)
 	case *calmlens.AssetSearchResponse:
 		for i, item := range typed.Items {
-			out.(map[string]any)["items"].([]any)[i].(map[string]any)["asset"] = normalize(t, item.Asset.Raw)
+			out.(map[string]any)["items"].([]any)[i].(map[string]any)["asset"] = normalize(t, item.Asset.RawJSON())
 		}
 	case *calmlens.EventsPage:
 		events := []any{}
 		for _, event := range typed.Items {
-			events = append(events, normalize(t, event.Raw))
+			events = append(events, normalize(t, event.RawJSON()))
 		}
 		out.(map[string]any)["items"] = events
 	case []calmlens.EventsPage:
@@ -651,7 +654,7 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		m.SetAPIKeyGrants(grants)
 		return nil, nil
 	case "mock.failNext":
-		failure := RequestFailure{Code: args["failure"].(string)}
+		failure := RequestFailure{Code: calmlens.ErrorCode(args["failure"].(string))}
 		failure.Operation, _ = args["operation"].(string)
 		failure.Details, _ = args["details"].(map[string]any)
 		if seconds, ok := args["retryAfter"].(float64); ok {
@@ -774,7 +777,7 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 	case "policies.iterate":
 		result, err = collect(ctx, m.Policies.ListAll(decode[calmlens.ListPoliciesOptions](t, args)))
 	case "policies.retrieveAssigned":
-		result, err = m.Policies.RetrieveAssigned(ctx)
+		result, err = m.Policies.RetrieveAssigned(ctx, calmlens.RetrieveAssignedPolicyOptions{})
 	case "policies.retrieve":
 		result, err = m.Policies.Retrieve(ctx, decode[calmlens.PolicyIDOptions](t, args))
 	case "policies.create":
@@ -812,11 +815,11 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 	case "uploadPresets.delete":
 		err = m.UploadPresets.Delete(ctx, decode[calmlens.UploadPresetIDOptions](t, args))
 	case "projectSettings.get":
-		result, err = m.ProjectSettings.Get(ctx)
+		result, err = m.ProjectSettings.Get(ctx, calmlens.GetProjectSettingsOptions{})
 	case "projectSettings.update":
 		result, err = m.ProjectSettings.Update(ctx, decode[calmlens.UpdateProjectSettingsOptions](t, args))
 	case "metadataFields.list":
-		result, err = m.MetadataFields.List(ctx)
+		result, err = m.MetadataFields.List(ctx, calmlens.ListMetadataFieldsOptions{})
 	case "metadataFields.ensure":
 		result, err = m.MetadataFields.Ensure(ctx, decode[calmlens.EnsureMetadataFieldsOptions](t, args))
 	case "metadataFields.delete":
@@ -987,7 +990,7 @@ func TestSharedMockScenarios(t *testing.T) {
 						if apiErr.Status != 0 {
 							status = &apiErr.Status
 						}
-						if apiErr.Code != want.Code || !reflect.DeepEqual(status, want.Status) {
+						if string(apiErr.Code) != want.Code || !reflect.DeepEqual(status, want.Status) {
 							t.Fatalf("%s: got %s (status %v), want %s (status %v): %v", label, apiErr.Code, apiErr.Status, want.Code, want.Status, err)
 						}
 						if want.RetryAfter != nil && (apiErr.RetryAfter == nil || *apiErr.RetryAfter != time.Duration(*want.RetryAfter)*time.Second) {

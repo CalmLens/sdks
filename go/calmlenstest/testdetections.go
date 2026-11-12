@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strconv"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // TestDetections are the person and face detection results a scenario reports. A nil field is

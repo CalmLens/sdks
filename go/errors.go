@@ -13,30 +13,34 @@ import (
 
 //go:generate go run ./internal/errorcodesgen ../../packages/shared/src/PublicErrorCodes.ts errorcodes.go
 
+// ErrorCode is an Error's code: one of the API codes in errorcodes.go or an "sdk/" code the SDK
+// produces itself. The API may add codes, which decode as their string values.
+type ErrorCode string
+
 // Error codes the SDK itself produces, in addition to the API codes in errorcodes.go.
 const (
 	// CodeSDKTransportError means the request could not be sent or its response could not be
 	// read: connection refused or reset, TLS, malformed HTTP, decompression or a truncated body.
-	CodeSDKTransportError = "sdk/transport-error"
+	CodeSDKTransportError ErrorCode = "sdk/transport-error"
 	// CodeSDKTimeout means a timeout or context deadline expired.
-	CodeSDKTimeout = "sdk/timeout"
+	CodeSDKTimeout ErrorCode = "sdk/timeout"
 	// CodeSDKCancelled means the context was cancelled.
-	CodeSDKCancelled = "sdk/cancelled"
+	CodeSDKCancelled ErrorCode = "sdk/cancelled"
 	// CodeSDKInvalidResponse means a success response was empty, not JSON or unexpected.
-	CodeSDKInvalidResponse = "sdk/invalid-response"
+	CodeSDKInvalidResponse ErrorCode = "sdk/invalid-response"
 	// CodeSDKResponseTooLarge means a response body exceeded Options.MaxResponseBytes.
-	CodeSDKResponseTooLarge = "sdk/response-too-large"
+	CodeSDKResponseTooLarge ErrorCode = "sdk/response-too-large"
 	// CodeSDKHTTPError means a non-2xx response had no CalmLens error body.
-	CodeSDKHTTPError = "sdk/http-error"
+	CodeSDKHTTPError ErrorCode = "sdk/http-error"
 	// CodeSDKInvalidArgument means a method argument was rejected before any request was sent.
-	CodeSDKInvalidArgument = "sdk/invalid-argument"
+	CodeSDKInvalidArgument ErrorCode = "sdk/invalid-argument"
 	// CodeSDKInvalidConfig means NewServerClient rejected an option.
-	CodeSDKInvalidConfig = "sdk/invalid-config"
+	CodeSDKInvalidConfig ErrorCode = "sdk/invalid-config"
 	// CodeSDKInvalidWebhookSignature means a webhook delivery failed signature or timestamp
 	// verification.
-	CodeSDKInvalidWebhookSignature = "sdk/invalid-webhook-signature"
+	CodeSDKInvalidWebhookSignature ErrorCode = "sdk/invalid-webhook-signature"
 	// CodeSDKInvalidWebhookPayload means a verified webhook body was not a valid event.
-	CodeSDKInvalidWebhookPayload = "sdk/invalid-webhook-payload"
+	CodeSDKInvalidWebhookPayload ErrorCode = "sdk/invalid-webhook-payload"
 )
 
 // Error is the error type every SDK method returns. Use errors.As to read it:
@@ -45,7 +49,7 @@ const (
 //	if errors.As(err, &apiErr) && apiErr.Code == calmlens.CodeAssetNotFound { ... }
 type Error struct {
 	// Code is an API error code (see errorcodes.go) or an "sdk/" code produced locally.
-	Code string `json:"code"`
+	Code ErrorCode `json:"code"`
 	// Message is a human-readable description. Do not match on it.
 	Message string `json:"message"`
 	// Details holds structured details from the API that tell an error code's cases apart, such
@@ -71,11 +75,11 @@ type Error struct {
 func (e *Error) Error() string {
 	var out strings.Builder
 	out.WriteString("[calmlens] ")
-	out.WriteString(e.Code)
+	out.WriteString(string(e.Code))
 	if e.Status != 0 {
 		out.WriteString(" (HTTP " + strconv.Itoa(e.Status) + ")")
 	}
-	if e.Message != "" && e.Message != e.Code {
+	if e.Message != "" && e.Message != string(e.Code) {
 		out.WriteString(": " + e.Message)
 	}
 	if e.RequestID != "" {
@@ -110,8 +114,8 @@ func IsLocal(err error) bool {
 	return errors.As(err, &e) && e.Local()
 }
 
-// ErrorCode returns the Code of a *Error in err's chain, or "" when there is none.
-func ErrorCode(err error) string {
+// CodeOf returns the Code of a *Error in err's chain, or "" when there is none.
+func CodeOf(err error) ErrorCode {
 	var e *Error
 	if errors.As(err, &e) {
 		return e.Code
@@ -133,7 +137,7 @@ func IsRetryable(err error) bool {
 }
 
 // PublicErrorStatus returns the HTTP status the API uses for an API error code.
-func PublicErrorStatus(code string) (int, bool) {
+func PublicErrorStatus(code ErrorCode) (int, bool) {
 	status, ok := publicErrorStatuses[code]
 	return status, ok
 }
@@ -158,7 +162,7 @@ func transportError(cause error) error {
 }
 
 // invalid returns a local validation error with the given code.
-func invalid(code, message string) error { return &Error{Code: code, Message: message} }
+func invalid(code ErrorCode, message string) error { return &Error{Code: code, Message: message} }
 
 // argumentError wraps a local failure (encoding a body or query, building a request) as
 // sdk/invalid-argument.

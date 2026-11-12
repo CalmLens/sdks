@@ -1,6 +1,9 @@
 package calmlens
 
-import "context"
+import (
+	"context"
+	"iter"
+)
 
 // Iterator walks every item of a cursor list across pages. It fetches pages lazily, keeps
 // the list's options and follows each page's NextCursor while HasMore is true:
@@ -81,7 +84,7 @@ func (it *Iterator[T]) Err() error { return it.err }
 
 // All returns a range-over-func sequence (Go 1.23+) of items. A failure is yielded once with
 // a zero item and ends the sequence.
-func (it *Iterator[T]) All(ctx context.Context) func(yield func(T, error) bool) {
+func (it *Iterator[T]) All(ctx context.Context) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		for it.Next(ctx) {
 			if !yield(it.Item(), nil) {
@@ -302,7 +305,7 @@ func (it *EventIterator) Err() error { return it.err }
 
 // All returns a range-over-func sequence (Go 1.23+) of events. A failure is yielded once
 // with a zero Event and ends the sequence.
-func (it *EventIterator) All(ctx context.Context) func(yield func(Event, error) bool) {
+func (it *EventIterator) All(ctx context.Context) iter.Seq2[Event, error] {
 	return func(yield func(Event, error) bool) {
 		for it.Next(ctx) {
 			if !yield(it.Event(), nil) {

@@ -12,12 +12,14 @@ const ModerationContextUsedCharacters = 2000
 // ModerationContextItem is an earlier post in the conversation. AuthorID is your identifier for
 // who wrote it.
 type ModerationContextItem struct {
+	responseJSON
 	Text     string  `json:"text"`
 	AuthorID *string `json:"authorId,omitempty"`
 }
 
 // ModerationContext holds earlier posts in the conversation, oldest first.
 type ModerationContext struct {
+	responseJSON
 	Items []ModerationContextItem `json:"items"`
 }
 

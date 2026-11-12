@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 func TestMockLifecycle(t *testing.T) {
@@ -45,7 +45,7 @@ func TestMockLifecycle(t *testing.T) {
 	}
 	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Status != calmlens.ModerationStatusAllowed || *a.Classification.CompletedAt != 123 ||
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || (a.Classification.Moderation.Decision == nil || *a.Classification.Moderation.Decision != calmlens.ModerationDecisionAllowed) || *a.Classification.CompletedAt != 123 ||
 		a.Content.Status != calmlens.ContentStatusStored || *a.Content.Format != "text/plain" || *a.Content.SizeInBytes != 5 || a.CreatedAt != 123 {
 		t.Fatal(a, err)
 	}
@@ -53,13 +53,13 @@ func TestMockLifecycle(t *testing.T) {
 	if err != nil || len(page.Items) != 1 {
 		t.Fatal(page, err)
 	}
-	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusFailed
-	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusPending
+	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["status"] = string(calmlens.ClassificationStatusFailed)
+	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = string(calmlens.ModerationStatusPending)
 	a, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Status != calmlens.ModerationStatusPending || a.Classification.CompletedAt != nil {
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Decision != nil || a.Classification.CompletedAt != nil {
 		t.Fatal(a, err)
 	}
-	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotRetryable {
+	if _, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); calmlens.CodeOf(err) != calmlens.CodeAssetNotRetryable {
 		t.Fatal("retried processing asset", err)
 	}
 	failing, err := NewServerClient(Options{Moderate: func(input ModerationInput) *Decision {
@@ -119,8 +119,8 @@ func TestDecisionPendingReviewIsRequestedWhenApplied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &calmlens.AssetPendingReview{RequestedAt: 1234, Reason: PendingReviewUncertain, UncertainCategories: []string{"violence"}}
-	if got := asset.Classification.Moderation.PendingReview; !reflect.DeepEqual(got, want) {
+	want := &calmlens.AssetPendingReview{RequestedAt: 1234, Reason: PendingReviewUncertain, UncertainCategories: []calmlens.Category{"violence"}}
+	if got := asset.Classification.Moderation.PendingReview; !sameJSON(got, want) {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -178,13 +178,13 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 	if err != nil || signed.ExpiresAt != 61000 {
 		t.Fatal(signed, err)
 	}
-	fetch := func() (int, string) {
+	fetch := func() (int, calmlens.ErrorCode) {
 		res, err := c.FetchCDN(ctx, signed.URL)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer res.Body.Close()
-		var failure struct{ Code string }
+		var failure struct{ Code calmlens.ErrorCode }
 		body, _ := io.ReadAll(res.Body)
 		_ = json.Unmarshal(body, &failure)
 		return res.StatusCode, failure.Code
@@ -198,7 +198,7 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 		t.Fatal("at expiry:", status, code)
 	}
 	c.DatabaseStorage.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"reason": "csam-suspected"}
-	if _, err = c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetHeld {
+	if _, err = c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID}); calmlens.CodeOf(err) != calmlens.CodeAssetHeld {
 		t.Fatal("signed a held asset:", err)
 	}
 }
@@ -213,7 +213,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", FolderID: &folder.ID, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Status != calmlens.ModerationStatusPending || a.Content.Status != calmlens.ContentStatusStored {
+	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Decision != nil || a.Content.Status != calmlens.ContentStatusStored {
 		t.Fatal(a, err)
 	}
 	if _, err = c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil {
@@ -248,7 +248,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 }
 
 func TestMockAppliesUploadTimeoutAndResponseSizeLimit(t *testing.T) {
-	if _, err := NewServerClient(Options{UploadTimeout: -time.Second}); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidConfig {
+	if _, err := NewServerClient(Options{UploadTimeout: -time.Second}); calmlens.CodeOf(err) != calmlens.CodeSDKInvalidConfig {
 		t.Fatal("invalid upload timeout accepted", err)
 	}
 	c, err := NewServerClient(Options{UploadTimeout: time.Minute, MaxResponseBytes: 64})
@@ -257,7 +257,7 @@ func TestMockAppliesUploadTimeoutAndResponseSizeLimit(t *testing.T) {
 	}
 	// The limit applies to the mock's answers as to the API's.
 	_, err = c.Assets.Create(context.Background(), calmlens.SubmitAssetOptions{Name: "note", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if calmlens.ErrorCode(err) != calmlens.CodeSDKResponseTooLarge {
+	if calmlens.CodeOf(err) != calmlens.CodeSDKResponseTooLarge {
 		t.Fatal("response size limit not applied", err)
 	}
 }
@@ -301,7 +301,7 @@ func TestMockRefusesFailuresItCannotInject(t *testing.T) {
 		"Retry-After on a transport error": {Err: errors.New("offline"), RetryAfter: calmlens.Ptr(time.Second)},
 		"fractional Retry-After":           {Code: calmlens.CodeFreeUploadsExhausted, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
 	} {
-		if err := c.FailNextRequest(RequestFailure{Code: FailureTimeout}, failure); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+		if err := c.FailNextRequest(RequestFailure{Code: FailureTimeout}, failure); calmlens.CodeOf(err) != calmlens.CodeSDKInvalidArgument {
 			t.Errorf("%s: got %v, want sdk/invalid-argument", name, err)
 		}
 	}
@@ -316,7 +316,7 @@ func TestMockReturnsAnInvalidModerateDecisionFromTheRequest(t *testing.T) {
 		return NewDecision(OutcomeBlocked).Flag("violence", 2, nil)
 	}})
 	_, err := c.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "n", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("x")}})
-	if calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+	if calmlens.CodeOf(err) != calmlens.CodeSDKInvalidArgument {
 		t.Fatalf("got %v, want sdk/invalid-argument", err)
 	}
 	if len(c.DatabaseStorage.Assets) != 0 {
@@ -357,7 +357,7 @@ func TestMockListHonoursFilterSortAndFolder(t *testing.T) {
 	create("b", nil)
 	blocked := create("a", &folder.ID)
 	create("c", &folder.ID)
-	c.DatabaseStorage.Assets[blocked]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
+	c.DatabaseStorage.Assets[blocked]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = string(calmlens.ModerationStatusBlocked)
 	names := func(options calmlens.ListAssetsOptions) string {
 		page, err := c.Assets.List(ctx, options)
 		if err != nil {
@@ -372,10 +372,10 @@ func TestMockListHonoursFilterSortAndFolder(t *testing.T) {
 	if got := names(calmlens.ListAssetsOptions{Sort: "-createdAt"}); got != "[c a b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==pending"), Sort: "-createdAt"}); got != "[c b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.decision==null"), Sort: "-createdAt"}); got != "[c b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==blocked,name=in=(b,x)"), Sort: "-createdAt"}); got != "[a b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.decision==blocked,name=in=(b,x)"), Sort: "-createdAt"}); got != "[a b]" {
 		t.Fatal(got)
 	}
 	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Sort: "createdAt"}); got != "[b a c]" {
@@ -535,7 +535,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 	for _, tc := range []struct {
 		path   string
 		status int
-		code   string
+		code   calmlens.ErrorCode
 	}{
 		// A selector after the embed page is refused before the asset is looked up.
 		{"/missing/embed/width=10", http.StatusBadRequest, calmlens.CodeInvalidTransform},
@@ -548,7 +548,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var refused struct{ Code string }
+		var refused struct{ Code calmlens.ErrorCode }
 		_ = json.NewDecoder(res.Body).Decode(&refused)
 		res.Body.Close()
 		if res.StatusCode != tc.status || refused.Code != tc.code {
@@ -556,7 +556,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 		}
 	}
 	// Like other resources, the embed page of blocked content is refused.
-	if _, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Blocked"}); err != nil {
+	if _, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationDecisionBlocked, Note: "Blocked"}); err != nil {
 		t.Fatal(err)
 	}
 	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: calmlens.ResourceEmbed}})
@@ -579,7 +579,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 		t.Fatal(a, err)
 	}
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": calmlens.SafetyHoldReasonSuspectedIllegalContent}
+		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": string(calmlens.SafetyHoldReasonSuspectedIllegalContent)}
 	})
 	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourceHLS, calmlens.ResourceEmbed, calmlens.ResourcePlaceholder} {
 		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: resource}})
@@ -594,7 +594,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 		}
 	}
 	// The page size is checked first, then the hold.
-	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: 101}); calmlens.ErrorCode(err) != calmlens.CodeInvalidRequest {
+	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: 101}); calmlens.CodeOf(err) != calmlens.CodeInvalidRequest {
 		t.Fatal(err)
 	}
 	var held *calmlens.Error
@@ -602,7 +602,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A decision while held keeps the rendered file and preview withheld.
-	if a, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Held"}); err != nil || a.Content.Rendered != nil || a.Content.Preview != nil {
+	if a, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationDecisionBlocked, Note: "Held"}); err != nil || a.Content.Rendered != nil || a.Content.Preview != nil {
 		t.Fatal(a, err)
 	}
 }
@@ -614,11 +614,11 @@ func TestMockEventsFeedRefusesMalformedFiltersAndEnqueuedEventsHaveActors(t *tes
 		t.Helper()
 		_, err := c.Events.List(ctx, options)
 		var apiErr *calmlens.Error
-		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(code, path)) {
+		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(string(code), path)) {
 			t.Fatalf("%+v: got %v, want %s at %s", options, err, code, path)
 		}
 	}
-	refused(calmlens.ListEventsOptions{Types: []string{calmlens.EventAssetBlocked, "blocked"}}, "validation/invalid-value", "types")
+	refused(calmlens.ListEventsOptions{Types: []calmlens.EventType{calmlens.EventAssetBlocked, "blocked"}}, "validation/invalid-value", "types")
 	refused(calmlens.ListEventsOptions{AssetID: "asset-1"}, "validation/invalid-format", "assetId")
 	start, err := c.Events.List(ctx, calmlens.ListEventsOptions{})
 	if err != nil {
@@ -631,7 +631,7 @@ func TestMockEventsFeedRefusesMalformedFiltersAndEnqueuedEventsHaveActors(t *tes
 		t.Fatal(page, err)
 	}
 	// An event enqueued without an actor is the mock API key's, which has no ID; a given one is kept.
-	if stored[0].Actor != (calmlens.Actor{Type: calmlens.ActorAPIKey}) || page.Items[0].Actor != stored[0].Actor ||
+	if stored[0].Actor.Type != calmlens.ActorAPIKey || stored[0].Actor.ID != nil || page.Items[0].Actor.Type != calmlens.ActorAPIKey || page.Items[0].Actor.ID != nil ||
 		page.Items[1].Actor.Type != calmlens.ActorUser || *page.Items[1].Actor.ID != keyID {
 		t.Fatalf("actors %+v %+v", stored, page.Items)
 	}
@@ -664,7 +664,7 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	}
 	ctx := context.Background()
 	queued, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "note", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
-	if err != nil || queued.Classification.Moderation.Status != calmlens.ModerationStatusPending {
+	if err != nil || queued.Classification.Moderation.Decision != nil {
 		t.Fatal(queued, err)
 	}
 	c.ClearRequests()
@@ -682,7 +682,7 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	}
 	// A decided asset still processing isn't settled yet.
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
+		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = calmlens.ModerationStatusBlocked
 	})
 	_, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: calmlens.Ptr(time.Duration(0))})
 	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["classificationStatus"] != calmlens.ClassificationStatusProcessing {
@@ -692,10 +692,10 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 		db.Assets[queued.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusCompleted
 	})
 	got, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
-	if err != nil || got.ID != queued.ID || got.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+	if err != nil || got.ID != queued.ID || (got.Classification.Moderation.Decision == nil || *got.Classification.Moderation.Decision != calmlens.ModerationDecisionBlocked) {
 		t.Fatal(got, err)
 	}
-	if _, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: "missing"}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotFound {
+	if _, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: "missing"}); calmlens.CodeOf(err) != calmlens.CodeAssetNotFound {
 		t.Fatal(err)
 	}
 }
@@ -714,16 +714,16 @@ func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
 	moderation := c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)
 	moderation["explanationComplete"] = false
 	explained, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID})
-	if err != nil || explained.Classification.Moderation.ExplanationComplete == nil || !*explained.Classification.Moderation.ExplanationComplete || explained.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+	if err != nil || explained.Classification.Moderation.ExplanationComplete == nil || !*explained.Classification.Moderation.ExplanationComplete || (explained.Classification.Moderation.Decision == nil || *explained.Classification.Moderation.Decision != calmlens.ModerationDecisionAllowed) {
 		t.Fatal(explained, err)
 	}
 	moderation["manualReviews"] = []any{calmlens.JSON{"status": "allowed"}}
-	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true}); calmlens.ErrorCode(err) != calmlens.CodeAssetReviewed {
+	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true}); calmlens.CodeOf(err) != calmlens.CodeAssetReviewed {
 		t.Fatal("reran a reviewed asset", err)
 	}
 	moderation["manualReviews"] = []any{}
 	rerun, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true})
-	if err != nil || rerun.Classification.Status != calmlens.ClassificationStatusCompleted || rerun.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+	if err != nil || rerun.Classification.Status != calmlens.ClassificationStatusCompleted || (rerun.Classification.Moderation.Decision == nil || *rerun.Classification.Moderation.Decision != calmlens.ModerationDecisionAllowed) {
 		t.Fatal(rerun, err)
 	}
 }
@@ -747,10 +747,10 @@ func TestMockRerunReplacesTheDecisionOnlyWithANewOne(t *testing.T) {
 	}
 	// The response is the asset as the re-run found it; the new decision follows.
 	rerun, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true})
-	if err != nil || rerun.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+	if err != nil || (rerun.Classification.Moderation.Decision == nil || *rerun.Classification.Moderation.Decision != calmlens.ModerationDecisionAllowed) {
 		t.Fatal(rerun, err)
 	}
-	if stored, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil || stored.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+	if stored, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil || (stored.Classification.Moderation.Decision == nil || *stored.Classification.Moderation.Decision != calmlens.ModerationDecisionBlocked) {
 		t.Fatal(stored, err)
 	}
 	// A failed re-run keeps the decision and records no processing events.
@@ -759,13 +759,13 @@ func TestMockRerunReplacesTheDecisionOnlyWithANewOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	stored, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
-	if err != nil || stored.Classification.Status != calmlens.ClassificationStatusCompleted || stored.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+	if err != nil || stored.Classification.Status != calmlens.ClassificationStatusCompleted || (stored.Classification.Moderation.Decision == nil || *stored.Classification.Moderation.Decision != calmlens.ModerationDecisionBlocked) {
 		t.Fatal(stored, err)
 	}
-	if last := c.events[len(c.events)-1]; last["type"] != calmlens.EventAssetRerunRequested {
+	if last := c.events[len(c.events)-1]; last["type"] != string(calmlens.EventAssetRerunRequested) {
 		t.Fatal(last["type"])
 	}
-	if _, err = c.CompleteProcessing(a.ID, nil); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+	if _, err = c.CompleteProcessing(a.ID, nil); calmlens.CodeOf(err) != calmlens.CodeSDKInvalidArgument {
 		t.Fatal("completed a decided asset with no queued re-run", err)
 	}
 }
@@ -784,7 +784,7 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListAssetNotHashed {
+	if _, err = c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID}); calmlens.CodeOf(err) != calmlens.CodeHashListAssetNotHashed {
 		t.Fatalf("added an asset without a perceptual hash: %v", err)
 	}
 	hash := strings.Repeat("ab", 32)
@@ -822,10 +822,10 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 	if err = c.HashLists.Delete(ctx, calmlens.HashListIDOptions{HashListID: list.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if err = c.HashLists.RemoveEntry(ctx, calmlens.HashListEntryIDOptions{EntryID: second.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListEntryNotFound {
+	if err = c.HashLists.RemoveEntry(ctx, calmlens.HashListEntryIDOptions{EntryID: second.ID}); calmlens.CodeOf(err) != calmlens.CodeHashListEntryNotFound {
 		t.Fatalf("entry outlived its list: %v", err)
 	}
-	if _, err = c.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptions{HashListID: list.ID}); calmlens.ErrorCode(err) != calmlens.CodeHashListNotFound {
+	if _, err = c.HashLists.ListEntries(ctx, calmlens.ListHashListEntriesOptions{HashListID: list.ID}); calmlens.CodeOf(err) != calmlens.CodeHashListNotFound {
 		t.Fatalf("listed entries of a deleted list: %v", err)
 	}
 }
@@ -837,7 +837,7 @@ func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refused := func(options calmlens.DecideAssetOptions, code, path string) {
+	refused := func(options calmlens.DecideAssetOptions, code calmlens.ErrorCode, path string) {
 		t.Helper()
 		options.AssetID = asset.ID
 		_, err := c.Assets.Decide(ctx, options)
@@ -848,26 +848,26 @@ func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
 			}
 			return
 		}
-		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(code, path)) {
+		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(string(code), path)) {
 			t.Fatalf("%+v: got %v %v, want %s at %q", options, err, apiErr, code, path)
 		}
 	}
 	refused(calmlens.DecideAssetOptions{Decision: "approved", Note: "x"}, "validation/invalid-value", "decision")
-	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusBlocked, Note: "  "}, "validation/too-small", "note")
-	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusBlocked, Note: strings.Repeat("x", 1500)}, "validation/too-big", "note")
-	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusPurged, Note: "x"}, "validation/invalid-value", "confirmPurge")
-	purged, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusPurged, Note: " Illegal ", ConfirmPurge: true})
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationDecisionBlocked, Note: "  "}, "validation/too-small", "note")
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationDecisionBlocked, Note: strings.Repeat("x", 1500)}, "validation/too-big", "note")
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationDecisionPurged, Note: "x"}, "validation/invalid-value", "confirmPurge")
+	purged, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationDecisionPurged, Note: " Illegal ", ConfirmPurge: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The review names the API key that decided (mock keys have no ID), never a person.
 	reviews := purged.Classification.Moderation.ManualReviews
 	if len(reviews) != 1 || reviews[0].Note == nil || *reviews[0].Note != "Illegal" || !reviews[0].Applied ||
-		reviews[0].DecidedBy != (calmlens.ReviewActor{Type: calmlens.ReviewActorAPIKey}) {
+		reviews[0].DecidedBy.Type != calmlens.ReviewActorAPIKey || reviews[0].DecidedBy.ID != nil {
 		t.Fatalf("reviews %+v", reviews)
 	}
-	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusAllowed, Note: "x"}, calmlens.CodeAssetContentPurged, "")
-	if blocked, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusBlocked, Note: "x"}); err != nil || blocked.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationDecisionAllowed, Note: "x"}, calmlens.CodeAssetContentPurged, "")
+	if blocked, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationDecisionBlocked, Note: "x"}); err != nil || (blocked.Classification.Moderation.Decision == nil || *blocked.Classification.Moderation.Decision != calmlens.ModerationDecisionBlocked) {
 		t.Fatalf("blocking purged content: %v", err)
 	}
 }
@@ -920,7 +920,7 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		name, method, path, query string
 		header                    http.Header
 		body                      string
-		code                      string
+		code                      calmlens.ErrorCode
 		details                   map[string]any
 	}{
 		{"JSON metadata object", "POST", assets, "wait=true", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
@@ -960,7 +960,7 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 			}
 			defer res.Body.Close()
 			var body struct {
-				Code    string
+				Code    calmlens.ErrorCode
 				Details map[string]any
 			}
 			if err = json.NewDecoder(res.Body).Decode(&body); err != nil {
@@ -1004,8 +1004,8 @@ func TestMockStoresUploadTagsAndKeepsProcessingOptionsOutOfTheAsset(t *testing.T
 		t.Fatal(uploaded.Tags, retrieved.Tags, text.Tags)
 	}
 	// The upload's processing options still apply, though the asset doesn't return them.
-	if _, ok := uploaded.Raw["processingOptions"]; ok || uploaded.Content.Status != calmlens.ContentStatusStored {
-		t.Fatal(uploaded.Raw["processingOptions"], uploaded.Content.Status)
+	if _, ok := uploaded.ExtraFields()["processingOptions"]; ok || uploaded.Content.Status != calmlens.ContentStatusStored {
+		t.Fatal(uploaded.ExtraFields()["processingOptions"], uploaded.Content.Status)
 	}
 }
 
@@ -1017,7 +1017,7 @@ func TestMockReplaysAnUploadFormByItsOptionsNotItsBoundary(t *testing.T) {
 	}
 	ctx := context.Background()
 	upload := func(description string) (*calmlens.Asset, error) {
-		return c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.png", Description: &description, Content: &calmlens.Content{Type: "image/png", Bytes: []byte{1, 2, 3}}, IdempotencyKey: "upload-1"})
+		return c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.png", Description: &description, Content: &calmlens.Content{Type: "image/png", Bytes: []byte{1, 2, 3}}, Params: calmlens.Params{IdempotencyKey: "upload-1"}})
 	}
 	first, err := upload("a photo")
 	if err != nil {
@@ -1029,7 +1029,7 @@ func TestMockReplaysAnUploadFormByItsOptionsNotItsBoundary(t *testing.T) {
 	if err != nil || again.ID != first.ID || len(c.DatabaseStorage.Assets) != 1 || boundary(requests[0]) == boundary(requests[1]) {
 		t.Fatal(again, err, boundary(requests[0]), boundary(requests[1]))
 	}
-	if _, err = upload("another photo"); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
+	if _, err = upload("another photo"); calmlens.CodeOf(err) != calmlens.CodeIdempotencyKeyReused {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(requests[0].Body, calmlens.JSON{"name": "photo.png", "description": "a photo"}) || !reflect.DeepEqual(requests[0].File, []byte{1, 2, 3}) {

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CalmLens/sdks/go/internal/clock"
+	"calmlens.com/go/calmlens/internal/clock"
 )
 
 // Default limits. Each one can be changed through Options.
@@ -50,6 +50,11 @@ const (
 	// the caller (as the error, or for CDN.Serve as the response) instead.
 	RetryAfterMax = time.Minute
 )
+
+// HTTPDoer sends HTTP requests. *http.Client implements it.
+type HTTPDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
 
 // Options configures NewServerClient. APIKey and ProjectID are required.
 type Options struct {
@@ -88,10 +93,12 @@ type Options struct {
 	// calling again with the same IdempotencyKey resumes the upload. From MinPartSizeBytes to
 	// MaxPartSizeBytes; zero means DefaultPartSizeBytes.
 	PartSizeBytes int64
-	// HTTPClient sends every request, including uploads and CDN requests. The SDK uses a copy
-	// with redirects disabled. A non-zero HTTPClient.Timeout bounds whole requests,
-	// including upload and download bodies, so leave it zero for large transfers.
-	HTTPClient *http.Client
+	// HTTPClient sends every request, including uploads and CDN requests: an *http.Client, or
+	// any HTTPDoer, such as one that adds logging or tracing around another client. The SDK uses a
+	// copy of an *http.Client with redirects disabled; another HTTPDoer must not follow redirects,
+	// which could send the API key to another origin. A non-zero http.Client.Timeout bounds whole
+	// requests, including upload and download bodies, so leave it zero for large transfers.
+	HTTPClient HTTPDoer
 }
 
 // String describes the options without the API key.
@@ -135,9 +142,8 @@ type ServerClient struct {
 
 	options    Options
 	maxRetries int
-	http       *http.Client
-	// lenses is shared with the clients WithRequestOptions returns.
-	lenses *lensCache
+	http       HTTPDoer
+	lenses     *lensCache
 	// sleep waits between retries and decision checks; tests replace it.
 	sleep func(context.Context, time.Duration) error
 	// now reads the clock for decision deadlines; tests replace it.
@@ -205,20 +211,24 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	}
 	options.BaseURL = strings.TrimRight(options.BaseURL, "/")
 	options.CDNBaseURL = strings.TrimRight(options.CDNBaseURL, "/")
-	var safeClient http.Client
-	if options.HTTPClient != nil {
-		// Copy the client so caller configuration is unchanged.
-		safeClient = *options.HTTPClient
-	} else {
-		safeClient.Transport = defaultTransport(options)
+	doer := options.HTTPClient
+	if client, ok := doer.(*http.Client); ok || doer == nil {
+		var safeClient http.Client
+		if client != nil {
+			// Copy the client so caller configuration is unchanged.
+			safeClient = *client
+		} else {
+			safeClient.Transport = defaultTransport(options)
+		}
+		// Never follow redirects, so credentials stay on the configured endpoint.
+		safeClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		doer = &safeClient
 	}
-	// Never follow redirects, so credentials stay on the configured endpoint.
-	safeClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	maxRetries := DefaultMaxRetries
 	if options.MaxRetries != nil {
 		maxRetries = *options.MaxRetries
 	}
-	c := &ServerClient{options: options, maxRetries: maxRetries, http: &safeClient, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
+	c := &ServerClient{options: options, maxRetries: maxRetries, http: doer, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
 	c.services()
 	return c, nil
 }
@@ -229,39 +239,6 @@ func (c *ServerClient) services() {
 	c.UploadTokens, c.HashLists, c.Policies = &UploadTokensService{c}, &HashListsService{c}, &PoliciesService{c}
 	c.Lenses = &LensesService{c}
 	c.UploadPresets, c.ProjectSettings, c.MetadataFields = &UploadPresetsService{c}, &ProjectSettingsService{c}, &MetadataFieldsService{c}
-}
-
-// RequestOptions changes the deadlines and retries of the calls made through the client
-// WithRequestOptions returns. Zero fields keep the client's settings. Cancel a call with its
-// context.
-type RequestOptions struct {
-	// Timeout replaces Options.Timeout; negative values are rejected.
-	Timeout time.Duration
-	// UploadTimeout replaces Options.UploadTimeout; negative values are rejected.
-	UploadTimeout time.Duration
-	// MaxRetries replaces Options.MaxRetries. Use Ptr(0) to disable retries.
-	MaxRetries *int
-}
-
-// WithRequestOptions returns a client with other deadlines or retries for the calls made
-// through it. It shares this client's credentials, HTTP client and lens cache; this client is
-// unchanged. Invalid options return a *Error with code sdk/invalid-config.
-func (c *ServerClient) WithRequestOptions(options RequestOptions) (*ServerClient, error) {
-	if options.Timeout < 0 || options.UploadTimeout < 0 || options.MaxRetries != nil && *options.MaxRetries < 0 {
-		return nil, invalid(CodeSDKInvalidConfig, "Timeouts and MaxRetries cannot be negative")
-	}
-	copied := *c
-	if options.Timeout > 0 {
-		copied.options.Timeout = options.Timeout
-	}
-	if options.UploadTimeout > 0 {
-		copied.options.UploadTimeout = options.UploadTimeout
-	}
-	if options.MaxRetries != nil {
-		copied.maxRetries = *options.MaxRetries
-	}
-	copied.services()
-	return &copied, nil
 }
 
 // defaultTransport bounds connecting and waiting for headers, never the body transfer.
@@ -437,7 +414,11 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 	if len(spec.params) > 0 {
 		endpoint += "?" + spec.params.Encode()
 	}
+	params := paramsOf(ctx)
 	headers := http.Header{}
+	for key, values := range params.Headers {
+		headers[key] = append([]string(nil), values...)
+	}
 	for key, values := range spec.headers {
 		headers[key] = append([]string(nil), values...)
 	}
@@ -449,18 +430,45 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		if payload, err = encodeJSON(spec.body); err != nil {
 			return argumentError("Could not encode the request body", err)
 		}
+		if payload, err = withExtra(payload, params.Extra); err != nil {
+			return err
+		}
 		headers.Set("Content-Type", "application/json")
 	} else if spec.raw != nil {
+		if len(params.Extra) > 0 {
+			return invalid(CodeSDKInvalidArgument, "Params.Extra can't be sent with an upload")
+		}
 		rewind = rewinder(spec.raw)
+	} else if len(params.Extra) > 0 {
+		extra, err := query(params.Extra)
+		if err != nil {
+			return err
+		}
+		separator := "?"
+		if len(spec.params) > 0 {
+			separator = "&"
+		}
+		endpoint += separator + extra.Encode()
 	}
-	if spec.idempotencyKey != "" {
-		headers.Set("Idempotency-Key", spec.idempotencyKey)
+	idempotencyKey := spec.idempotencyKey
+	if idempotencyKey == "" && spec.method != http.MethodGet && spec.method != http.MethodHead {
+		idempotencyKey = params.IdempotencyKey
+	}
+	if idempotencyKey != "" {
+		headers.Set("Idempotency-Key", idempotencyKey)
 	}
 	timeout := c.options.Timeout
 	if spec.binary {
 		timeout = c.options.UploadTimeout
 	}
-	retryable := spec.method == http.MethodGet || spec.method == http.MethodHead || spec.idempotencyKey != ""
+	if params.Timeout > 0 {
+		timeout = params.Timeout
+	}
+	maxRetries := c.maxRetries
+	if params.MaxRetries != nil {
+		maxRetries = *params.MaxRetries
+	}
+	retryable := spec.method == http.MethodGet || spec.method == http.MethodHead || idempotencyKey != ""
 	for attempt := 0; ; attempt++ {
 		var reader io.Reader
 		size := int64(0)
@@ -475,7 +483,7 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 			return nil
 		}
 		sdkErr, ok := err.(*Error)
-		if !ok || !retryable || attempt >= c.maxRetries || !sdkErr.Retryable() || ctx.Err() != nil {
+		if !ok || !retryable || attempt >= maxRetries || !sdkErr.Retryable() || ctx.Err() != nil {
 			return err
 		}
 		if rewind == nil || rewind() != nil {
@@ -547,7 +555,32 @@ func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, hea
 	if err = decodeJSON(data, out); err != nil {
 		return &Error{Code: CodeSDKInvalidResponse, Message: "Invalid JSON response", Status: res.StatusCode, RequestID: requestID, Header: res.Header, Cause: err}
 	}
+	if model, ok := out.(lastResponseSetter); ok {
+		model.setLastResponse(&APIResponse{StatusCode: res.StatusCode, Header: res.Header, RequestID: requestID, IdempotencyKey: headers.Get("Idempotency-Key")})
+	}
 	return nil
+}
+
+// withExtra adds Params.Extra to a JSON object body; the body's own fields win.
+func withExtra(payload []byte, extra map[string]any) ([]byte, error) {
+	if len(extra) == 0 {
+		return payload, nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &fields); err != nil || fields == nil {
+		return nil, invalid(CodeSDKInvalidArgument, "Params.Extra needs a JSON object body")
+	}
+	for key, value := range extra {
+		if _, declared := fields[key]; declared {
+			continue
+		}
+		encoded, err := encodeJSON(value)
+		if err != nil {
+			return nil, argumentError("Could not encode Params.Extra", err)
+		}
+		fields[key] = encoded
+	}
+	return encodeJSON(fields)
 }
 
 // readLimited reads a response body of at most limit bytes. A larger declared Content-Length
@@ -589,7 +622,7 @@ func responseError(res *http.Response, data []byte, now time.Time) error {
 		RequestID string  `json:"requestId"`
 	}
 	if decodeJSON(data, &failure) == nil && failure.Code != nil {
-		result.Code, result.Message, result.Details = *failure.Code, *failure.Code, failure.Details
+		result.Code, result.Message, result.Details = ErrorCode(*failure.Code), *failure.Code, failure.Details
 		if result.RequestID == "" {
 			result.RequestID = failure.RequestID
 		}
@@ -619,6 +652,10 @@ func decodeJSON(data []byte, out any) error {
 // EnsureLens creates a lens, or changes it to this definition, by identifier and returns it.
 // See EnsureLenses.
 func (c *ServerClient) EnsureLens(ctx context.Context, options EnsureLensOptions) (*Lens, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	lenses, err := c.EnsureLenses(ctx, EnsureLensesOptions{Lenses: []EnsureLensOptions{options}})
 	if err != nil {
 		return nil, err
@@ -643,6 +680,13 @@ const EnsureLensesMaxPerRequest = 100
 // lens. More than EnsureLensesMaxPerRequest new definitions are sent in consecutive requests, in
 // order.
 func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOptions) ([]Lens, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
+	// Each of the consecutive requests is a PUT of its own definitions; one key would replay the
+	// first.
+	ctx = withoutIdempotencyKey(ctx)
 	if len(options.Lenses) == 0 {
 		return nil, invalid(CodeSDKInvalidArgument, "At least one lens is required")
 	}

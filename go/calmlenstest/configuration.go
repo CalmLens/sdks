@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // configurationStore holds the project's upload presets by key, its settings as last sent and its
@@ -106,19 +106,19 @@ func (m *MockServerClient) ensureUploadPresets(body calmlens.JSON, now int64) (a
 		}
 		values := calmlens.JSON{
 			"key": key, "name": name,
-			"access":              orDefault(definition["access"], calmlens.UploadPresetAccessToken),
+			"access":              orDefault(definition["access"], string(calmlens.UploadPresetAccessToken)),
 			"enabled":             orDefault(definition["enabled"], true),
 			"allowedContentTypes": uniqueList(definition["allowedContentTypes"]),
 			"maxSizeInBytes":      definition["maxSizeInBytes"],
 			"folderId":            definition["folderId"],
 			"policyId":            definition["policyId"],
-			"visibility":          orDefault(definition["visibility"], calmlens.VisibilityPrivate),
+			"visibility":          orDefault(definition["visibility"], string(calmlens.VisibilityPrivate)),
 			"processingOptions":   definition["processingOptions"],
 			"revealDecision":      orDefault(definition["revealDecision"], false),
 			"dailyUploadLimit":    definition["dailyUploadLimit"],
 			"allowedOrigins":      uniqueList(definition["allowedOrigins"]),
 		}
-		if values["access"] == calmlens.UploadPresetAccessAnyone && number(values["dailyUploadLimit"]) == 0 {
+		if text(values["access"]) == string(calmlens.UploadPresetAccessAnyone) && number(values["dailyUploadLimit"]) == 0 {
 			return nil, fail(calmlens.CodeUploadPresetDailyLimitRequired)
 		}
 		plans = append(plans, plan{existing, values})

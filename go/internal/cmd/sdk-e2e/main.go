@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 
-	sdk "github.com/CalmLens/sdks/go"
+	sdk "calmlens.com/go/calmlens"
 )
 
 type command struct {
@@ -173,7 +173,7 @@ func main() {
 				// The shared tests compare the cross-SDK message form; Error() adds code and status.
 				message := apiError.Message
 				if message == "" {
-					message = apiError.Code
+					message = string(apiError.Code)
 				}
 				detail["message"] = "[calmlens] " + message
 				switch {

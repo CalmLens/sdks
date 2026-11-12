@@ -30,10 +30,10 @@ func signedRequest(t *testing.T, body string, now time.Time) *http.Request {
 
 func TestParseAndVerifyWebhookRequest(t *testing.T) {
 	now := time.Unix(1760000000, 0)
-	body := `{"id": "event-1", "type": "asset.blocked", "createdAt": 1760000000000, "projectId": "p", "severity": "low", "title": "t", "description": null, "assetId": "a", "asset": {"id": "a", "externalId": null, "content": {"status": "removed"}, "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "blocked"}}}, "facts": [{"key": "limit", "value": 9007199254740993}, {"key": "test", "value": true}]}`
+	body := `{"id": "event-1", "type": "asset.blocked", "createdAt": 1760000000000, "projectId": "p", "severity": "low", "title": "t", "description": null, "assetId": "a", "asset": {"id": "a", "externalId": null, "content": {"status": "removed"}, "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"decision": "blocked"}}}, "facts": [{"key": "limit", "value": 9007199254740993}, {"key": "test", "value": true}]}`
 	req := signedRequest(t, body, now)
 	event, err := VerifyWebhookRequest(req, "secret", WithNow(now))
-	if err != nil || event.ID != "event-1" || *event.AssetID != "a" || !event.Facts.IsTest() || event.Asset.Classification.Status != ClassificationStatusCompleted || event.Asset.Classification.Moderation.Status != ModerationStatusBlocked || event.Asset.Content.Status != ContentStatusRemoved || event.Asset.ExternalID != nil {
+	if err != nil || event.ID != "event-1" || *event.AssetID != "a" || !event.Facts.IsTest() || event.Asset.Classification.Status != ClassificationStatusCompleted || (event.Asset.Classification.Moderation.Decision == nil || *event.Asset.Classification.Moderation.Decision != ModerationDecisionBlocked) || event.Asset.Content.Status != ContentStatusRemoved || event.Asset.ExternalID != nil {
 		t.Fatal(event, err)
 	}
 	if limit, ok := event.Facts[0].Int64(); !ok || limit != 9007199254740993 {
@@ -44,17 +44,17 @@ func TestParseAndVerifyWebhookRequest(t *testing.T) {
 	}
 	tampered := signedRequest(t, body, now)
 	tampered.Body = io.NopCloser(strings.NewReader(strings.Replace(body, "event-1", "event-2", 1)))
-	if _, err = VerifyWebhookRequest(tampered, "secret", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookSignature {
+	if _, err = VerifyWebhookRequest(tampered, "secret", WithNow(now)); CodeOf(err) != CodeSDKInvalidWebhookSignature {
 		t.Fatal(err)
 	}
-	if _, err = VerifyWebhookRequest(signedRequest(t, body, now), "secret", WithNow(now), WithMaxBodyBytes(10)); ErrorCode(err) != CodeSDKInvalidWebhookPayload {
+	if _, err = VerifyWebhookRequest(signedRequest(t, body, now), "secret", WithNow(now), WithMaxBodyBytes(10)); CodeOf(err) != CodeSDKInvalidWebhookPayload {
 		t.Fatal("oversized body accepted", err)
 	}
 	notEvent := signedRequest(t, `{"hello":1}`, now)
-	if _, err = VerifyWebhookRequest(notEvent, "secret", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookPayload {
+	if _, err = VerifyWebhookRequest(notEvent, "secret", WithNow(now)); CodeOf(err) != CodeSDKInvalidWebhookPayload {
 		t.Fatal(err)
 	}
-	if _, err = ParseWebhookEvent([]byte(body), "", "", "", WithNow(now)); ErrorCode(err) != CodeSDKInvalidWebhookSignature {
+	if _, err = ParseWebhookEvent([]byte(body), "", "", "", WithNow(now)); CodeOf(err) != CodeSDKInvalidWebhookSignature {
 		t.Fatal("empty secret accepted", err)
 	}
 }

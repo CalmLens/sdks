@@ -8,7 +8,7 @@ import (
 
 func TestErrorCodesAreUpToDate(t *testing.T) {
 	// The shared TypeScript source only exists in the monorepo, not in module downloads.
-	source, err := os.ReadFile("../../../shared/src/PublicErrorCodes.ts")
+	source, err := os.ReadFile("../../../../packages/shared/src/PublicErrorCodes.ts")
 	if os.IsNotExist(err) {
 		t.Skip("PublicErrorCodes.ts is not available outside the monorepo")
 	}

@@ -1,17 +1,17 @@
 # CalmLens Go SDK
 
-Go client for the [CalmLens](https://calmlens.com) content moderation and delivery API. It requires Go 1.22 or later and uses only the standard library.
+Go client for the [CalmLens](https://calmlens.com) content moderation and delivery API. It requires Go 1.25 or later and uses only the standard library. The minimum Go version rises only in a minor release, and never past the oldest Go release the Go team still supports.
 
 ## Installation
 
 ```sh
-go get github.com/CalmLens/sdks/go@latest
+go get calmlens.com/go/calmlens@latest
 ```
 
 | Package        | Import path                                | Use                                                      |
 | -------------- | ------------------------------------------ | -------------------------------------------------------- |
-| `calmlens`     | `github.com/CalmLens/sdks/go`              | The server client, webhook verification and CDN helpers. |
-| `calmlenstest` | `github.com/CalmLens/sdks/go/calmlenstest` | An in-memory mock client for offline tests.              |
+| `calmlens`     | `calmlens.com/go/calmlens`              | The server client, webhook verification and CDN helpers. |
+| `calmlenstest` | `calmlens.com/go/calmlens/calmlenstest` | An in-memory mock client for offline tests.              |
 
 Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
 
@@ -28,7 +28,7 @@ import (
 	"log"
 	"os"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 func main() {

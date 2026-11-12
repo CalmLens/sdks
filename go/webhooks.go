@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -29,16 +30,17 @@ const (
 var webhookEventFields = []string{"id", "projectId", "actor", "type", "severity", "title", "description", "assetId", "assetSequence", "asset", "facts", "createdAt"}
 
 // ToWebhookEventPayload returns the body a webhook connector delivers for an event, such as one
-// from Events.List: the event in the same shape. Its Raw holds that body, built from the event's
-// Raw (or, for an event built in code, from its typed fields), with Description, AssetID,
-// AssetSequence and Asset null when absent; fields that are not part of the shape are left out.
+// from Events.List: the event in the same shape. Its RawJSON holds that body, built from the
+// event's RawJSON (or, for an event built in code, from its typed fields), with Description,
+// AssetID, AssetSequence and Asset null when absent; fields that are not part of the shape are
+// left out.
 func ToWebhookEventPayload(event Event) Event {
-	source := event.Raw
-	if source == nil {
-		if data, err := json.Marshal(event); err == nil {
-			_ = decodeJSON(data, &source)
-		}
+	data := event.RawJSON()
+	if data == nil {
+		data, _ = json.Marshal(event)
 	}
+	var source JSON
+	_ = decodeJSON(data, &source)
 	raw := JSON{}
 	for _, key := range webhookEventFields {
 		if value, ok := source[key]; ok {
@@ -47,7 +49,8 @@ func ToWebhookEventPayload(event Event) Event {
 			raw[key] = nil
 		}
 	}
-	event.Raw = raw
+	encoded, _ := json.Marshal(raw)
+	event.responseJSON = responseJSON{raw: encoded, model: reflect.TypeFor[Event]()}
 	return event
 }
 
@@ -205,7 +208,6 @@ func ParseWebhookEvent(payload []byte, signature, timestamp, secret string, opti
 	if err := decodeJSON(payload, &event); err != nil {
 		return nil, &Error{Code: CodeSDKInvalidWebhookPayload, Message: "Webhook body does not match the event type", Cause: err}
 	}
-	event.Raw = object
 	return &event, nil
 }
 

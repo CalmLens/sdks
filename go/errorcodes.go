@@ -6,248 +6,248 @@ package calmlens
 // rather than string literals; new codes may be added at any time.
 const (
 	// CodeInvalidViewerClaims is returned with HTTP 400.
-	CodeInvalidViewerClaims = "viewer-claims/invalid"
+	CodeInvalidViewerClaims ErrorCode = "viewer-claims/invalid"
 	// CodeAgeConfirmationRequired is returned with HTTP 403.
-	CodeAgeConfirmationRequired = "viewer/age-confirmation-required"
+	CodeAgeConfirmationRequired ErrorCode = "viewer/age-confirmation-required"
 	// CodeInvalidViewerRegion is returned with HTTP 400.
-	CodeInvalidViewerRegion = "viewer-region/invalid"
+	CodeInvalidViewerRegion ErrorCode = "viewer-region/invalid"
 	// CodeViewerRegionRequired is returned with HTTP 403.
-	CodeViewerRegionRequired = "viewer/region-required"
+	CodeViewerRegionRequired ErrorCode = "viewer/region-required"
 	// CodeRegionalEvidenceRequired is returned with HTTP 403.
-	CodeRegionalEvidenceRequired = "asset/regional-evidence-required"
+	CodeRegionalEvidenceRequired ErrorCode = "asset/regional-evidence-required"
 	// CodeSignedURLExpired is returned with HTTP 403.
-	CodeSignedURLExpired = "signed-url/expired"
+	CodeSignedURLExpired ErrorCode = "signed-url/expired"
 	// CodeSignedURLInvalid is returned with HTTP 403.
-	CodeSignedURLInvalid = "signed-url/invalid"
+	CodeSignedURLInvalid ErrorCode = "signed-url/invalid"
 	// CodeSignedURLOriginalNotGranted is returned with HTTP 403.
-	CodeSignedURLOriginalNotGranted = "signed-url/original-not-granted"
+	CodeSignedURLOriginalNotGranted ErrorCode = "signed-url/original-not-granted"
 	// CodeInvalidRequest is returned with HTTP 400.
-	CodeInvalidRequest = "validation/invalid-request"
+	CodeInvalidRequest ErrorCode = "validation/invalid-request"
 	// CodeInvalidType is returned with HTTP 400.
-	CodeInvalidType = "validation/invalid-type"
+	CodeInvalidType ErrorCode = "validation/invalid-type"
 	// CodeTooSmall is returned with HTTP 400.
-	CodeTooSmall = "validation/too-small"
+	CodeTooSmall ErrorCode = "validation/too-small"
 	// CodeTooBig is returned with HTTP 400.
-	CodeTooBig = "validation/too-big"
+	CodeTooBig ErrorCode = "validation/too-big"
 	// CodeInvalidFormat is returned with HTTP 400.
-	CodeInvalidFormat = "validation/invalid-format"
+	CodeInvalidFormat ErrorCode = "validation/invalid-format"
 	// CodeInvalidValue is returned with HTTP 400.
-	CodeInvalidValue = "validation/invalid-value"
+	CodeInvalidValue ErrorCode = "validation/invalid-value"
 	// CodeUnknownField is returned with HTTP 400.
-	CodeUnknownField = "validation/unknown-field"
+	CodeUnknownField ErrorCode = "validation/unknown-field"
 	// CodeUnsupportedContentType is returned with HTTP 415.
-	CodeUnsupportedContentType = "request/unsupported-content-type"
+	CodeUnsupportedContentType ErrorCode = "request/unsupported-content-type"
 	// CodeInvalidFilter is returned with HTTP 400.
-	CodeInvalidFilter = "filter/invalid"
+	CodeInvalidFilter ErrorCode = "filter/invalid"
 	// CodeUnsupportedOrderingField is returned with HTTP 400.
-	CodeUnsupportedOrderingField = "ordering/unsupported-field"
+	CodeUnsupportedOrderingField ErrorCode = "ordering/unsupported-field"
 	// CodeRouteNotFound is returned with HTTP 404.
-	CodeRouteNotFound = "request/route-not-found"
+	CodeRouteNotFound ErrorCode = "request/route-not-found"
 	// CodeInternalError is returned with HTTP 500.
-	CodeInternalError = "server/internal-error"
+	CodeInternalError ErrorCode = "server/internal-error"
 	// CodeUnauthenticated is returned with HTTP 401.
-	CodeUnauthenticated = "auth/unauthenticated"
+	CodeUnauthenticated ErrorCode = "auth/unauthenticated"
 	// CodeTokenExpired is returned with HTTP 401.
-	CodeTokenExpired = "session-token/expired"
+	CodeTokenExpired ErrorCode = "session-token/expired"
 	// CodeInvalidToken is returned with HTTP 401.
-	CodeInvalidToken = "session-token/invalid"
+	CodeInvalidToken ErrorCode = "session-token/invalid"
 	// CodeSearchUnavailable is returned with HTTP 503.
-	CodeSearchUnavailable = "search/unavailable"
+	CodeSearchUnavailable ErrorCode = "search/unavailable"
 	// CodeInvalidTransform is returned with HTTP 400.
-	CodeInvalidTransform = "transform/invalid"
+	CodeInvalidTransform ErrorCode = "transform/invalid"
 	// CodeInvalidTransformOptions is returned with HTTP 400.
-	CodeInvalidTransformOptions = "transform-options/invalid"
+	CodeInvalidTransformOptions ErrorCode = "transform-options/invalid"
 	// CodeRemoteURLTooManyRedirects is returned with HTTP 400.
-	CodeRemoteURLTooManyRedirects = "remote-url/too-many-redirects"
+	CodeRemoteURLTooManyRedirects ErrorCode = "remote-url/too-many-redirects"
 	// CodeInvalidCursor is returned with HTTP 400.
-	CodeInvalidCursor = "cursor/invalid"
+	CodeInvalidCursor ErrorCode = "cursor/invalid"
 	// CodeMissingAPIKey is returned with HTTP 401.
-	CodeMissingAPIKey = "api-key/missing"
+	CodeMissingAPIKey ErrorCode = "api-key/missing"
 	// CodeInvalidAPIKey is returned with HTTP 401.
-	CodeInvalidAPIKey = "api-key/invalid"
+	CodeInvalidAPIKey ErrorCode = "api-key/invalid"
 	// CodeAPIKeyProjectMismatch is returned with HTTP 403.
-	CodeAPIKeyProjectMismatch = "api-key/project-mismatch"
+	CodeAPIKeyProjectMismatch ErrorCode = "api-key/project-mismatch"
 	// CodeAPIKeyNotAccepted is returned with HTTP 403.
-	CodeAPIKeyNotAccepted = "api-key/not-accepted"
+	CodeAPIKeyNotAccepted ErrorCode = "api-key/not-accepted"
 	// CodePermissionDenied is returned with HTTP 403.
-	CodePermissionDenied = "auth/permission-denied"
+	CodePermissionDenied ErrorCode = "auth/permission-denied"
 	// CodeUploadTooLarge is returned with HTTP 413.
-	CodeUploadTooLarge = "upload/too-large"
+	CodeUploadTooLarge ErrorCode = "upload/too-large"
 	// CodeDocumentTooManyItems is returned with HTTP 422.
-	CodeDocumentTooManyItems = "document/too-many-items"
+	CodeDocumentTooManyItems ErrorCode = "document/too-many-items"
 	// CodeMediaDurationLimit is returned with HTTP 422.
-	CodeMediaDurationLimit = "media/duration-limit"
+	CodeMediaDurationLimit ErrorCode = "media/duration-limit"
 	// CodeInvalidImage is returned with HTTP 422.
-	CodeInvalidImage = "image/invalid"
+	CodeInvalidImage ErrorCode = "image/invalid"
 	// CodeImageTooLarge is returned with HTTP 422.
-	CodeImageTooLarge = "image/too-large"
+	CodeImageTooLarge ErrorCode = "image/too-large"
 	// CodeFreeUploadsExhausted is returned with HTTP 403.
-	CodeFreeUploadsExhausted = "usage/free-uploads-exhausted"
+	CodeFreeUploadsExhausted ErrorCode = "usage/free-uploads-exhausted"
 	// CodeUploadsPaused is returned with HTTP 402.
-	CodeUploadsPaused = "usage/uploads-paused"
+	CodeUploadsPaused ErrorCode = "usage/uploads-paused"
 	// CodeUnsupportedUploadType is returned with HTTP 415.
-	CodeUnsupportedUploadType = "upload/unsupported-type"
+	CodeUnsupportedUploadType ErrorCode = "upload/unsupported-type"
 	// CodeInvalidUploadPayload is returned with HTTP 400.
-	CodeInvalidUploadPayload = "upload-payload/invalid"
+	CodeInvalidUploadPayload ErrorCode = "upload-payload/invalid"
 	// CodeUploadOptionsInQuery is returned with HTTP 400.
-	CodeUploadOptionsInQuery = "upload/options-in-query"
+	CodeUploadOptionsInQuery ErrorCode = "upload/options-in-query"
 	// CodeUseUploadPart is returned with HTTP 409.
-	CodeUseUploadPart = "upload/use-upload-part"
+	CodeUseUploadPart ErrorCode = "upload/use-upload-part"
 	// CodeUploadNotOpen is returned with HTTP 409.
-	CodeUploadNotOpen = "upload/not-open"
+	CodeUploadNotOpen ErrorCode = "upload/not-open"
 	// CodeInvalidUploadPartNumber is returned with HTTP 409.
-	CodeInvalidUploadPartNumber = "upload-part/invalid-number"
+	CodeInvalidUploadPartNumber ErrorCode = "upload-part/invalid-number"
 	// CodeUploadMissing is returned with HTTP 409.
-	CodeUploadMissing = "upload/missing"
+	CodeUploadMissing ErrorCode = "upload/missing"
 	// CodeUploadSizeMismatch is returned with HTTP 400.
-	CodeUploadSizeMismatch = "upload/size-mismatch"
+	CodeUploadSizeMismatch ErrorCode = "upload/size-mismatch"
 	// CodeInvalidIdempotencyKey is returned with HTTP 400.
-	CodeInvalidIdempotencyKey = "idempotency/invalid-key"
+	CodeInvalidIdempotencyKey ErrorCode = "idempotency/invalid-key"
 	// CodeIdempotencyKeyReused is returned with HTTP 409.
-	CodeIdempotencyKeyReused = "idempotency/key-reused"
+	CodeIdempotencyKeyReused ErrorCode = "idempotency/key-reused"
 	// CodeIdempotentRequestInProgress is returned with HTTP 409.
-	CodeIdempotentRequestInProgress = "idempotency/request-in-progress"
+	CodeIdempotentRequestInProgress ErrorCode = "idempotency/request-in-progress"
 	// CodeNoRenderedVersion is returned with HTTP 404.
-	CodeNoRenderedVersion = "asset/no-rendered-version"
+	CodeNoRenderedVersion ErrorCode = "asset/no-rendered-version"
 	// CodeAssetNotFound is returned with HTTP 404.
-	CodeAssetNotFound = "asset/not-found"
+	CodeAssetNotFound ErrorCode = "asset/not-found"
 	// CodeProjectNotFound is returned with HTTP 404.
-	CodeProjectNotFound = "project/not-found"
+	CodeProjectNotFound ErrorCode = "project/not-found"
 	// CodeAssetChildNotDeletable is returned with HTTP 409.
-	CodeAssetChildNotDeletable = "asset/child-not-deletable"
+	CodeAssetChildNotDeletable ErrorCode = "asset/child-not-deletable"
 	// CodeAssetReviewChanged is returned with HTTP 409.
-	CodeAssetReviewChanged = "asset/review-changed"
+	CodeAssetReviewChanged ErrorCode = "asset/review-changed"
 	// CodeAssetReviewNoteRequired is returned with HTTP 400.
-	CodeAssetReviewNoteRequired = "asset/review-note-required"
+	CodeAssetReviewNoteRequired ErrorCode = "asset/review-note-required"
 	// CodeAssetUpdateFailed is returned with HTTP 500.
-	CodeAssetUpdateFailed = "asset/update-failed"
+	CodeAssetUpdateFailed ErrorCode = "asset/update-failed"
 	// CodeAssetHeld is returned with HTTP 423.
-	CodeAssetHeld = "asset/held"
+	CodeAssetHeld ErrorCode = "asset/held"
 	// CodeAssetProcessing is returned with HTTP 409.
-	CodeAssetProcessing = "asset/processing"
+	CodeAssetProcessing ErrorCode = "asset/processing"
 	// CodeAssetDecisionNotAllowed is returned with HTTP 409.
-	CodeAssetDecisionNotAllowed = "asset/decision-not-allowed"
+	CodeAssetDecisionNotAllowed ErrorCode = "asset/decision-not-allowed"
 	// CodeAssetDecisionUnchanged is returned with HTTP 409.
-	CodeAssetDecisionUnchanged = "asset/decision-unchanged"
+	CodeAssetDecisionUnchanged ErrorCode = "asset/decision-unchanged"
 	// CodeAssetNotRetryable is returned with HTTP 409.
-	CodeAssetNotRetryable = "asset/not-retryable"
+	CodeAssetNotRetryable ErrorCode = "asset/not-retryable"
 	// CodeAssetContentUnavailable is returned with HTTP 409.
-	CodeAssetContentUnavailable = "asset/content-unavailable"
+	CodeAssetContentUnavailable ErrorCode = "asset/content-unavailable"
 	// CodeAssetContentPurged is returned with HTTP 409.
-	CodeAssetContentPurged = "asset/content-purged"
+	CodeAssetContentPurged ErrorCode = "asset/content-purged"
 	// CodeAssetNotDecided is returned with HTTP 409.
-	CodeAssetNotDecided = "asset/not-decided"
+	CodeAssetNotDecided ErrorCode = "asset/not-decided"
 	// CodeAssetPolicyChanged is returned with HTTP 409.
-	CodeAssetPolicyChanged = "asset/policy-changed"
+	CodeAssetPolicyChanged ErrorCode = "asset/policy-changed"
 	// CodeAssetReviewed is returned with HTTP 409.
-	CodeAssetReviewed = "asset/reviewed"
+	CodeAssetReviewed ErrorCode = "asset/reviewed"
 	// CodeSupportTicketNotFound is returned with HTTP 404.
-	CodeSupportTicketNotFound = "support-ticket/not-found"
+	CodeSupportTicketNotFound ErrorCode = "support-ticket/not-found"
 	// CodeDuplicateExternalID is returned with HTTP 409.
-	CodeDuplicateExternalID = "asset/duplicate-external-id"
+	CodeDuplicateExternalID ErrorCode = "asset/duplicate-external-id"
 	// CodeFolderNotFound is returned with HTTP 404.
-	CodeFolderNotFound = "folder/not-found"
+	CodeFolderNotFound ErrorCode = "folder/not-found"
 	// CodeDuplicateFolderName is returned with HTTP 409.
-	CodeDuplicateFolderName = "folder/duplicate-name"
+	CodeDuplicateFolderName ErrorCode = "folder/duplicate-name"
 	// CodeFolderNotEmpty is returned with HTTP 409.
-	CodeFolderNotEmpty = "folder/not-empty"
+	CodeFolderNotEmpty ErrorCode = "folder/not-empty"
 	// CodeFolderParentCycle is returned with HTTP 409.
-	CodeFolderParentCycle = "folder/parent-cycle"
+	CodeFolderParentCycle ErrorCode = "folder/parent-cycle"
 	// CodeLensNotFound is returned with HTTP 404.
-	CodeLensNotFound = "lens/not-found"
+	CodeLensNotFound ErrorCode = "lens/not-found"
 	// CodeLensIdentifierTaken is returned with HTTP 409.
-	CodeLensIdentifierTaken = "lens/identifier-taken"
+	CodeLensIdentifierTaken ErrorCode = "lens/identifier-taken"
 	// CodeLensIdentifierReserved is returned with HTTP 409.
-	CodeLensIdentifierReserved = "lens/identifier-reserved"
+	CodeLensIdentifierReserved ErrorCode = "lens/identifier-reserved"
 	// CodeHashListNotFound is returned with HTTP 404.
-	CodeHashListNotFound = "hash-list/not-found"
+	CodeHashListNotFound ErrorCode = "hash-list/not-found"
 	// CodeHashListEntryNotFound is returned with HTTP 404.
-	CodeHashListEntryNotFound = "hash-list-entry/not-found"
+	CodeHashListEntryNotFound ErrorCode = "hash-list-entry/not-found"
 	// CodeHashListLimitReached is returned with HTTP 409.
-	CodeHashListLimitReached = "hash-list/limit-reached"
+	CodeHashListLimitReached ErrorCode = "hash-list/limit-reached"
 	// CodeHashListEntryLimitReached is returned with HTTP 409.
-	CodeHashListEntryLimitReached = "hash-list-entry/limit-reached"
+	CodeHashListEntryLimitReached ErrorCode = "hash-list-entry/limit-reached"
 	// CodeHashListAssetNotHashed is returned with HTTP 409.
-	CodeHashListAssetNotHashed = "hash-list/asset-not-hashed"
+	CodeHashListAssetNotHashed ErrorCode = "hash-list/asset-not-hashed"
 	// CodePolicyNotFound is returned with HTTP 404.
-	CodePolicyNotFound = "policy/not-found"
+	CodePolicyNotFound ErrorCode = "policy/not-found"
 	// CodePolicyRevisionConflict is returned with HTTP 409.
-	CodePolicyRevisionConflict = "policy/revision-conflict"
+	CodePolicyRevisionConflict ErrorCode = "policy/revision-conflict"
 	// CodePolicyProjectsChanged is returned with HTTP 409.
-	CodePolicyProjectsChanged = "policy/projects-changed"
+	CodePolicyProjectsChanged ErrorCode = "policy/projects-changed"
 	// CodePolicyInUse is returned with HTTP 409.
-	CodePolicyInUse = "policy/in-use"
+	CodePolicyInUse ErrorCode = "policy/in-use"
 	// CodePolicyUsedByAnotherProject is returned with HTTP 409.
-	CodePolicyUsedByAnotherProject = "policy/used-by-another-project"
+	CodePolicyUsedByAnotherProject ErrorCode = "policy/used-by-another-project"
 	// CodePolicyNoPreset is returned with HTTP 400.
-	CodePolicyNoPreset = "policy/no-preset"
+	CodePolicyNoPreset ErrorCode = "policy/no-preset"
 	// CodePolicyPresetVersionConflict is returned with HTTP 409.
-	CodePolicyPresetVersionConflict = "policy/preset-version-conflict"
+	CodePolicyPresetVersionConflict ErrorCode = "policy/preset-version-conflict"
 	// CodePolicyPresetUpdateUnavailable is returned with HTTP 409.
-	CodePolicyPresetUpdateUnavailable = "policy/preset-update-unavailable"
+	CodePolicyPresetUpdateUnavailable ErrorCode = "policy/preset-update-unavailable"
 	// CodePolicyAutomaticUpdatesUnavailable is returned with HTTP 409.
-	CodePolicyAutomaticUpdatesUnavailable = "policy/automatic-updates-unavailable"
+	CodePolicyAutomaticUpdatesUnavailable ErrorCode = "policy/automatic-updates-unavailable"
 	// CodeUploadPresetNotFound is returned with HTTP 404.
-	CodeUploadPresetNotFound = "upload-preset/not-found"
+	CodeUploadPresetNotFound ErrorCode = "upload-preset/not-found"
 	// CodeUploadPresetDisabled is returned with HTTP 403.
-	CodeUploadPresetDisabled = "upload-preset/disabled"
+	CodeUploadPresetDisabled ErrorCode = "upload-preset/disabled"
 	// CodeUploadPresetTokenRequired is returned with HTTP 401.
-	CodeUploadPresetTokenRequired = "upload-preset/token-required"
+	CodeUploadPresetTokenRequired ErrorCode = "upload-preset/token-required"
 	// CodeRemoteURLNotAllowed is returned with HTTP 403.
-	CodeRemoteURLNotAllowed = "remote-url/not-allowed"
+	CodeRemoteURLNotAllowed ErrorCode = "remote-url/not-allowed"
 	// CodeWebsiteRateLimitReached is returned with HTTP 429.
-	CodeWebsiteRateLimitReached = "upload/website-rate-limit-reached"
+	CodeWebsiteRateLimitReached ErrorCode = "upload/website-rate-limit-reached"
 	// CodeUploadPresetDailyLimitReached is returned with HTTP 429.
-	CodeUploadPresetDailyLimitReached = "upload-preset/daily-limit-reached"
+	CodeUploadPresetDailyLimitReached ErrorCode = "upload-preset/daily-limit-reached"
 	// CodeUploadPresetOriginNotAllowed is returned with HTTP 403.
-	CodeUploadPresetOriginNotAllowed = "upload-preset/origin-not-allowed"
+	CodeUploadPresetOriginNotAllowed ErrorCode = "upload-preset/origin-not-allowed"
 	// CodeUploadPresetFieldNotAllowed is returned with HTTP 400.
-	CodeUploadPresetFieldNotAllowed = "upload-preset/field-not-allowed"
+	CodeUploadPresetFieldNotAllowed ErrorCode = "upload-preset/field-not-allowed"
 	// CodeUploadPresetRevisionConflict is returned with HTTP 409.
-	CodeUploadPresetRevisionConflict = "upload-preset/revision-conflict"
+	CodeUploadPresetRevisionConflict ErrorCode = "upload-preset/revision-conflict"
 	// CodeUploadPresetKeyTaken is returned with HTTP 409.
-	CodeUploadPresetKeyTaken = "upload-preset/key-taken"
+	CodeUploadPresetKeyTaken ErrorCode = "upload-preset/key-taken"
 	// CodeUploadPresetDailyLimitRequired is returned with HTTP 400.
-	CodeUploadPresetDailyLimitRequired = "upload-preset/daily-limit-required"
+	CodeUploadPresetDailyLimitRequired ErrorCode = "upload-preset/daily-limit-required"
 	// CodeUploadPresetInvalidFolder is returned with HTTP 400.
-	CodeUploadPresetInvalidFolder = "upload-preset/invalid-folder"
+	CodeUploadPresetInvalidFolder ErrorCode = "upload-preset/invalid-folder"
 	// CodeUploadPresetInvalidPolicy is returned with HTTP 400.
-	CodeUploadPresetInvalidPolicy = "upload-preset/invalid-policy"
+	CodeUploadPresetInvalidPolicy ErrorCode = "upload-preset/invalid-policy"
 	// CodeProjectSettingsRevisionConflict is returned with HTTP 409.
-	CodeProjectSettingsRevisionConflict = "project-settings/revision-conflict"
+	CodeProjectSettingsRevisionConflict ErrorCode = "project-settings/revision-conflict"
 	// CodeSearchEstimateChanged is returned with HTTP 409.
-	CodeSearchEstimateChanged = "search/estimate-changed"
+	CodeSearchEstimateChanged ErrorCode = "search/estimate-changed"
 	// CodeMetadataFieldNotFound is returned with HTTP 404.
-	CodeMetadataFieldNotFound = "metadata-field/not-found"
+	CodeMetadataFieldNotFound ErrorCode = "metadata-field/not-found"
 	// CodeUploadTokenInvalid is returned with HTTP 401.
-	CodeUploadTokenInvalid = "upload-token/invalid"
+	CodeUploadTokenInvalid ErrorCode = "upload-token/invalid"
 	// CodeUploadTokenExpired is returned with HTTP 401.
-	CodeUploadTokenExpired = "upload-token/expired"
+	CodeUploadTokenExpired ErrorCode = "upload-token/expired"
 	// CodeUploadTokenUsed is returned with HTTP 409.
-	CodeUploadTokenUsed = "upload-token/used"
+	CodeUploadTokenUsed ErrorCode = "upload-token/used"
 	// CodeInvalidRemoteURL is returned with HTTP 400.
-	CodeInvalidRemoteURL = "remote-url/invalid"
+	CodeInvalidRemoteURL ErrorCode = "remote-url/invalid"
 	// CodeRemoteURLUnavailable is returned with HTTP 422.
-	CodeRemoteURLUnavailable = "remote-url/unavailable"
+	CodeRemoteURLUnavailable ErrorCode = "remote-url/unavailable"
 	// CodeAppealNotFound is returned with HTTP 404.
-	CodeAppealNotFound = "appeal/not-found"
+	CodeAppealNotFound ErrorCode = "appeal/not-found"
 	// CodeAppealJudgmentNotFound is returned with HTTP 404.
-	CodeAppealJudgmentNotFound = "appeal/judgment-not-found"
+	CodeAppealJudgmentNotFound ErrorCode = "appeal/judgment-not-found"
 	// CodeAppealAssetNotFound is returned with HTTP 404.
-	CodeAppealAssetNotFound = "appeal/asset-not-found"
+	CodeAppealAssetNotFound ErrorCode = "appeal/asset-not-found"
 	// CodeAppealPermissionDenied is returned with HTTP 403.
-	CodeAppealPermissionDenied = "appeal/permission-denied"
+	CodeAppealPermissionDenied ErrorCode = "appeal/permission-denied"
 	// CodeAppealAlreadyReviewed is returned with HTTP 409.
-	CodeAppealAlreadyReviewed = "appeal/already-reviewed"
+	CodeAppealAlreadyReviewed ErrorCode = "appeal/already-reviewed"
 	// CodeAppealDecisionChanged is returned with HTTP 409.
-	CodeAppealDecisionChanged = "appeal/decision-changed"
+	CodeAppealDecisionChanged ErrorCode = "appeal/decision-changed"
 	// CodeAppealInvalidAction is returned with HTTP 400.
-	CodeAppealInvalidAction = "appeal/invalid-action"
+	CodeAppealInvalidAction ErrorCode = "appeal/invalid-action"
 	// CodeAppealContentUnavailable is returned with HTTP 409.
-	CodeAppealContentUnavailable = "appeal/content-unavailable"
+	CodeAppealContentUnavailable ErrorCode = "appeal/content-unavailable"
 )
 
-var publicErrorStatuses = map[string]int{
+var publicErrorStatuses = map[ErrorCode]int{
 	CodeInvalidViewerClaims:               400,
 	CodeAgeConfirmationRequired:           403,
 	CodeInvalidViewerRegion:               400,

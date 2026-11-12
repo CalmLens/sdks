@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/CalmLens/sdks/go/internal/contract"
+	"calmlens.com/go/calmlens/internal/contract"
 )
 
 // <generated: image-transform-options>

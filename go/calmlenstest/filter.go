@@ -3,15 +3,16 @@ package calmlenstest
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
-// lookup returns the value at a dotted field path, such as "classification.moderation.status", or nil.
+// lookup returns the value at a dotted field path, such as "classification.moderation.decision", or nil.
 func lookup(asset calmlens.JSON, path string) any {
 	var value any = asset
 	for _, key := range strings.Split(path, ".") {
@@ -20,6 +21,25 @@ func lookup(asset calmlens.JSON, path string) any {
 			return nil
 		}
 		value = object[key]
+	}
+	return plain(value)
+}
+
+// plain turns the SDK's typed strings, such as calmlens.ModerationStatus, which the mock keeps in
+// its JSON, into strings, and slices of them into []any, so they compare like decoded JSON.
+func plain(value any) any {
+	v := reflect.ValueOf(value)
+	switch {
+	case !v.IsValid():
+		return value
+	case v.Kind() == reflect.String:
+		return v.String()
+	case v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.String:
+		out := make([]any, v.Len())
+		for i := range out {
+			out[i] = v.Index(i).String()
+		}
+		return out
 	}
 	return value
 }

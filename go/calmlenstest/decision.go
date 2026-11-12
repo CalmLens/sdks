@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // Moderation statuses of a mock Decision. OutcomeAllowed to OutcomePurged are also the reviewer

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CalmLens/sdks/go/internal/fixtures"
+	"calmlens.com/go/calmlens/internal/fixtures"
 )
 
 // Every transform option, decoded into ImageTransformOptions and serialized, gives the selector
@@ -296,7 +296,7 @@ func TestWebhookContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if event.Type != f.ExpectedType || len(event.Facts) == 0 || event.Facts[0].Key != f.ExpectedFactKey || !reflect.DeepEqual(plain(t, event.Raw), plainJSON(t, f.Body)) {
+			if string(event.Type) != f.ExpectedType || len(event.Facts) == 0 || string(event.Facts[0].Key) != f.ExpectedFactKey || !reflect.DeepEqual(plain(t, event.RawJSON()), plainJSON(t, f.Body)) {
 				t.Fatal(event)
 			}
 		})
@@ -329,7 +329,7 @@ func TestWebhookContract(t *testing.T) {
 			if err := json.Unmarshal(fixture.Event, &event); err != nil {
 				t.Fatal(err)
 			}
-			if got := plain(t, ToWebhookEventPayload(event).Raw); !reflect.DeepEqual(got, fixture.Payload) {
+			if got := plain(t, ToWebhookEventPayload(event).RawJSON()); !reflect.DeepEqual(got, fixture.Payload) {
 				t.Errorf("payload %v, want %v", got, fixture.Payload)
 			}
 		})
@@ -360,7 +360,7 @@ func TestWebhookContract(t *testing.T) {
 				request, _ := http.NewRequest(http.MethodPost, "https://example.test/webhook", strings.NewReader(fixture.Body))
 				request.Header = header
 				_, err := VerifyWebhookRequest(request, fixture.Secret, at(fixture.Now))
-				if refused := ErrorCode(err) == CodeSDKInvalidWebhookSignature; refused == fixture.Valid {
+				if refused := CodeOf(err) == CodeSDKInvalidWebhookSignature; refused == fixture.Valid {
 					t.Fatalf("VerifyWebhookRequest: %v, want valid %v", err, fixture.Valid)
 				}
 			})
@@ -369,7 +369,7 @@ func TestWebhookContract(t *testing.T) {
 	for _, fixture := range fixtures.ParseErrors {
 		t.Run("parse error: "+fixture.Name, func(t *testing.T) {
 			_, err := ParseWebhookEvent([]byte(fixture.Body), fixture.Signature, fixture.Timestamp, fixture.Secret, at(fixture.Now))
-			if ErrorCode(err) != fixture.Error {
+			if string(CodeOf(err)) != fixture.Error {
 				t.Fatalf("got %v, want %s", err, fixture.Error)
 			}
 		})
@@ -380,11 +380,11 @@ func TestWebhookContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := plain(t, event.Raw); !reflect.DeepEqual(got, fixture.Expected) {
+			if got := plain(t, event.RawJSON()); !reflect.DeepEqual(got, fixture.Expected) {
 				t.Fatalf("parsed %v, want %v", got, fixture.Expected)
 			}
 			expected := fixture.Expected.(map[string]any)
-			if event.ID != expected["id"] || event.Type != expected["type"] || event.ProjectID != expected["projectId"] || float64(event.CreatedAt) != expected["createdAt"] {
+			if event.ID != expected["id"] || string(event.Type) != expected["type"] || event.ProjectID != expected["projectId"] || float64(event.CreatedAt) != expected["createdAt"] {
 				t.Fatalf("typed fields %+v", event)
 			}
 			if event.Facts.IsTest() != fixture.IsTest {
@@ -425,7 +425,7 @@ func TestWebhookContract(t *testing.T) {
 			if err := decodeJSON(fixture.Event, &event); err != nil {
 				t.Fatal(err)
 			}
-			if got := plain(t, GetEventFact(&event, fixture.Key)); !reflect.DeepEqual(got, fixture.Value) {
+			if got := plain(t, GetEventFact(&event, EventFactKey(fixture.Key))); !reflect.DeepEqual(got, fixture.Value) {
 				t.Fatalf("GetEventFact(%q) = %#v, want %#v", fixture.Key, got, fixture.Value)
 			}
 		})
@@ -448,7 +448,7 @@ func TestWebhookContract(t *testing.T) {
 				t.Fatal(err)
 			}
 			payload := ToWebhookEventPayload(event)
-			if got := plain(t, payload.Raw); !reflect.DeepEqual(got, fixture.Payload) {
+			if got := plain(t, payload.RawJSON()); !reflect.DeepEqual(got, fixture.Payload) {
 				t.Fatalf("payload %v, want %v", got, fixture.Payload)
 			}
 			if !reflect.DeepEqual(plainJSON(t, fixture.Body), fixture.Payload) {
@@ -468,8 +468,8 @@ func TestWebhookContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(plain(t, received.Raw), fixture.Payload) || received.Facts.IsTest() != fixture.IsTest {
-				t.Fatalf("received %v (test %v)", received.Raw, received.Facts.IsTest())
+			if !reflect.DeepEqual(plain(t, received.RawJSON()), fixture.Payload) || received.Facts.IsTest() != fixture.IsTest {
+				t.Fatalf("received %v (test %v)", received.RawJSON(), received.Facts.IsTest())
 			}
 			// The body stays readable for later handlers.
 			if body, _ := io.ReadAll(request.Body); string(body) != fixture.Body {
@@ -539,7 +539,7 @@ func TestRejections(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, err = invoke(t, context.Background(), c, rejection.Operation, args)
-			if got := ErrorCode(err); got != rejection.Error || len(transport.received) != 0 {
+			if got := string(CodeOf(err)); got != rejection.Error || len(transport.received) != 0 {
 				t.Fatalf("got %q (%v) after %d requests; want %q before any request", got, err, len(transport.received), rejection.Error)
 			}
 			var failure *Error
@@ -562,7 +562,7 @@ func TestRetryableAndLocalFollowTheCodeAndStatus(t *testing.T) {
 		}
 	}](t, "surface.json")
 	for _, entry := range surface.Retryable {
-		failure := &Error{Code: entry.Code}
+		failure := &Error{Code: ErrorCode(entry.Code)}
 		if entry.Status != nil {
 			failure.Status = *entry.Status
 		}
@@ -687,10 +687,10 @@ func TestUploadTokenContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = client.UploadTokens.Sign(context.Background(), options); ErrorCode(err) != c.Error {
+			if _, err = client.UploadTokens.Sign(context.Background(), options); string(CodeOf(err)) != c.Error {
 				t.Fatalf("Sign: %v, want %s", err, c.Error)
 			}
-			if _, err = signUploadToken(c.APIKey, options, time.UnixMilli(0), "n"); ErrorCode(err) != c.Error {
+			if _, err = signUploadToken(c.APIKey, options, time.UnixMilli(0), "n"); string(CodeOf(err)) != c.Error {
 				t.Fatalf("signing at a fixed time: %v, want %s", err, c.Error)
 			}
 		})

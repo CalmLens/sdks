@@ -6,14 +6,15 @@ package calmlens
 //
 // How Go expresses the schema:
 //   - Struct fields are named by their json tag, or, for fields the SDK encodes by hand (path and
-//     query parameters, json:"-"), by their Go name compared case-insensitively.
+//     query parameters, json:"-"), by their Go name compared case-insensitively. The embedded
+//     Params are per-call options, not API fields.
 //   - Optional is a pointer, a slice, a map, an interface, a Patch or an omitempty tag. Nullable is
 //     a pointer, a slice, a map, an interface or a Patch. A slice or map can't say "never null" in
 //     Go, so either is accepted where the API never sends null.
 //   - Integers are any Go integer or float kind; numbers are float kinds.
-//   - An enum is a named string type whose typed constants match the schema's values exactly, or a
-//     plain string listed in openStrings below, whose constant block (when it has one) must also
-//     match the values exactly.
+//   - An enum is a named string type whose typed constants match the schema's values exactly (less
+//     sharedEnums' exclusions). A plain string enum must be listed in openStrings, with a reason.
+//   - Every struct in a result keeps its JSON: RawJSON and ExtraFields (responsejson.go).
 //   - A union of objects is one struct that has the fields of every branch: a field is required
 //     only when every branch requires it, and a discriminator's values are the branches'
 //     constants together. A union of different kinds is any, json.RawMessage or a type that
@@ -33,117 +34,36 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CalmLens/sdks/go/internal/fixtures"
+	"calmlens.com/go/calmlens/internal/fixtures"
 )
 
-// openStrings lists the enum fields Go declares as a plain string, keyed by "<Type>.<Field>"
-// (with " key" for a map's keys). Go's convention keeps them open so a value added to the API
-// after this SDK still decodes, and so callers can pass the API's strings directly. Each names a
-// constant of the block that lists the field's values, or none when the SDK declares no
-// constants for it; the block's values, less those excluded (values of other fields that share
-// the block), must match the schema exactly.
-type openString struct {
-	constant string
-	exclude  []string
+// openStrings lists enum fields Go declares as a plain string, keyed by "<Type>.<Field>" (with
+// " key" for a map's keys), with the reason. Every enum is a named string type with typed
+// constants, so it is empty; an entry needs a reason Go genuinely can't type the field.
+var openStrings = map[string]string{}
+
+// sharedEnums lists fields whose enum type is shared with other fields that take more values,
+// keyed by "<Type>.<Field>", with the type's values the field never takes. The type's other
+// constants must match the field's schema exactly.
+var sharedEnums = map[string][]string{
+	// Category and qualifier results are never reported in children.
+	"CategoryResult.Reason":  {"in-children"},
+	"QualifierResult.Reason": {"in-children"},
+	// Only category results are partially evaluated.
+	"QualifierResult.Status":       {"partial"},
+	"FaceDetectionResult.Status":   {"partial"},
+	"LinkDetectionResult.Status":   {"partial"},
+	"OCRResult.Status":             {"partial"},
+	"PersonDetectionResult.Status": {"partial"},
+	// A regional decision only ever restricts.
+	"RegionalDecision.Status": {"allowed"},
 }
 
-var openStrings = map[string]openString{
-	"Actor.Type":                                {constant: "ActorUser"},
-	"Asset.Type":                                {constant: "AssetTypeImage"},
-	"Asset.Visibility":                          {constant: "VisibilityPrivate"},
-	"AssetClassification.FailureReason":         {constant: "AssetFailureReasonFileTooLarge"},
-	"AssetClassification.Status":                {constant: "ClassificationStatusQueued"},
-	"AssetContent.RemovalReason":                {constant: "ContentRemovalReasonPolicy"},
-	"AssetContent.Status":                       {constant: "ContentStatusTemporary"},
-	"AssetHls.Reason":                           {},
-	"AssetHls.Status":                           {},
-	"AssetModeration.AutomatedStatus":           {constant: "ModerationDecisionAllowed"},
-	"AssetModeration.Categories key":            {constant: "CategoryPersonalInformation"},
-	"AssetModeration.FlaggedCategories":         {constant: "CategoryPersonalInformation"},
-	"AssetModeration.Source":                    {constant: "DecisionSourcePolicy"},
-	"AssetModeration.Status":                    {constant: "ModerationStatusPending"},
-	"AssetPendingReview.Reason":                 {},
-	"AssetPendingReview.UncertainCategories":    {constant: "CategoryPersonalInformation"},
-	"AssetReview.Decision":                      {constant: "ModerationDecisionAllowed"},
-	"AssetSearchMatch.MatchedFields":            {constant: "MatchedFieldName"},
-	"AssetSearchResponse.SemanticStatus":        {constant: "SemanticStatusDisabled"},
-	"AssetUpload.Status":                        {},
-	"BatchAssetsResponse.Status":                {constant: "BatchStatusQueued"},
-	"CategoryPolicyScore.Action":                {constant: "ModerationActionAllow"},
-	"CategoryPolicySettings.Action":             {constant: "ModerationActionAllow"},
-	"CategoryPolicySettingsSnapshot.Action":     {constant: "ModerationActionAllow"},
-	"CategoryPolicySource.Kind":                 {},
-	"CategoryResult.Likelihood":                 {constant: "LikelihoodVeryUnlikely"},
-	"CategoryResult.Qualifiers key":             {constant: "QualifierSexualPornographicMedia"},
-	"CategoryResult.Reason":                     {constant: "ReasonNotSupported", exclude: []string{"in-children"}},
-	"CategoryResult.Status":                     {constant: "ResultEvaluated"},
-	"CreateHashListOptions.Action":              {constant: "HashListActionFlag"},
-	"CreateLensOptions.Type":                    {constant: "LensTypeImage"},
-	"CreatePolicyOptions.PresetID":              {constant: "PolicyPresetGeneral"},
-	"DecideAssetOptions.Decision":               {constant: "ModerationDecisionAllowed"},
-	"DecisionPolicyPreset.ID":                   {constant: "PolicyPresetGeneral"},
-	"DetectedLink.Source":                       {},
-	"EnsureLensOptions.Type":                    {constant: "LensTypeImage"},
-	"Event.Severity":                            {constant: "SeverityLow"},
-	"Event.Type":                                {constant: "EventAssetUploaded"},
-	"EventAssetClassification.Status":           {constant: "ClassificationStatusQueued"},
-	"EventAssetContent.Status":                  {constant: "ContentStatusTemporary"},
-	"EventAssetModeration.Status":               {constant: "ModerationStatusPending"},
-	"EventAssetUpload.Status":                   {},
-	"EventFact.Key":                             {constant: "FactAssetName"},
-	"EventsPage.ExcludedTypes":                  {constant: "EventAssetUploaded"},
-	"ExtractedText.Type":                        {constant: "ExtractedTextString"},
-	"FaceDetectionResult.Reason":                {constant: "ReasonNotSupported"},
-	"FaceDetectionResult.Status":                {constant: "ResultEvaluated", exclude: []string{"partial"}},
-	"HashList.Action":                           {constant: "HashListActionFlag"},
-	"HashMatch.Action":                          {constant: "HashListActionFlag"},
-	"HashMatch.Source":                          {constant: "HashMatchSourceHashList"},
-	"Lens.Type":                                 {constant: "LensTypeImage"},
-	"LinkDetectionResult.Reason":                {constant: "ReasonNotSupported"},
-	"LinkDetectionResult.Status":                {constant: "ResultEvaluated", exclude: []string{"partial"}},
-	"ListEventsOptions.Types":                   {constant: "EventAssetUploaded"},
-	"MediaClassificationSegment.Categories key": {constant: "CategoryPersonalInformation"},
-	"MediaClassificationSegment.Source":         {constant: "SegmentSourceFrame"},
-	"MetadataField.Icon":                        {},
-	"MetadataField.Type":                        {},
-	"ModerationRaw.Categories key":              {constant: "CategoryPersonalInformation"},
-	"OCRResult.Reason":                          {constant: "ReasonNotSupported"},
-	"OCRResult.Status":                          {constant: "ResultEvaluated", exclude: []string{"partial"}},
-	"PersonDetectionResult.Reason":              {constant: "ReasonNotSupported"},
-	"PersonDetectionResult.Status":              {constant: "ResultEvaluated", exclude: []string{"partial"}},
-	"PolicyPresetOrigin.ID":                     {constant: "PolicyPresetGeneral"},
-	"PolicyPresetOrigin.Mode":                   {constant: "PolicyPresetModeLive"},
-	"PolicyRuleSnapshot.Action":                 {constant: "ModerationActionAllow"},
-	"PolicyRuleSnapshot.Unless":                 {constant: "QualifierSexualPornographicMedia"},
-	"PolicyRuleSnapshot.When":                   {constant: "QualifierSexualPornographicMedia"},
-	"PolicySettings.CategorySettings key":       {constant: "CategoryPersonalInformation"},
-	"ProjectSettings.OptOutJurisdictions":       {},
-	"ProjectSettingsInput.OptOutJurisdictions":  {},
-	"QualifierResult.Likelihood":                {constant: "LikelihoodVeryUnlikely"},
-	"QualifierResult.Reason":                    {constant: "ReasonNotSupported", exclude: []string{"in-children"}},
-	"QualifierResult.Status":                    {constant: "ResultEvaluated", exclude: []string{"partial"}},
-	"RegionalDecision.Category":                 {constant: "CategoryPersonalInformation"},
-	"RegionalDecision.Region":                   {},
-	"RegionalDecision.Status":                   {constant: "ModerationDecisionAllowed", exclude: []string{"allowed"}},
-	"RemoteURLRule.Mode":                        {},
-	"ReviewActor.Type":                          {constant: "ReviewActorUser"},
-	"SafetyHold.Reason":                         {constant: "SafetyHoldReasonSuspectedIllegalContent"},
-	"SearchAssetsOptions.Mode":                  {constant: "SearchModeKeyword"},
-	"SubmitAssetOptions.Visibility":             {constant: "VisibilityPrivate"},
-	"UpdateAssetOptions.Visibility":             {constant: "VisibilityPrivate"},
-	"UpdateHashListOptions.Action":              {constant: "HashListActionFlag"},
-	"UpdateLensOptions.Type":                    {constant: "LensTypeImage"},
-	"UploadPreset.Access":                       {constant: "UploadPresetAccessToken"},
-	"UploadPreset.Visibility":                   {constant: "VisibilityPrivate"},
-	"UploadPresetDefinition.Access":             {constant: "UploadPresetAccessToken"},
-	"UploadPresetDefinition.Visibility":         {constant: "VisibilityPrivate"},
-}
-
-// enumExtras lists constants Go keeps although types.json lacks them, keyed by "<Type>.<Field>"
-// (or the enum type's name), with the reason. Only values the API hides behind a disabled feature
+// enumExtras lists constants Go keeps although types.json lacks them, keyed by the enum type's
+// name, with the reason. Only values the API hides behind a disabled feature
 // switch belong here.
 var enumExtras = map[string]map[string]string{
-	"AssetModeration.Source": {"link-safety": "ENABLE_LINK_SAFETY: link safety decisions are hidden while the switch is off"},
+	"DecisionSource": {"link-safety": "ENABLE_LINK_SAFETY: link safety decisions are hidden while the switch is off"},
 }
 
 // switchedOff lists fields types.json lacks because the API leaves them out of its schemas while
@@ -229,7 +149,7 @@ type typesFixture struct {
 type typeWalker struct {
 	t           *testing.T
 	definitions map[string]*typeSchema
-	consts      packageConstants
+	consts      map[string][]string
 	prefix      string
 	options     bool
 	// patch is set for a PATCH operation's options, where null clears a field.
@@ -384,7 +304,8 @@ func structFields(t reflect.Type) []field {
 	var fields []field
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		if !f.IsExported() {
+		// Params are the per-call options every options struct embeds, not API fields.
+		if !f.IsExported() || f.Type == reflect.TypeFor[Params]() {
 			continue
 		}
 		tag, hasTag := f.Tag.Lookup("json")
@@ -680,51 +601,44 @@ func (w *typeWalker) stringValue(t reflect.Type, owner string, branches []*typeS
 		return
 	}
 	values, isEnum := enumValues(branches)
-	named := t != reflect.TypeFor[string]()
-	if named {
-		declared, ok := w.consts.typed[t.Name()]
-		if !ok {
-			if isEnum {
-				w.fail(path, "an enum of %v, but %s has no constants", values, t.Name())
-			}
-			return
-		}
+	if t == reflect.TypeFor[string]() {
 		if !isEnum {
-			w.fail(path, "an open string, but %s is an enum of %v", t.Name(), declared)
 			return
 		}
-		w.compareEnum(path, t.Name(), declared, values)
+		if _, listed := openStrings[owner]; !listed {
+			w.fail(path, "an enum of %v, but %s is a plain string (declare an enum type)", values, owner)
+			return
+		}
+		w.used["open "+owner] = true
+		return
+	}
+	constants, ok := w.consts[t.Name()]
+	if !ok {
+		if isEnum {
+			w.fail(path, "an enum of %v, but %s has no constants", values, t.Name())
+		}
 		return
 	}
 	if !isEnum {
+		w.fail(path, "an open string, but %s is an enum of %v", t.Name(), constants)
 		return
 	}
-	open, listed := openStrings[owner]
-	if !listed {
-		w.fail(path, "an enum of %v, but %s is a plain string (declare an enum type or list it in openStrings)", values, owner)
-		return
-	}
-	w.used["open "+owner] = true
-	if open.constant == "" {
-		return
-	}
-	block, ok := w.consts.blockOf[open.constant]
-	if !ok {
-		w.t.Errorf("openStrings[%q] names %s, which is not an untyped string constant", owner, open.constant)
-		return
+	excluded, shared := sharedEnums[owner]
+	if shared {
+		w.used["shared "+owner] = true
 	}
 	var declared []string
-	for _, value := range block {
-		if !slices.Contains(open.exclude, value) {
+	for _, value := range constants {
+		if !slices.Contains(excluded, value) {
 			declared = append(declared, value)
 		}
 	}
-	for _, value := range open.exclude {
-		if !slices.Contains(block, value) || slices.Contains(values, value) {
-			w.t.Errorf("openStrings[%q] excludes %q, which is not in its block or is one of the field's values", owner, value)
+	for _, value := range excluded {
+		if !slices.Contains(constants, value) || slices.Contains(values, value) {
+			w.t.Errorf("sharedEnums[%q] excludes %q, which %s lacks or the field takes", owner, value, t.Name())
 		}
 	}
-	w.compareEnum(path, owner, declared, values)
+	w.compareEnum(path, t.Name(), declared, values)
 }
 
 func (w *typeWalker) compareEnum(path, key string, declared, values []string) {
@@ -906,6 +820,14 @@ func (w *typeWalker) objectValue(t reflect.Type, owner string, shape flat, path 
 		}
 		return
 	}
+	// Every response model keeps its JSON (responsejson.go): RawJSON and ExtraFields.
+	if !w.options && !reflect.PointerTo(t).Implements(reflect.TypeFor[interface {
+		RawJSON() json.RawMessage
+		ExtraFields() map[string]json.RawMessage
+		json.Unmarshaler
+	}]()) {
+		w.fail(path, "%s doesn't keep its JSON (embed responseJSON and decode it in models_json.go)", t.Name())
+	}
 	required := map[string]bool{}
 	for name, count := range counts {
 		if count == objects {
@@ -915,21 +837,15 @@ func (w *typeWalker) objectValue(t reflect.Type, owner string, shape flat, path 
 	w.object(t, t.Name(), properties, required, nil, refs, path)
 }
 
-// packageConstants are the package's string constants: typed ones by their type's name, and
-// untyped ones by the block that declares them, keyed by each constant's name.
-type packageConstants struct {
-	typed   map[string][]string
-	blockOf map[string][]string
-}
-
-func readPackageConstants(t *testing.T) packageConstants {
+// readPackageConstants returns the package's typed string constants by their type's name.
+func readPackageConstants(t *testing.T) map[string][]string {
 	t.Helper()
 	paths, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	files := token.NewFileSet()
-	constants := packageConstants{typed: map[string][]string{}, blockOf: map[string][]string{}}
+	constants := map[string][]string{}
 	for _, path := range paths {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
@@ -943,32 +859,24 @@ func readPackageConstants(t *testing.T) packageConstants {
 			if !ok || general.Tok != token.CONST {
 				continue
 			}
-			var block []string
-			var names []string
 			for _, spec := range general.Specs {
 				value := spec.(*ast.ValueSpec)
-				for i, name := range value.Names {
+				ident, typed := value.Type.(*ast.Ident)
+				if !typed {
+					continue
+				}
+				for i := range value.Names {
 					if i >= len(value.Values) {
 						continue
 					}
-					literal, ok := value.Values[i].(*ast.BasicLit)
-					if !ok || literal.Kind != token.STRING {
-						continue
-					}
-					text, err := strconv.Unquote(literal.Value)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if ident, ok := value.Type.(*ast.Ident); ok {
-						constants.typed[ident.Name] = append(constants.typed[ident.Name], text)
-					} else if value.Type == nil {
-						block = append(block, text)
-						names = append(names, name.Name)
+					if literal, ok := value.Values[i].(*ast.BasicLit); ok && literal.Kind == token.STRING {
+						text, err := strconv.Unquote(literal.Value)
+						if err != nil {
+							t.Fatal(err)
+						}
+						constants[ident.Name] = append(constants[ident.Name], text)
 					}
 				}
-			}
-			for _, name := range names {
-				constants.blockOf[name] = block
 			}
 		}
 	}
@@ -1041,6 +949,11 @@ func TestDeclaredTypesContract(t *testing.T) {
 	}
 	for _, problem := range problems {
 		t.Error(problem)
+	}
+	for owner := range sharedEnums {
+		if !used["shared "+owner] {
+			t.Errorf("sharedEnums lists %s, which no operation declares", owner)
+		}
 	}
 	for owner := range openStrings {
 		if !used["open "+owner] {

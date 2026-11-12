@@ -10,7 +10,7 @@ Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage 
 | Rust                    | [rust](rust)             | `cargo add calmlens`                                       |
 | Java                    | [java](java)             | `com.calmlens:calmlens-sdk`                                |
 | PHP                     | [php](php)               | `composer require calmlens/sdk`                            |
-| Go                      | [go](go)                 | `go get github.com/CalmLens/sdks/go`                       |
+| Go                      | [go](go)                 | `go get calmlens.com/go/calmlens`                          |
 
 See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
 

@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // uploadOptionKeys are the asset fields an upload carries in its body: the JSON body of text and

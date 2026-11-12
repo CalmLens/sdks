@@ -7,17 +7,21 @@ import (
 	"strconv"
 )
 
-// Values of UploadPreset.Access. Access is a plain string so values added later still decode.
+// UploadPresetAccess is who can upload with an upload preset.
+type UploadPresetAccess string
+
+// Values of UploadPreset.Access.
 const (
 	// UploadPresetAccessToken needs an upload token signed by your server.
-	UploadPresetAccessToken = "token"
+	UploadPresetAccessToken UploadPresetAccess = "token"
 	// UploadPresetAccessAnyone accepts the preset ID alone, and needs a DailyUploadLimit.
-	UploadPresetAccessAnyone = "anyone"
+	UploadPresetAccessAnyone UploadPresetAccess = "anyone"
 )
 
 // UploadPreset holds the rules for uploads made from browsers and apps. Key identifies it within
 // the project, and Revision changes with every saved change.
 type UploadPreset struct {
+	responseJSON
 	ID              string  `json:"id"`
 	ProjectID       string  `json:"projectId"`
 	CreatedByUserID *string `json:"createdByUserId"`
@@ -25,7 +29,7 @@ type UploadPreset struct {
 	Revision        int     `json:"revision"`
 	Name            string  `json:"name"`
 	// Access is UploadPresetAccessToken or UploadPresetAccessAnyone.
-	Access string `json:"access"`
+	Access UploadPresetAccess `json:"access"`
 	// Enabled is whether the preset accepts uploads.
 	Enabled bool `json:"enabled"`
 	// AllowedContentTypes are the MIME types the preset accepts, such as "image/*"; nil accepts
@@ -38,7 +42,7 @@ type UploadPreset struct {
 	// PolicyID is the moderation policy for uploads through the preset; nil uses the project's.
 	PolicyID *string `json:"policyId"`
 	// Visibility of uploaded assets: VisibilityPrivate or VisibilityPublic.
-	Visibility string `json:"visibility"`
+	Visibility Visibility `json:"visibility"`
 	// ProcessingOptions apply to every upload through the preset.
 	ProcessingOptions *ProcessingOptions `json:"processingOptions"`
 	// RevealDecision is whether browser uploads see the moderation decision for their own upload.
@@ -60,13 +64,16 @@ type ListUploadPresetsOptions struct {
 	Cursor   string `json:"cursor,omitempty"`
 	PageSize int    `json:"pageSize,omitempty"`
 	Sort     string `json:"sort,omitempty"`
+	Params   `json:"-"`
 }
 
 // UploadPresetPage is one page of the project's upload presets.
 type UploadPresetPage struct {
+	responseJSON
 	Items      []UploadPreset `json:"items"`
 	HasMore    bool           `json:"hasMore"`
 	NextCursor *string        `json:"nextCursor"`
+	APIResource
 }
 
 // UploadPresetDefinition is one preset's whole definition, addressed by Key. Key and Name are
@@ -80,7 +87,7 @@ type UploadPresetDefinition struct {
 	Name     string `json:"name"`
 	// Access is UploadPresetAccessToken (the default) or UploadPresetAccessAnyone, which needs a
 	// DailyUploadLimit.
-	Access string `json:"access"`
+	Access UploadPresetAccess `json:"access"`
 	// Enabled is whether the preset accepts uploads (default true).
 	Enabled *bool `json:"enabled"`
 	// AllowedContentTypes are the MIME types the preset accepts, such as "image/*". Empty accepts
@@ -94,7 +101,7 @@ type UploadPresetDefinition struct {
 	// project's.
 	PolicyID Patch[string] `json:"policyId"`
 	// Visibility of uploaded assets: VisibilityPrivate (the default) or VisibilityPublic.
-	Visibility string `json:"visibility"`
+	Visibility Visibility `json:"visibility"`
 	// ProcessingOptions apply to every upload through the preset.
 	ProcessingOptions *ProcessingOptions `json:"processingOptions"`
 	// RevealDecision is whether browser uploads see the moderation decision for their own upload
@@ -148,15 +155,21 @@ func (d UploadPresetDefinition) MarshalJSON() ([]byte, error) {
 // EnsureUploadPresetsOptions are the presets to create or replace, at most 50 per request.
 type EnsureUploadPresetsOptions struct {
 	UploadPresets []UploadPresetDefinition `json:"uploadPresets"`
+	Params        `json:"-"`
 }
 
 // EnsureUploadPresetsResponse holds the stored presets, in the order they were sent.
 type EnsureUploadPresetsResponse struct {
+	responseJSON
 	UploadPresets []UploadPreset `json:"uploadPresets"`
+	APIResource
 }
 
 // UploadPresetIDOptions identifies an upload preset.
-type UploadPresetIDOptions struct{ UploadPresetID string }
+type UploadPresetIDOptions struct {
+	UploadPresetID string
+	Params         `json:"-"`
+}
 
 // UploadPresetsService manages the project's upload presets: the rules for uploads from browsers
 // and apps. Ensure creates or replaces presets by key, for deploys that declare them in code.
@@ -165,6 +178,10 @@ type UploadPresetsService struct{ c *ServerClient }
 // List returns one page of the project's upload presets, oldest first unless options.Sort says
 // otherwise. Use ListAll to iterate over every page.
 func (s *UploadPresetsService) List(ctx context.Context, options ListUploadPresetsOptions) (*UploadPresetPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -192,6 +209,10 @@ func (s *UploadPresetsService) ListAll(options ListUploadPresetsOptions) *Iterat
 // keeps its revision, so deploys can send their presets every time. Every preset is checked before
 // any is saved.
 func (s *UploadPresetsService) Ensure(ctx context.Context, options EnsureUploadPresetsOptions) (*EnsureUploadPresetsResponse, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result EnsureUploadPresetsResponse
 	if err := s.c.request(ctx, "PUT", s.c.project("upload-presets"), nil, options, &result); err != nil {
 		return nil, err
@@ -202,6 +223,10 @@ func (s *UploadPresetsService) Ensure(ctx context.Context, options EnsureUploadP
 // Delete deletes an upload preset. Browsers can no longer upload through it; assets already
 // uploaded stay.
 func (s *UploadPresetsService) Delete(ctx context.Context, options UploadPresetIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("upload-presets", options.UploadPresetID, "")
 	if err != nil {
 		return err
@@ -211,9 +236,10 @@ func (s *UploadPresetsService) Delete(ctx context.Context, options UploadPresetI
 
 // RemoteURLRule restricts the domains a project accepts when content is submitted by URL.
 type RemoteURLRule struct {
+	responseJSON
 	// Mode is "allow", which accepts only Domains, or "deny", which accepts every domain except
 	// Domains.
-	Mode string `json:"mode"`
+	Mode RemoteURLRuleMode `json:"mode"`
 	// Domains are bare lowercase domains such as example.com.
 	Domains []string `json:"domains"`
 }
@@ -221,6 +247,7 @@ type RemoteURLRule struct {
 // HumanReviewSettings say which automated decisions are sampled into the human review queue. The
 // zero value samples none, which is the default.
 type HumanReviewSettings struct {
+	responseJSON
 	AllowedSamplePercent    float64 `json:"allowedSamplePercent"`
 	RestrictedSamplePercent float64 `json:"restrictedSamplePercent"`
 	// UncertaintyMarginPercent queues decisions with a moderated category whose policy score lies
@@ -242,9 +269,10 @@ type HumanReviewSettingsInput struct {
 // ProjectSettings are a project's settings with defaults filled in. The project's policy and
 // metadata fields have their own endpoints.
 type ProjectSettings struct {
+	responseJSON
 	RetainContent bool `json:"retainContent"`
 	// OptOutJurisdictions are optional standards this project doesn't serve, such as "EU".
-	OptOutJurisdictions []string `json:"optOutJurisdictions"`
+	OptOutJurisdictions []Jurisdiction `json:"optOutJurisdictions"`
 	// BlockUnmoderatedAssets makes the CDN refuse assets whose moderation is still pending.
 	BlockUnmoderatedAssets bool `json:"blockUnmoderatedAssets"`
 	// StoreSensitiveMetadata keeps embedded image metadata (EXIF, XMP and IPTC) on uploads.
@@ -265,10 +293,12 @@ type ProjectSettings struct {
 
 // ProjectSettingsResource is a project's settings and the revision to send back with a change.
 type ProjectSettingsResource struct {
+	responseJSON
 	ProjectID string `json:"projectId"`
 	// Revision counts changes to the project's settings and metadata fields, starting at 1.
 	Revision int             `json:"revision"`
 	Settings ProjectSettings `json:"settings"`
+	APIResource
 }
 
 // ProjectSettingsInput is the complete settings an update stores: fields left unset return to
@@ -277,7 +307,7 @@ type ProjectSettingsInput struct {
 	// RetainContent defaults to true.
 	RetainContent *bool `json:"retainContent"`
 	// OptOutJurisdictions defaults to none.
-	OptOutJurisdictions []string `json:"optOutJurisdictions"`
+	OptOutJurisdictions []Jurisdiction `json:"optOutJurisdictions"`
 	// BlockUnmoderatedAssets defaults to true.
 	BlockUnmoderatedAssets *bool `json:"blockUnmoderatedAssets"`
 	// StoreSensitiveMetadata defaults to false.
@@ -338,14 +368,24 @@ type UpdateProjectSettingsOptions struct {
 	// units you accept for the project's existing media. A value below the estimate is refused
 	// with CodeSearchEstimateChanged, whose details give the estimate.
 	SearchIndexingBudgetUnits *float64 `json:"searchIndexingBudgetUnits,omitempty"`
+	Params                    `json:"-"`
 }
 
 // ProjectSettingsService reads and replaces the project's settings.
 type ProjectSettingsService struct{ c *ServerClient }
 
+// GetProjectSettingsOptions holds the per-call Params of ProjectSettingsService.Get.
+type GetProjectSettingsOptions struct {
+	Params `json:"-"`
+}
+
 // Get returns the project's settings, with every default filled in, and the revision to send back
 // with a change.
-func (s *ProjectSettingsService) Get(ctx context.Context) (*ProjectSettingsResource, error) {
+func (s *ProjectSettingsService) Get(ctx context.Context, options GetProjectSettingsOptions) (*ProjectSettingsResource, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result ProjectSettingsResource
 	if err := s.c.request(ctx, "GET", s.c.project("settings"), nil, nil, &result); err != nil {
 		return nil, err
@@ -356,6 +396,10 @@ func (s *ProjectSettingsService) Get(ctx context.Context) (*ProjectSettingsResou
 // Update replaces the project's settings: settings left out return to their defaults. Unchanged
 // settings keep their revision.
 func (s *ProjectSettingsService) Update(ctx context.Context, options UpdateProjectSettingsOptions) (*ProjectSettingsResource, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result ProjectSettingsResource
 	if err := s.c.request(ctx, "PUT", s.c.project("settings"), nil, options, &result); err != nil {
 		return nil, err
@@ -365,13 +409,14 @@ func (s *ProjectSettingsService) Update(ctx context.Context, options UpdateProje
 
 // MetadataField is a metadata field the portal shows and filters by.
 type MetadataField struct {
+	responseJSON
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
 	// Type is "string", "number", "boolean", "date" or "url".
-	Type string `json:"type"`
+	Type MetadataFieldType `json:"type"`
 	// Icon is "tag", "hash", "user", "folder", "layers", "photo" or "link".
-	Icon string `json:"icon"`
+	Icon MetadataFieldIcon `json:"icon"`
 	// Color is a hex color such as "#2563eb".
 	Color string `json:"color"`
 }
@@ -379,9 +424,11 @@ type MetadataField struct {
 // MetadataFieldsResource is a project's metadata fields, in display order, and the revision to
 // send back with a change. It shares that revision with the project's settings.
 type MetadataFieldsResource struct {
+	responseJSON
 	ProjectID string          `json:"projectId"`
 	Revision  int             `json:"revision"`
 	Fields    []MetadataField `json:"fields"`
+	APIResource
 }
 
 // EnsureMetadataFieldsOptions are the fields to create, or replace by ID.
@@ -390,6 +437,7 @@ type EnsureMetadataFieldsOptions struct {
 	// refused with CodeProjectSettingsRevisionConflict; 0 changes them whatever their revision.
 	Revision int             `json:"revision,omitempty"`
 	Fields   []MetadataField `json:"fields"`
+	Params   `json:"-"`
 }
 
 // DeleteMetadataFieldOptions identifies a metadata field to delete. Revision works as in
@@ -397,13 +445,23 @@ type EnsureMetadataFieldsOptions struct {
 type DeleteMetadataFieldOptions struct {
 	FieldID  string
 	Revision int
+	Params   `json:"-"`
 }
 
 // MetadataFieldsService manages the project's metadata fields.
 type MetadataFieldsService struct{ c *ServerClient }
 
+// ListMetadataFieldsOptions holds the per-call Params of MetadataFieldsService.List.
+type ListMetadataFieldsOptions struct {
+	Params `json:"-"`
+}
+
 // List returns the project's metadata fields in display order.
-func (s *MetadataFieldsService) List(ctx context.Context) (*MetadataFieldsResource, error) {
+func (s *MetadataFieldsService) List(ctx context.Context, options ListMetadataFieldsOptions) (*MetadataFieldsResource, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result MetadataFieldsResource
 	if err := s.c.request(ctx, "GET", s.c.project("metadata-fields"), nil, nil, &result); err != nil {
 		return nil, err
@@ -414,6 +472,10 @@ func (s *MetadataFieldsService) List(ctx context.Context) (*MetadataFieldsResour
 // Ensure creates each field, or replaces it with the definition sent, by ID. Other fields are kept
 // and new ones are added at the end. Unchanged fields keep their revision.
 func (s *MetadataFieldsService) Ensure(ctx context.Context, options EnsureMetadataFieldsOptions) (*MetadataFieldsResource, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result MetadataFieldsResource
 	if err := s.c.request(ctx, "PUT", s.c.project("metadata-fields"), nil, options, &result); err != nil {
 		return nil, err
@@ -423,6 +485,10 @@ func (s *MetadataFieldsService) Ensure(ctx context.Context, options EnsureMetada
 
 // Delete deletes a metadata field definition. Assets keep the metadata values they hold.
 func (s *MetadataFieldsService) Delete(ctx context.Context, options DeleteMetadataFieldOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	escaped, err := segment(options.FieldID)
 	if err != nil {
 		return err
@@ -433,3 +499,45 @@ func (s *MetadataFieldsService) Delete(ctx context.Context, options DeleteMetada
 	}
 	return s.c.request(ctx, "DELETE", s.c.project("metadata-fields/"+escaped), params, nil, nil)
 }
+
+// Jurisdiction is an optional standard a project can opt out of serving.
+type Jurisdiction string
+
+const (
+	// JurisdictionEU is the European Union's standard.
+	JurisdictionEU Jurisdiction = "EU"
+)
+
+// RemoteURLRuleMode is how a RemoteURLRule uses its domains.
+type RemoteURLRuleMode string
+
+const (
+	// RemoteURLRuleAllow accepts only the rule's domains.
+	RemoteURLRuleAllow RemoteURLRuleMode = "allow"
+	// RemoteURLRuleDeny accepts every domain except the rule's.
+	RemoteURLRuleDeny RemoteURLRuleMode = "deny"
+)
+
+// MetadataFieldType is the kind of value a metadata field holds.
+type MetadataFieldType string
+
+const (
+	MetadataFieldTypeString  MetadataFieldType = "string"
+	MetadataFieldTypeNumber  MetadataFieldType = "number"
+	MetadataFieldTypeBoolean MetadataFieldType = "boolean"
+	MetadataFieldTypeDate    MetadataFieldType = "date"
+	MetadataFieldTypeURL     MetadataFieldType = "url"
+)
+
+// MetadataFieldIcon is the icon the portal shows for a metadata field.
+type MetadataFieldIcon string
+
+const (
+	MetadataFieldIconTag    MetadataFieldIcon = "tag"
+	MetadataFieldIconHash   MetadataFieldIcon = "hash"
+	MetadataFieldIconUser   MetadataFieldIcon = "user"
+	MetadataFieldIconFolder MetadataFieldIcon = "folder"
+	MetadataFieldIconLayers MetadataFieldIcon = "layers"
+	MetadataFieldIconPhoto  MetadataFieldIcon = "photo"
+	MetadataFieldIconLink   MetadataFieldIcon = "link"
+)

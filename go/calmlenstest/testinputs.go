@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // TestInput is a test scenario: the qualifying instances found, and optionally regional delivery

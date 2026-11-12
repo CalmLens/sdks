@@ -1,7 +1,7 @@
 module github.com/CalmLens/sdks/examples/voice-clips-go
 
-go 1.22
+go 1.25
 
-require github.com/CalmLens/sdks/go v0.0.0
+require calmlens.com/go/calmlens v0.0.0
 
-replace github.com/CalmLens/sdks/go => ../../go
+replace calmlens.com/go/calmlens => ../../go

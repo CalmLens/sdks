@@ -81,8 +81,8 @@ type CDNAssetURLOptions struct {
 // Range). The resource defaults to ResourceRendered.
 type CDNServeOptions struct {
 	CDNAssetURLOptions
-	Method  string
-	Headers http.Header
+	Method string
+	Params `json:"-"`
 }
 
 // SignAssetURLOptions signs a private asset's URL. Name the asset by exactly one of AssetID and
@@ -104,37 +104,45 @@ type SignAssetURLOptions struct {
 	Transform        string
 	TransformOptions any
 	ViewerClaims     *ViewerClaims
+	Params           `json:"-"`
 }
 
 // SignedAssetURL is a signed asset URL (or a resource URL beneath it) and its expiry in unix
 // milliseconds.
 type SignedAssetURL struct {
+	responseJSON
 	URL       string `json:"url"`
 	ExpiresAt int64  `json:"expiresAt"`
+	APIResource
 }
 
 // GetAssetInfoOptions are the viewer claims to read an asset URL's info for. Nil ViewerClaims
 // keeps the claims the URL carries.
 type GetAssetInfoOptions struct {
 	ViewerClaims *ViewerClaims
+	Params       `json:"-"`
 }
+
+// AssetAvailability is whether a viewer can see an asset's content.
+type AssetAvailability string
 
 // AssetInfo availabilities.
 const (
 	// AssetAvailabilityAvailable means the viewer can see the content now.
-	AssetAvailabilityAvailable = "available"
+	AssetAvailabilityAvailable AssetAvailability = "available"
 	// AssetAvailabilityAgeRestricted means the content needs the viewer's age confirmed
 	// (ViewerClaims.AgeConfirmed).
-	AssetAvailabilityAgeRestricted = "age-restricted"
+	AssetAvailabilityAgeRestricted AssetAvailability = "age-restricted"
 	// AssetAvailabilityUnavailable means the viewer can't see the content: it is held, blocked in
 	// the viewer's region, not yet moderated or removed.
-	AssetAvailabilityUnavailable = "unavailable"
+	AssetAvailabilityUnavailable AssetAvailability = "unavailable"
 )
 
 // AssetInfo is an asset's display info, the CDN's info resource: the public asset fields a
 // viewer needs, with the same names as on Asset, and whether this viewer can see it now. It never
 // holds moderation results, metadata, names, tags or extracted text.
 type AssetInfo struct {
+	responseJSON
 	ID        string `json:"id"`
 	ProjectID string `json:"projectId"`
 	// Type is one of the AssetType constants.
@@ -144,11 +152,13 @@ type AssetInfo struct {
 	Content     AssetInfoContent `json:"content"`
 	// Availability is one of the AssetAvailability constants, for the request's viewer claims.
 	// The CDN's resources refuse exactly what it refuses.
-	Availability string `json:"availability"`
+	Availability AssetAvailability `json:"availability"`
+	APIResource
 }
 
 // AssetInfoContent is the part of AssetContent that AssetInfo carries.
 type AssetInfoContent struct {
+	responseJSON
 	// Format is the MIME type of the content; it tells a spreadsheet from other documents.
 	Format          *string        `json:"format"`
 	Width           *int           `json:"width"`
@@ -289,6 +299,10 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 // asset URL; ResourceOriginal only when signed with Original. With a Resource, it returns that
 // resource's URL beneath the grant. The options are checked before anything is sent.
 func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptions) (*SignedAssetURL, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	if options.ExpiresIn < 0 || options.ExpiresIn > MaxSignedURLExpiresIn {
 		return nil, invalid(CodeSDKInvalidArgument, "ExpiresIn must be from 1 to 86400 seconds (0 for the default)")
 	}
@@ -334,6 +348,10 @@ func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptio
 // as a browser would. A refusal returns *Error with the CDN's code, such as signed-url/expired or
 // asset/not-available.
 func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options GetAssetInfoOptions) (*AssetInfo, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	parsed, err := url.Parse(assetURL)
 	if err != nil || !parsed.IsAbs() || parsed.Host == "" {
 		return nil, invalid(CodeSDKInvalidArgument, "The URL must be an absolute asset URL")
@@ -356,7 +374,7 @@ func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options 
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, s.c.options.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, s.c.timeout(ctx))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+"/info"+query, nil)
 	if err != nil {
@@ -395,6 +413,10 @@ func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options 
 // honouring Retry-After); when retries run out, the last response is returned. A redirect is
 // never followed: it fails with sdk/http-error and its status.
 func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.Response, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	location := options.CDNAssetURLOptions
 	if location.Resource == "" {
 		location.Resource = ResourceRendered
@@ -408,9 +430,13 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 		method = "GET"
 	}
 	retryable := method == http.MethodGet || method == http.MethodHead
+	maxRetries := s.c.maxRetries
+	if params := paramsOf(ctx); params.MaxRetries != nil {
+		maxRetries = *params.MaxRetries
+	}
 	for attempt := 0; ; attempt++ {
-		canRetry := retryable && attempt < s.c.maxRetries
-		response, err := s.attempt(ctx, method, endpoint, options.Headers)
+		canRetry := retryable && attempt < maxRetries
+		response, err := s.attempt(ctx, method, endpoint, nil)
 		if err != nil {
 			sdkErr, ok := err.(*Error)
 			if !ok || !canRetry || !sdkErr.Retryable() || ctx.Err() != nil {
@@ -445,7 +471,7 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 func (s *CDNService) attempt(ctx context.Context, method, endpoint string, headers http.Header) (*http.Response, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	var timedOut atomic.Bool
-	timer := time.AfterFunc(s.c.options.Timeout, func() {
+	timer := time.AfterFunc(s.c.timeout(ctx), func() {
 		timedOut.Store(true)
 		cancel()
 	})
@@ -458,6 +484,11 @@ func (s *CDNService) attempt(ctx context.Context, method, endpoint string, heade
 	req.Header = headers.Clone()
 	if req.Header == nil {
 		req.Header = http.Header{}
+	}
+	for key, values := range paramsOf(ctx).Headers {
+		if req.Header.Get(key) == "" {
+			req.Header[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
+		}
 	}
 	req.Header.Set("X-Api-Key", s.c.options.APIKey)
 	req.Header.Set("User-Agent", userAgent)

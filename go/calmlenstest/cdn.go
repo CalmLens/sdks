@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 // externalIDPrefix starts the asset segment of a URL that names the asset by its external ID.

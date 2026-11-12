@@ -7,30 +7,30 @@ import (
 	"sync"
 	"time"
 
-	calmlens "github.com/CalmLens/sdks/go"
-	"github.com/CalmLens/sdks/go/calmlenstest"
+	"calmlens.com/go/calmlens"
+	"calmlens.com/go/calmlens/calmlenstest"
 )
 
 // Categories are the category IDs the simulated reports contain.
-var Categories = []string{"sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity"}
+var Categories = []calmlens.Category{"sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity"}
 
 // Scenario is the simulated report for one selected outcome: a fixed clip length (the demo never
 // decodes media) and the category scores in each analysed segment. Categories left out score 0.03.
 type Scenario struct {
 	Duration float64
-	Segments []map[string]float64
+	Segments []map[calmlens.Category]float64
 }
 
 // Scenarios holds a simulated report per outcome. Segments mirror native analysis: 30-second
 // chunks that overlap by one second, so a clip of D seconds has ceil((D-1)/29) of them.
 var Scenarios = map[string]Scenario{
-	calmlens.ModerationStatusAllowed:       {Duration: 41, Segments: []map[string]float64{{}, {}}},
-	calmlens.ModerationStatusLimited:       {Duration: 64, Segments: []map[string]float64{{}, {"harassment": 0.58}, {}}},
-	calmlens.ModerationStatusAgeRestricted: {Duration: 52, Segments: []map[string]float64{{}, {"sexual": 0.72}}},
-	calmlens.ModerationStatusBlocked: {Duration: 96, Segments: []map[string]float64{
+	string(calmlens.ModerationStatusAllowed):       {Duration: 41, Segments: []map[calmlens.Category]float64{{}, {}}},
+	string(calmlens.ModerationStatusLimited):       {Duration: 64, Segments: []map[calmlens.Category]float64{{}, {"harassment": 0.58}, {}}},
+	string(calmlens.ModerationStatusAgeRestricted): {Duration: 52, Segments: []map[calmlens.Category]float64{{}, {"sexual": 0.72}}},
+	string(calmlens.ModerationStatusBlocked): {Duration: 96, Segments: []map[calmlens.Category]float64{
 		{}, {}, {"violence": 0.91, "harassment": 0.44}, {"violence": 0.47},
 	}},
-	calmlens.ModerationStatusPurged: {Duration: 38, Segments: []map[string]float64{{"criminal-activity": 0.94}, {}}},
+	string(calmlens.ModerationStatusPurged): {Duration: 38, Segments: []map[calmlens.Category]float64{{"criminal-activity": 0.94}, {}}},
 }
 
 // Range returns segment i's start and end: 30-second chunks with a one-second overlap.
@@ -74,15 +74,15 @@ func (b *Backend) Timeline(assetID string) []calmlens.MediaClassificationSegment
 // content, as in CalmLens.
 func (b *Backend) Settle(assetID, choice string) {
 	b.Mock.WithStorage(func(db *calmlenstest.InMemoryDatabaseStorage, images *calmlenstest.InMemoryImageStorage) {
-		if stored := db.Assets[assetID]; stored != nil && Section(stored, "classification")["status"] == calmlens.ClassificationStatusProcessing {
+		if stored := db.Assets[assetID]; stored != nil && Section(stored, "classification")["status"] == string(calmlens.ClassificationStatusProcessing) {
 			segments := apply(stored, choice)
 			b.mu.Lock()
 			b.timeline[assetID] = segments
 			b.mu.Unlock()
-			if choice == calmlens.ModerationStatusPurged {
+			if choice == string(calmlens.ModerationStatusPurged) {
 				delete(images.Content, assetID)
 				content := Section(stored, "content")
-				content["status"], content["removalReason"], content["extractedText"] = calmlens.ContentStatusRemoved, calmlens.ContentRemovalReasonPolicy, nil
+				content["status"], content["removalReason"], content["extractedText"] = string(calmlens.ContentStatusRemoved), string(calmlens.ContentRemovalReasonPolicy), nil
 				content["updatedAt"] = time.Now().UnixMilli()
 			}
 		}
@@ -104,14 +104,14 @@ func Section(stored calmlens.JSON, key string) calmlens.JSON {
 func apply(stored calmlens.JSON, choice string) []calmlens.MediaClassificationSegment {
 	processing, moderation := Section(stored, "classification"), Section(Section(stored, "classification"), "moderation")
 	if choice == "error" {
-		processing["status"] = calmlens.ClassificationStatusFailed
+		processing["status"] = string(calmlens.ClassificationStatusFailed)
 		return nil
 	}
 	scenario := Scenarios[choice]
-	overall := map[string]float64{}
+	overall := map[calmlens.Category]float64{}
 	segments := []calmlens.MediaClassificationSegment{}
 	for i, scores := range scenario.Segments {
-		categories := map[string]calmlens.CategoryResult{}
+		categories := map[calmlens.Category]calmlens.CategoryResult{}
 		for _, id := range Categories {
 			score := 0.03
 			if s, ok := scores[id]; ok {
@@ -128,13 +128,13 @@ func apply(stored calmlens.JSON, choice string) []calmlens.MediaClassificationSe
 	categories := calmlens.JSON{}
 	for id, score := range overall {
 		result := categoryResult(score)
-		categories[id] = calmlens.JSON{"status": result.Status, "score": *result.Score, "likelihood": result.Likelihood}
+		categories[string(id)] = calmlens.JSON{"status": string(result.Status), "score": *result.Score, "likelihood": string(result.Likelihood)}
 	}
 	// The selected outcome is the moderation status the policy decided.
-	processing["status"] = calmlens.ClassificationStatusCompleted
+	processing["status"] = string(calmlens.ClassificationStatusCompleted)
 	processing["completedAt"] = time.Now().UnixMilli()
 	Section(stored, "content")["durationSeconds"] = scenario.Duration
-	moderation["status"] = choice
+	moderation["decision"] = choice
 	moderation["automatedStatus"] = choice
 	moderation["raw"] = calmlens.JSON{"categories": categories}
 	moderation["timeline"] = calmlens.JSON{"segmentCount": len(segments)}
@@ -147,16 +147,16 @@ func apply(stored calmlens.JSON, choice string) []calmlens.MediaClassificationSe
 }
 
 func categoryResult(score float64) calmlens.CategoryResult {
-	likelihood := "very-unlikely"
+	likelihood := calmlens.LikelihoodVeryUnlikely
 	switch {
 	case score >= 0.8:
-		likelihood = "very-likely"
+		likelihood = calmlens.LikelihoodVeryLikely
 	case score >= 0.6:
-		likelihood = "likely"
+		likelihood = calmlens.LikelihoodLikely
 	case score >= 0.4:
-		likelihood = "possible"
+		likelihood = calmlens.LikelihoodPossible
 	case score >= 0.2:
-		likelihood = "unlikely"
+		likelihood = calmlens.LikelihoodUnlikely
 	}
 	return calmlens.CategoryResult{Status: calmlens.ResultEvaluated, Score: &score, Likelihood: likelihood}
 }

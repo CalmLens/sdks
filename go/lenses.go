@@ -11,6 +11,10 @@ type LensesService struct{ c *ServerClient }
 // otherwise. The built-in lenses are always available and aren't listed. Use ListAll to iterate
 // over every page.
 func (s *LensesService) List(ctx context.Context, options ListLensesOptions) (*LensPage, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	params, err := query(options)
 	if err != nil {
 		return nil, err
@@ -25,6 +29,10 @@ func (s *LensesService) List(ctx context.Context, options ListLensesOptions) (*L
 // Create creates a lens. Its identifier must be new to the project; otherwise it fails with
 // CodeLensIdentifierTaken.
 func (s *LensesService) Create(ctx context.Context, options CreateLensOptions) (*Lens, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	var result Lens
 	if err := s.c.request(ctx, "POST", s.c.project("lenses"), nil, options, &result); err != nil {
 		return nil, err
@@ -35,12 +43,20 @@ func (s *LensesService) Create(ctx context.Context, options CreateLensOptions) (
 
 // Retrieve returns one of the project's lenses by ID.
 func (s *LensesService) Retrieve(ctx context.Context, options LensIDOptions) (*Lens, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.lensRequest(ctx, "GET", options.LensID, nil)
 }
 
 // Update changes a lens's name, description, type, transform or whether the CDN serves it. The
 // CDN serves the new transform from then on.
 func (s *LensesService) Update(ctx context.Context, options UpdateLensOptions) (*Lens, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	lens, err := s.lensRequest(ctx, "PATCH", options.LensID, options)
 	if err != nil {
 		return nil, err
@@ -52,6 +68,10 @@ func (s *LensesService) Update(ctx context.Context, options UpdateLensOptions) (
 // Delete deletes a lens. URLs that select it stop being served; files the CDN already
 // delivered may stay in caches until they expire.
 func (s *LensesService) Delete(ctx context.Context, options LensIDOptions) error {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return paramsErr
+	}
 	path, err := resourcePath("lenses", options.LensID, "")
 	if err != nil {
 		return err

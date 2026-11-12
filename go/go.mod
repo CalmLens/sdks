@@ -1,3 +1,3 @@
-module github.com/CalmLens/sdks/go
+module calmlens.com/go/calmlens
 
-go 1.22
+go 1.25

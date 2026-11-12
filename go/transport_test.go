@@ -29,7 +29,7 @@ func hijack(raw string) http.HandlerFunc {
 	}
 }
 
-func expectSDKError(t *testing.T, err error, code string) *Error {
+func expectSDKError(t *testing.T, err error, code ErrorCode) *Error {
 	t.Helper()
 	var sdk *Error
 	if !errors.As(err, &sdk) {
@@ -137,17 +137,30 @@ func TestConstructorValidatesOptionsFirst(t *testing.T) {
 	}
 	custom := &http.Client{Timeout: time.Minute}
 	client, err := NewServerClient(Options{APIKey: "key", ProjectID: "project", HTTPClient: custom, Timeout: time.Second})
-	if err != nil || client.http == custom || client.http.CheckRedirect == nil || custom.CheckRedirect != nil {
+	if copied, ok := client.http.(*http.Client); err != nil || !ok || copied == custom || copied.CheckRedirect == nil || custom.CheckRedirect != nil {
 		t.Fatalf("caller's client was modified: %v", err)
+	}
+	// Any HTTPDoer sends the requests as it is; a redirect it returns is never followed.
+	var sent []*http.Request
+	doer := doerFunc(func(r *http.Request) (*http.Response, error) {
+		sent = append(sent, r)
+		return &http.Response{StatusCode: http.StatusFound, Header: http.Header{"Location": {"https://elsewhere.example"}}, Body: io.NopCloser(strings.NewReader("")), Request: r}, nil
+	})
+	client, err = NewServerClient(Options{APIKey: "key", ProjectID: "project", HTTPClient: doer, MaxRetries: Ptr(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"}); CodeOf(err) != CodeSDKHTTPError || len(sent) != 1 || sent[0].Header.Get("X-Api-Key") != "key" {
+		t.Fatalf("custom doer: %v after %d requests", err, len(sent))
 	}
 	// The default client bounds connecting and waiting for headers, never the whole transfer.
 	client, err = NewServerClient(Options{APIKey: "key", ProjectID: "project", ResponseHeaderTimeout: 5 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := client.http.Transport.(*http.Transport)
-	if client.http.Timeout != 0 || transport.ResponseHeaderTimeout != 5*time.Second || transport.TLSHandshakeTimeout != DefaultConnectTimeout {
-		t.Fatalf("whole-request timeout %v, header timeout %v", client.http.Timeout, transport.ResponseHeaderTimeout)
+	transport := client.http.(*http.Client).Transport.(*http.Transport)
+	if client.http.(*http.Client).Timeout != 0 || transport.ResponseHeaderTimeout != 5*time.Second || transport.TLSHandshakeTimeout != DefaultConnectTimeout {
+		t.Fatalf("whole-request timeout %v, header timeout %v", client.http.(*http.Client).Timeout, transport.ResponseHeaderTimeout)
 	}
 }
 
@@ -182,7 +195,12 @@ func TestTimeoutDoesNotCutOffUploadsOrDownloads(t *testing.T) {
 		t.Fatalf("download cut off: %v", err)
 	}
 	// JSON API calls stay bounded.
-	if _, err = client.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "asset"}); ErrorCode(err) != CodeSDKTimeout {
+	if _, err = client.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "asset"}); CodeOf(err) != CodeSDKTimeout {
 		t.Fatalf("JSON call not bounded: %v", err)
 	}
 }
+
+// doerFunc is an HTTPDoer that isn't an *http.Client.
+type doerFunc func(*http.Request) (*http.Response, error)
+
+func (f doerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }

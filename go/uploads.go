@@ -14,7 +14,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/CalmLens/sdks/go/internal/contract"
+	"calmlens.com/go/calmlens/internal/contract"
 )
 
 // payload validates content and returns its reader and size (nil when unknown).
@@ -198,12 +198,20 @@ func readAgain(raw io.Reader, size int64) *source {
 // and other content as a multipart/form-data upload whose options part holds the fields and
 // whose file part holds the bytes.
 func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.submit(ctx, options, false)
 }
 
 // Classify submits an asset and waits for classification where supported (audio and video
 // always return pending).
 func (s *AssetsService) Classify(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	if options.Content != nil && options.Content.PlainText != nil && strings.TrimSpace(*options.Content.PlainText) == "" {
 		return nil, invalid(CodeInvalidUploadPayload, "Text to classify must be a non-empty string")
 	}
@@ -220,6 +228,8 @@ func idempotencyKey(key string) string {
 // submit uploads an asset; wait says whether the response waits for its decision. A multipart
 // upload saves the choice with its first part.
 func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, wait bool) (*Asset, error) {
+	// The upload's requests each send their own key, derived from options.IdempotencyKey.
+	ctx = withoutIdempotencyKey(ctx)
 	if options.Name == "" {
 		return nil, invalid(CodeInvalidUploadPayload, "Asset name is required")
 	}
@@ -363,7 +373,7 @@ type uploadFields struct {
 	Name              string             `json:"name"`
 	Description       *string            `json:"description,omitempty"`
 	ProcessingOptions *ProcessingOptions `json:"processingOptions,omitempty"`
-	Visibility        string             `json:"visibility,omitempty"`
+	Visibility        Visibility         `json:"visibility,omitempty"`
 	Metadata          []MetadataItem     `json:"metadata,omitempty"`
 	Tags              []string           `json:"tags,omitempty"`
 	AuthorID          *string            `json:"authorId,omitempty"`
@@ -531,7 +541,7 @@ func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fi
 		final := n == count
 		piece := src.part(n, partSize)
 		size := piece.Size()
-		next, err := s.uploadPart(ctx, UploadAssetPartOptions{AssetID: asset.ID, Part: Content{Data: piece, SizeInBytes: &size, PartNumber: n, IsFinal: final}, IdempotencyKey: fmt.Sprintf("%s:part-%d", key, n)})
+		next, err := s.uploadPart(ctx, UploadAssetPartOptions{AssetID: asset.ID, Part: Content{Data: piece, SizeInBytes: &size, PartNumber: n, IsFinal: final}, Params: Params{IdempotencyKey: fmt.Sprintf("%s:part-%d", key, n)}})
 		var apiErr *Error
 		if err != nil && errors.As(err, &apiErr) {
 			// The API already has the parts before the one it expects: their responses were lost.
@@ -574,6 +584,10 @@ func partNumber(value any) (int, bool) {
 // final part waits for the decision was chosen when the upload started and is saved by CalmLens;
 // Wait overrides it.
 func (s *AssetsService) UploadPart(ctx context.Context, options UploadAssetPartOptions) (*Asset, error) {
+	ctx, paramsErr := withParams(ctx, options.Params)
+	if paramsErr != nil {
+		return nil, paramsErr
+	}
 	return s.uploadPart(ctx, options)
 }
 

@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	calmlens "github.com/CalmLens/sdks/go"
+	"calmlens.com/go/calmlens"
 )
 
 const mib = 1 << 20
@@ -25,7 +25,7 @@ func TestMockJoinsAnUploadTheClientSplits(t *testing.T) {
 	var moderated [][]byte
 	c, err := NewServerClient(Options{PartSizeBytes: 5 * mib, Moderate: func(input ModerationInput) *Decision {
 		moderated = append(moderated, input.Content.Bytes)
-		return NewDecision(calmlens.ModerationStatusAllowed)
+		return NewDecision(OutcomeAllowed)
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -49,18 +49,18 @@ func TestMockResumesAnUploadWithTheSameKeyAfterAPartFails(t *testing.T) {
 	moderations := 0
 	c, err := NewServerClient(Options{PartSizeBytes: 5 * mib, Moderate: func(ModerationInput) *Decision {
 		moderations++
-		return NewDecision(calmlens.ModerationStatusAllowed)
+		return NewDecision(OutcomeAllowed)
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
 	file := distinctBytes(12 * mib)
-	options := calmlens.SubmitAssetOptions{Name: "report.pdf", Content: &calmlens.Content{Type: "application/pdf", Bytes: file}, ProcessingOptions: keep, IdempotencyKey: "upload-3"}
+	options := calmlens.SubmitAssetOptions{Name: "report.pdf", Content: &calmlens.Content{Type: "application/pdf", Bytes: file}, ProcessingOptions: keep, Params: calmlens.Params{IdempotencyKey: "upload-3"}}
 	if err = c.FailNextRequest(RequestFailure{Code: FailureTransportError, Operation: "assets.uploadPart"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = c.Assets.Classify(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeSDKTransportError {
+	if _, err = c.Assets.Classify(ctx, options); calmlens.CodeOf(err) != calmlens.CodeSDKTransportError {
 		t.Fatal(err)
 	}
 	before := len(c.Requests())
@@ -87,7 +87,7 @@ func TestMockResumesAnUploadWithTheSameKeyAfterAPartFails(t *testing.T) {
 	}
 	options.Name = "changed.pdf"
 	before = len(c.Requests())
-	if _, err := c.Assets.Classify(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
+	if _, err := c.Assets.Classify(ctx, options); calmlens.CodeOf(err) != calmlens.CodeIdempotencyKeyReused {
 		t.Fatal("changed metadata was accepted", err)
 	}
 	if requests := c.Requests()[before:]; len(requests) != 1 || len(requests[0].File) != 0 {

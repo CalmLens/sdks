@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	calmlens "github.com/CalmLens/sdks/go"
-	"github.com/CalmLens/sdks/go/internal/fixtures"
+	"calmlens.com/go/calmlens"
+	"calmlens.com/go/calmlens/internal/fixtures"
 )
 
 type testInputCase struct {

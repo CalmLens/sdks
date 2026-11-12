@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CalmLens/sdks/go/internal/clock"
+	"calmlens.com/go/calmlens/internal/clock"
 )
 
 const (

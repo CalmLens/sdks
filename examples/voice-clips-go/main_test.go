@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"calmlens.com/go/calmlens"
+	"calmlens.com/go/calmlens/calmlenstest"
 	"github.com/CalmLens/sdks/examples/voice-clips-go/demo"
-	calmlens "github.com/CalmLens/sdks/go"
-	"github.com/CalmLens/sdks/go/calmlenstest"
 )
 
 var clipBytes = []byte("ID3\x04\x00\x00\x00\x00\x00\x00simulated mp3 frames")
@@ -54,7 +54,7 @@ func uploadRequest(t *testing.T, a *app, u upload) *httptest.ResponseRecorder {
 		u.data = clipBytes
 	}
 	if u.choice == "" {
-		u.choice = calmlens.ModerationStatusAllowed
+		u.choice = string(calmlens.ModerationDecisionAllowed)
 	}
 	if u.token == "" {
 		u.token = a.csrf
@@ -107,7 +107,7 @@ func decideAsset(stored calmlens.JSON, status string) {
 		processing["status"] = calmlens.ClassificationStatusFailed
 		return
 	}
-	processing["status"], moderation["status"] = calmlens.ClassificationStatusCompleted, status
+	processing["status"], moderation["decision"] = calmlens.ClassificationStatusCompleted, status
 }
 
 func decide(item *entry) { item.PendingSince = time.Now().Add(-demoDelay - time.Second) }
@@ -206,7 +206,7 @@ func TestMultipartAboveThreshold(t *testing.T) {
 }
 
 func TestOnlyAllowedAndLimitedClipsPlay(t *testing.T) {
-	for _, choice := range []string{calmlens.ModerationStatusAllowed, calmlens.ModerationStatusLimited, calmlens.ModerationStatusAgeRestricted, calmlens.ModerationStatusBlocked, calmlens.ModerationStatusPurged, clipError} {
+	for _, choice := range []string{string(calmlens.ModerationDecisionAllowed), string(calmlens.ModerationDecisionLimited), string(calmlens.ModerationDecisionAgeRestricted), string(calmlens.ModerationDecisionBlocked), string(calmlens.ModerationDecisionPurged), clipError} {
 		t.Run(choice, func(t *testing.T) {
 			a := demoApp(t)
 			item := mustUpload(t, a, upload{choice: choice})
@@ -220,14 +220,14 @@ func TestOnlyAllowedAndLimitedClipsPlay(t *testing.T) {
 			decide(item)
 			page := get(a, "/").Body.String()
 			media := get(a, mediaURL)
-			if choice == calmlens.ModerationStatusAllowed || choice == calmlens.ModerationStatusLimited {
+			if choice == string(calmlens.ModerationDecisionAllowed) || choice == string(calmlens.ModerationDecisionLimited) {
 				if media.Code != 200 || !bytes.Equal(media.Body.Bytes(), clipBytes) || media.Header().Get("Content-Type") != "audio/mpeg" || !strings.Contains(page, mediaURL) {
 					t.Fatal(media.Code, page)
 				}
 			} else if media.Code != 403 || strings.Contains(page, mediaURL) || item.Status != choice {
 				t.Fatal("clip that is not allowed exposed", item.Status, media.Code)
 			}
-			if purged := a.demo.Mock.ImageStorage.Content[item.ID] == nil; purged != (choice == calmlens.ModerationStatusPurged) {
+			if purged := a.demo.Mock.ImageStorage.Content[item.ID] == nil; purged != (choice == string(calmlens.ModerationDecisionPurged)) {
 				t.Fatal("demo content kept after purge, or removed without one", choice)
 			}
 		})
@@ -349,7 +349,7 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 	item := liveClip(t, a, mock)
 	stored := mock.DatabaseStorage.Assets[item.ID]
 
-	decideAsset(stored, calmlens.ModerationStatusAllowed)
+	decideAsset(stored, string(calmlens.ModerationDecisionAllowed))
 	rec := get(a, "/media?id="+item.ID)
 	location, _ := url.Parse(rec.Header().Get("Location"))
 	if rec.Code != 303 || location.Scheme != "https" || !strings.HasSuffix(location.Path, "/"+calmlens.ResourceRendered) {
@@ -377,8 +377,8 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 	}
 
 	// A webhook reports a new decision: the cached URL is dropped and playback refused.
-	decideAsset(stored, calmlens.ModerationStatusBlocked)
-	body := event("event-revoked", calmlens.EventAssetBlocked, item.ID, "[]")
+	decideAsset(stored, string(calmlens.ModerationDecisionBlocked))
+	body := event("event-revoked", string(calmlens.EventAssetBlocked), item.ID, "[]")
 	if webhook(a, body, sign(body)).Code != 204 {
 		t.Fatal("webhook failed")
 	}
@@ -386,7 +386,7 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 	if get(a, "/media?id="+item.ID).Code != 403 {
 		t.Fatal("signed a clip that is no longer allowed")
 	}
-	decideAsset(stored, calmlens.ModerationStatusAllowed)
+	decideAsset(stored, string(calmlens.ModerationDecisionAllowed))
 	if err := mock.FailNextRequest(calmlenstest.RequestFailure{Err: errors.New("offline")}); err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func score(v float64) *float64 { return &v }
 // duration.
 func TestTimelineFromTheFindingsTimeline(t *testing.T) {
 	asset := `{"id":"asset_1","projectId":"project","name":"note.mp3","type":"audio","externalId":"clip_1","upload":{"status":"completed"},
-		"classification":{"status":"completed","moderation":{"status":"blocked","timeline":{"segmentCount":2}}},"content":{"status":"stored","durationSeconds":60}}`
+		"classification":{"status":"completed","moderation":{"decision":"blocked","timeline":{"segmentCount":2}}},"content":{"status":"stored","durationSeconds":60}}`
 	pages := map[string]string{
 		"": `{"items":[{"source":"clip","startSeconds":29,"endSeconds":60,"categories":{
 			"hate":{"status":"evaluated","score":0.1,"likelihood":"very-unlikely"},
@@ -446,7 +446,7 @@ func TestTimelineFromTheFindingsTimeline(t *testing.T) {
 	item := &entry{ID: "asset_1", Key: "clip_1", Name: "note.mp3", Type: "audio/mpeg", Status: clipPending}
 	a.entries = []*entry{item}
 	page := get(a, "/").Body.String()
-	if item.Status != calmlens.ModerationStatusBlocked || item.Duration != 60 || len(item.Segments) != 2 || !reflect.DeepEqual(cursors, []string{"", "page-2"}) {
+	if item.Status != string(calmlens.ModerationDecisionBlocked) || item.Duration != 60 || len(item.Segments) != 2 || !reflect.DeepEqual(cursors, []string{"", "page-2"}) {
 		t.Fatal(item.Status, item.Duration, item.Segments, cursors)
 	}
 	first, second := item.Segments[0], item.Segments[1]
@@ -467,11 +467,11 @@ func TestTimelineFromTheFindingsTimeline(t *testing.T) {
 
 func TestDemoOutcomesProduceClipSegments(t *testing.T) {
 	a := demoApp(t)
-	item := mustUpload(t, a, upload{choice: calmlens.ModerationStatusBlocked, contentType: "video/mp4"})
+	item := mustUpload(t, a, upload{choice: string(calmlens.ModerationDecisionBlocked), contentType: "video/mp4"})
 	decide(item)
 	get(a, "/")
-	scenario := demo.Scenarios[calmlens.ModerationStatusBlocked]
-	if item.Status != calmlens.ModerationStatusBlocked || item.Duration != scenario.Duration || len(item.Segments) != len(scenario.Segments) {
+	scenario := demo.Scenarios[string(calmlens.ModerationDecisionBlocked)]
+	if item.Status != string(calmlens.ModerationDecisionBlocked) || item.Duration != scenario.Duration || len(item.Segments) != len(scenario.Segments) {
 		t.Fatalf("%+v", item)
 	}
 	// Native chunks: 30 seconds, overlapping by one, the last ending with the clip.
@@ -500,8 +500,8 @@ func TestDemoOutcomesProduceClipSegments(t *testing.T) {
 func TestTimelineBarDoesNotOverlap(t *testing.T) {
 	score := 0.9
 	rows := timeline(60, []calmlens.MediaClassificationSegment{
-		{StartSeconds: 29, EndSeconds: 60, Categories: map[string]calmlens.CategoryResult{}},
-		{StartSeconds: 0, EndSeconds: 30, Categories: map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: &score, Likelihood: "very-likely"}}},
+		{StartSeconds: 29, EndSeconds: 60, Categories: map[calmlens.Category]calmlens.CategoryResult{}},
+		{StartSeconds: 0, EndSeconds: 30, Categories: map[calmlens.Category]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: &score, Likelihood: "very-likely"}}},
 	})
 	if rows[0].Left != 0 || rows[0].Left+rows[0].Width > rows[1].Left || rows[1].Left+rows[1].Width != 100 {
 		t.Fatal("bar segments overlap or leave the bar", rows)
@@ -513,8 +513,8 @@ func TestTimelineBarDoesNotOverlap(t *testing.T) {
 
 func TestLanesAndMergedFindings(t *testing.T) {
 	high, low, clear := 0.92, 0.5, 0.01
-	result := func(score *float64) map[string]calmlens.CategoryResult {
-		return map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: score, Likelihood: map[*float64]string{&high: "very-likely", &low: "possible", &clear: "very-unlikely"}[score]}}
+	result := func(score *float64) map[calmlens.Category]calmlens.CategoryResult {
+		return map[calmlens.Category]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: score, Likelihood: map[*float64]calmlens.Likelihood{&high: "very-likely", &low: "possible", &clear: "very-unlikely"}[score]}}
 	}
 	segments := []calmlens.MediaClassificationSegment{
 		{Source: calmlens.SegmentSourceFrame, StartSeconds: 0, EndSeconds: 1, Categories: result(&clear)},
@@ -526,7 +526,7 @@ func TestLanesAndMergedFindings(t *testing.T) {
 	item := entry{Duration: 4}
 	item.Segments = timeline(item.Duration, segments)
 	lanes := item.Lanes()
-	if len(lanes) != 2 || len(lanes[0].Segments) != 1 || lanes[0].Segments[0].Source != calmlens.SegmentSourceSpeech || len(lanes[1].Segments) != 4 {
+	if len(lanes) != 2 || len(lanes[0].Segments) != 1 || lanes[0].Segments[0].Source != string(calmlens.SegmentSourceSpeech) || len(lanes[1].Segments) != 4 {
 		t.Fatal("segments not grouped by source", lanes)
 	}
 	// The speech segment spans the clip; frames are still drawn one second wide each.
@@ -545,7 +545,7 @@ func TestLanesAndMergedFindings(t *testing.T) {
 
 func TestStatusChecksRecordDecisions(t *testing.T) {
 	a := demoApp(t)
-	item := mustUpload(t, a, upload{choice: calmlens.ModerationStatusBlocked})
+	item := mustUpload(t, a, upload{choice: string(calmlens.ModerationDecisionBlocked)})
 	get(a, "/")
 	if len(a.activity) != 0 {
 		t.Fatal("recorded a clip that is still pending", a.activity)
@@ -553,7 +553,7 @@ func TestStatusChecksRecordDecisions(t *testing.T) {
 	decide(item)
 	get(a, "/")
 	get(a, "/")
-	if len(a.activity) != 1 || a.activity[0].Name != item.Name || a.activity[0].Status != calmlens.ModerationStatusBlocked {
+	if len(a.activity) != 1 || a.activity[0].Name != item.Name || a.activity[0].Status != string(calmlens.ModerationDecisionBlocked) {
 		t.Fatal("decision not recorded exactly once", a.activity)
 	}
 }
@@ -577,18 +577,18 @@ func TestRetryFailedClip(t *testing.T) {
 	if item.Status != "error" {
 		t.Fatal(item.Status)
 	}
-	form := url.Values{"csrf": {a.csrf}, "id": {item.ID}, "demo_result": {calmlens.ModerationStatusAllowed}}
-	if post(a, "/retry", url.Values{"csrf": {"wrong"}, "id": {item.ID}, "demo_result": {calmlens.ModerationStatusAllowed}}).Code != 403 {
+	form := url.Values{"csrf": {a.csrf}, "id": {item.ID}, "demo_result": {string(calmlens.ModerationDecisionAllowed)}}
+	if post(a, "/retry", url.Values{"csrf": {"wrong"}, "id": {item.ID}, "demo_result": {string(calmlens.ModerationDecisionAllowed)}}).Code != 403 {
 		t.Fatal("retry without CSRF token")
 	}
 	if rec := post(a, "/retry", form); rec.Code != 303 {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
-	if item.Status != "pending" || demo.Section(a.demo.Mock.DatabaseStorage.Assets[item.ID], "classification")["status"] != calmlens.ClassificationStatusProcessing {
+	if item.Status != "pending" || demo.Section(a.demo.Mock.DatabaseStorage.Assets[item.ID], "classification")["status"] != string(calmlens.ClassificationStatusProcessing) {
 		t.Fatal("retry did not return the clip to pending")
 	}
 	decide(item)
-	if get(a, "/media?id="+item.ID).Code != 200 || item.Status != calmlens.ModerationStatusAllowed {
+	if get(a, "/media?id="+item.ID).Code != 200 || item.Status != string(calmlens.ModerationDecisionAllowed) {
 		t.Fatal("retried clip not allowed", item.Status)
 	}
 	a.demo.Mock.ClearRequests()
@@ -653,7 +653,7 @@ func TestAssetsAreTiedToTheirClip(t *testing.T) {
 	if !strings.HasPrefix(item.Key, "clip_") || stored["externalId"] != item.Key {
 		t.Fatal("asset not tagged with the clip key", item.Key, stored["externalId"])
 	}
-	decideAsset(stored, calmlens.ModerationStatusAllowed)
+	decideAsset(stored, string(calmlens.ModerationDecisionAllowed))
 	stored["externalId"] = "someone-else"
 	if get(a, "/media?id="+item.ID).Code != 502 || item.Status != "pending" {
 		t.Fatal("applied a decision for an asset this clip did not create")
@@ -668,7 +668,7 @@ func TestSlowCalmLensCallsDoNotBlockOtherRequests(t *testing.T) {
 		enter.Do(func() { close(entered) })
 		<-release
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"id": "slow", "externalId": "clip_slow", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "allowed"}}}`))
+		w.Write([]byte(`{"id": "slow", "externalId": "clip_slow", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"decision": "allowed"}}}`))
 	}))
 	defer server.Close()
 	a, err := newApp(config{APIKey: "key", ProjectID: "project", UploadPresetID: testPreset, SDKDir: sdkDir(t), BaseURL: server.URL})
@@ -697,7 +697,7 @@ func TestLiveHasNoServerUploadOrDemoSelector(t *testing.T) {
 	a := demoApp(t)
 	mock := live(t, a)
 	// Clips never stream through the server in live mode.
-	if rec := uploadRequest(t, a, upload{choice: calmlens.ModerationStatusBlocked}); rec.Code != 404 && rec.Code != 405 {
+	if rec := uploadRequest(t, a, upload{choice: string(calmlens.ModerationDecisionBlocked)}); rec.Code != 404 && rec.Code != 405 {
 		t.Fatal("live mode accepted a server upload", rec.Code)
 	}
 	if len(a.entries) != 0 || len(mock.Requests()) != 0 {
@@ -787,7 +787,7 @@ func TestFinishLinksOnlyTheClipsOwnAsset(t *testing.T) {
 	_, theirs := startUpload(t, a, "theirs.mp3", "audio/mpeg", int64(len(clipBytes)))
 	item := a.findKey(mine.Clip)
 	other := browserUpload(t, mock, theirs.Token)
-	decideAsset(mock.DatabaseStorage.Assets[other.ID], calmlens.ModerationStatusAllowed)
+	decideAsset(mock.DatabaseStorage.Assets[other.ID], string(calmlens.ModerationDecisionAllowed))
 
 	// Another clip's asset, or one that doesn't exist, is refused after a retrieve.
 	for _, id := range []string{other.ID, "missing"} {
@@ -878,7 +878,7 @@ func sign(body string) string {
 	return calmlens.SignWebhookPayload([]byte(body), webhookTimestamp, "secret")
 }
 func event(id, kind, assetID, facts string) string {
-	return fmt.Sprintf(`{ "id": %q, "projectId": "project", "actor": {"type": "automated", "id": null}, "type": %q, "severity": "low", "title": "Asset event", "description": null, "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s, "createdAt": 1700000000000 }`, id, kind, assetID, assetID, facts)
+	return fmt.Sprintf(`{ "id": %q, "projectId": "project", "actor": {"type": "automated", "id": null}, "type": %q, "severity": "low", "title": "Asset event", "description": null, "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"decision":"allowed"}}, "content": {"status": "stored"}}, "facts": %s, "createdAt": 1700000000000 }`, id, kind, assetID, assetID, facts)
 }
 func retrieves(mock *calmlenstest.MockServerClient) int {
 	n := 0
@@ -894,8 +894,8 @@ func TestWebhookTamperReplayAndRetry(t *testing.T) {
 	a := demoApp(t)
 	mock := live(t, a)
 	item := liveClip(t, a, mock)
-	decideAsset(mock.DatabaseStorage.Assets[item.ID], calmlens.ModerationStatusBlocked)
-	body := event("event-1", calmlens.EventAssetBlocked, item.ID, `[{"key":"flagged-categories","value":["harassment"]}]`)
+	decideAsset(mock.DatabaseStorage.Assets[item.ID], string(calmlens.ModerationDecisionBlocked))
+	body := event("event-1", string(calmlens.EventAssetBlocked), item.ID, `[{"key":"flagged-categories","value":["harassment"]}]`)
 	if webhook(a, body, "bad").Code != 401 || webhook(a, strings.ReplaceAll(body, " ", ""), sign(body)).Code != 401 {
 		t.Fatal("forged or altered webhook accepted")
 	}
@@ -911,7 +911,7 @@ func TestWebhookTamperReplayAndRetry(t *testing.T) {
 	if rec := webhook(a, body, sign(body)); rec.Code != 204 {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
-	if item.Status != calmlens.ModerationStatusBlocked {
+	if item.Status != string(calmlens.ModerationDecisionBlocked) {
 		t.Fatal("trusted the event snapshot instead of retrieving the asset")
 	}
 	before := retrieves(mock)
@@ -932,8 +932,8 @@ func TestWebhookTestFactChangesNothing(t *testing.T) {
 	a := demoApp(t)
 	mock := live(t, a)
 	item := liveClip(t, a, mock)
-	decideAsset(mock.DatabaseStorage.Assets[item.ID], calmlens.ModerationStatusAllowed)
-	body := event("event-test", calmlens.EventAssetAllowed, item.ID, `[{"key":"test","value":true}]`)
+	decideAsset(mock.DatabaseStorage.Assets[item.ID], string(calmlens.ModerationDecisionAllowed))
+	body := event("event-test", string(calmlens.EventAssetAllowed), item.ID, `[{"key":"test","value":true}]`)
 	if rec := webhook(a, body, sign(body)); rec.Code != 204 {
 		t.Fatal(rec.Code)
 	}
@@ -974,7 +974,7 @@ func TestLocalCDNPlayback(t *testing.T) {
 			app.demo, app.client = nil, mock.ServerClient
 			app.preset, app.apiURL, app.sdkDir = testPreset, "https://api.example.test/v1", sdkDir(t)
 			item := liveClip(t, app, mock)
-			decideAsset(mock.DatabaseStorage.Assets[item.ID], calmlens.ModerationStatusAllowed)
+			decideAsset(mock.DatabaseStorage.Assets[item.ID], string(calmlens.ModerationDecisionAllowed))
 			response := get(app, "/media?id="+item.ID)
 			expected := 303
 			if baseURL == "http://cdn.example.com/v1" {

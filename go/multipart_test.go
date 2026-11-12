@@ -26,7 +26,7 @@ func uploadReply(status string, parts any) reply {
 	return reply{status: 200, result: JSON{"id": "asset-1", "upload": JSON{"status": status, "partsReceived": parts}}}
 }
 
-func apiErrorReply(code string, status int, details JSON) reply {
+func apiErrorReply(code ErrorCode, status int, details JSON) reply {
 	return reply{status: status, result: JSON{"code": code, "message": code, "requestId": "req", "details": details}}
 }
 
@@ -79,7 +79,7 @@ func checkAndRemoveResumeProbe(t *testing.T, h *harness) {
 func TestContentLargerThanPartSizeIsSentInPartsWithDerivedKeys(t *testing.T) {
 	c, h := splitClient(t, 5*mib, reply{status: 204}, uploadReply("uploading", 1), uploadReply("uploading", 2), uploadReply("completed", nil))
 	file := fileOf(11 * mib)
-	asset, err := c.Assets.Classify(context.Background(), SubmitAssetOptions{Name: "clip.mp4", Description: Ptr("a clip"), AuthorID: Ptr("user-2"), Context: &ModerationContext{Items: []ModerationContextItem{{Text: "earlier"}}}, Content: &Content{Type: "video/mp4", Bytes: file}, IdempotencyKey: "upload-1"})
+	asset, err := c.Assets.Classify(context.Background(), SubmitAssetOptions{Name: "clip.mp4", Description: Ptr("a clip"), AuthorID: Ptr("user-2"), Context: &ModerationContext{Items: []ModerationContextItem{{Text: "earlier"}}}, Content: &Content{Type: "video/mp4", Bytes: file}, Params: Params{IdempotencyKey: "upload-1"}})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
@@ -128,7 +128,7 @@ func TestADroppedPartIsRetriedWithItsKeyAndAPartTheAPIHasIsSkipped(t *testing.T)
 	if _, err := reader.Seek(7, io.SeekStart); err != nil {
 		t.Fatal(err)
 	}
-	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Data: onlySeeker{reader}, SizeInBytes: &size}, IdempotencyKey: "upload-2"})
+	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Data: onlySeeker{reader}, SizeInBytes: &size}, Params: Params{IdempotencyKey: "upload-2"}})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
@@ -145,7 +145,7 @@ func TestMultipartResumeStartsAfterThePartsAlreadyRecorded(t *testing.T) {
 	file := fileOf(16 * mib)
 	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{
 		Name: "report.pdf", Content: &Content{Type: "application/pdf", Bytes: file},
-		IdempotencyKey: "resume",
+		Params: Params{IdempotencyKey: "resume"},
 	})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
@@ -198,18 +198,18 @@ func TestContentOfOnePartAndStreamsGoInOneRequest(t *testing.T) {
 
 func TestPartSizeAndSplitUploadLimits(t *testing.T) {
 	for _, size := range []int64{MinPartSizeBytes - 1, MaxPartSizeBytes + 1, -1} {
-		if _, err := NewServerClient(Options{APIKey: "key", ProjectID: "p", PartSizeBytes: size}); ErrorCode(err) != CodeSDKInvalidConfig {
+		if _, err := NewServerClient(Options{APIKey: "key", ProjectID: "p", PartSizeBytes: size}); CodeOf(err) != CodeSDKInvalidConfig {
 			t.Fatal(size, err)
 		}
 	}
 	c, h := splitClient(t, DefaultPartSizeBytes)
 	ctx := context.Background()
-	_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "clip.mp4", Content: &Content{Type: "video/mp4", Bytes: fileOf(9 * mib)}, IdempotencyKey: strings.Repeat("k", 241)})
-	if ErrorCode(err) != CodeSDKInvalidArgument {
+	_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "clip.mp4", Content: &Content{Type: "video/mp4", Bytes: fileOf(9 * mib)}, Params: Params{IdempotencyKey: strings.Repeat("k", 241)}})
+	if CodeOf(err) != CodeSDKInvalidArgument {
 		t.Fatal(err)
 	}
 	// An image over 20 MiB cannot be sent at all; one over 10 MiB can, in parts.
-	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "huge.png", Content: &Content{Type: "image/png", Bytes: fileOf(21 * mib)}}); ErrorCode(err) != CodeUploadTooLarge {
+	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "huge.png", Content: &Content{Type: "image/png", Bytes: fileOf(21 * mib)}}); CodeOf(err) != CodeUploadTooLarge {
 		t.Fatal(err)
 	}
 	if len(h.calls) != 0 {
@@ -224,7 +224,7 @@ func TestPartSizeAndSplitUploadLimits(t *testing.T) {
 
 func TestMultipartResumeOfCompletedUploadSendsNoFileBytes(t *testing.T) {
 	c, h := splitClient(t, 5*mib, uploadReply("completed", nil))
-	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Bytes: fileOf(11 * mib)}, IdempotencyKey: "finished"})
+	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Bytes: fileOf(11 * mib)}, Params: Params{IdempotencyKey: "finished"}})
 	if err != nil || asset.ID != "asset-1" || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}

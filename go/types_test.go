@@ -1,6 +1,7 @@
 package calmlens
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
@@ -10,22 +11,22 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"status":"ready","reason":null,"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]},"completedAt":1760000000700}}`), &a)
+	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"status":"ready","reason":null,"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"decision":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]},"completedAt":1760000000700}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if p := a.Classification; p.Status != ClassificationStatusCompleted || *p.UpdatedAt != 1760000000500 || *a.Upload.PartsReceived != 3 {
 		t.Fatalf("processing: %+v", p)
 	}
-	if m := a.Classification.Moderation; m.Status != ModerationStatusAgeRestricted || m.ManualReviews[0].Decision != ModerationDecisionAgeRestricted ||
+	if m := a.Classification.Moderation; *m.Decision != ModerationDecisionAgeRestricted || m.ManualReviews[0].Decision != ModerationDecisionAgeRestricted ||
 		*m.ManualReviews[0].Note != "Fine" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
 	}
 	if review := a.Classification.Moderation.ManualReviews[0]; review.DecidedBy.Type != ReviewActorUser || *review.DecidedBy.ID != "user-1" || !review.Applied {
 		t.Fatalf("review: %+v", review)
 	}
-	if m := a.Classification.Moderation; *m.AutomatedStatus != ModerationStatusAllowed ||
-		!reflect.DeepEqual(m.Regions, []RegionalDecision{{Region: "DE", Status: ModerationStatusBlocked, Rule: "de-jugendschutz", Category: "violence"}}) {
+	if m := a.Classification.Moderation; *m.AutomatedStatus != ModerationDecisionAllowed ||
+		!sameJSON(m.Regions, []RegionalDecision{{Region: "DE", Status: ModerationDecisionBlocked, Rule: "de-jugendschutz", Category: "violence"}}) {
 		t.Fatalf("automated and regional statuses: %+v", m)
 	}
 	content := a.Content
@@ -42,7 +43,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if r := content.Rendered; r.Kind != AssetRenderedKindAudio || r.Format != "audio/mp4" || r.Width != nil || len(r.Peaks) != 2 || r.Peaks[1] != 1 {
 		t.Fatalf("rendered: %+v", r)
 	}
-	if h := content.HLS; h.Status != "ready" || h.Reason != nil || len(h.Renditions) != 1 || h.Renditions[0] != (AssetHlsRendition{Kind: AssetHlsRenditionKindAudio, Bandwidth: 128000, Codecs: "mp4a.40.2"}) {
+	if h := content.HLS; h.Status != "ready" || h.Reason != nil || len(h.Renditions) != 1 || h.Renditions[0].Kind != AssetHlsRenditionKindAudio || h.Renditions[0].Bandwidth != 128000 || h.Renditions[0].Codecs != "mp4a.40.2" {
 		t.Fatalf("hls: %+v", h)
 	}
 	if p := content.Preview; *p.Width != 1200 || *p.Height != 300 || *p.Thumbhash != "th" || *p.AverageColor != "#fff" {
@@ -66,19 +67,19 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if hate := report.Raw.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
 		t.Fatalf("hate: %+v", hate)
 	}
-	if !reflect.DeepEqual(report.Raw.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, HashListID: "list-1", HashListEntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
+	if !sameJSON(report.Raw.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, HashListID: "list-1", HashListEntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
 		*report.Source != DecisionSourceHashList {
 		t.Fatalf("hash matches: %+v, decision %+v", report.Raw.HashMatches, report)
 	}
 	links := a.Classification.LinkDetection
-	if links.Status != ResultEvaluated || !reflect.DeepEqual(links.QRCodes, []DetectedQRCode{{Value: "https://example.com", Box: BoundingBox{Left: 0.1, Top: 0.2, Width: 0.3, Height: 0.4}}}) ||
-		!reflect.DeepEqual(links.Links, []DetectedLink{{URL: "https://example.com", Source: "qr-code"}}) {
+	if links.Status != ResultEvaluated || !sameJSON(links.QRCodes, []DetectedQRCode{{Value: "https://example.com", Box: BoundingBox{Left: 0.1, Top: 0.2, Width: 0.3, Height: 0.4}}}) ||
+		!sameJSON(links.Links, []DetectedLink{{URL: "https://example.com", Source: "qr-code"}}) {
 		t.Fatalf("link detection: %+v", links)
 	}
-	if ai := a.Classification.AIGeneratedDetection; ai.Provenance != "ai-generated" || !reflect.DeepEqual(ai.Signals, []ProvenanceSignal{{Kind: "c2pa", Value: "trainedAlgorithmicMedia"}}) {
+	if ai := a.Classification.AIGeneratedDetection; ai.Provenance != "ai-generated" || !sameJSON(ai.Signals, []ProvenanceSignal{{Kind: "c2pa", Value: "trainedAlgorithmicMedia"}}) {
 		t.Fatalf("AI-generated detection: %+v", ai)
 	}
-	if ocr := a.Classification.OCR; ocr.Status != ResultEvaluated || !reflect.DeepEqual(ocr.TextRegions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
+	if ocr := a.Classification.OCR; ocr.Status != ResultEvaluated || !sameJSON(ocr.TextRegions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
 		t.Fatalf("OCR: %+v", ocr)
 	}
 }
@@ -136,7 +137,7 @@ func TestClassifyTextKeepsAnOverLongNewestPost(t *testing.T) {
 	if err := json.Unmarshal(h.bodies[len(h.bodies)-1], &sent); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sent.Context.Items, []ModerationContextItem{{Text: newest}}) {
+	if !sameJSON(sent.Context.Items, []ModerationContextItem{{Text: newest}}) {
 		t.Fatalf("sent %d items, want only the newest", len(sent.Context.Items))
 	}
 }
@@ -258,7 +259,7 @@ func TestEventFactsDecode(t *testing.T) {
         "classification": {
           "status": "completed",
           "moderation": {
-            "status": "blocked"
+            "decision": "blocked"
           }
         }
       },
@@ -312,7 +313,7 @@ func TestEventFactsDecode(t *testing.T) {
 	if err = flagged.Facts.Decode(&facts); err != nil {
 		t.Fatal(err)
 	}
-	if *facts.AssetName != "cat.jpg" || !reflect.DeepEqual(facts.FlaggedCategories, []string{CategorySexual, CategoryHate}) || facts.ModerationStatus != ModerationStatusBlocked || facts.AssetType != nil {
+	if *facts.AssetName != "cat.jpg" || !reflect.DeepEqual(facts.FlaggedCategories, []Category{CategorySexual, CategoryHate}) || facts.ModerationStatus != ModerationStatusBlocked || facts.AssetType != nil {
 		t.Fatalf("%+v", facts)
 	}
 	name, ok := flagged.Facts.Get(FactAssetName)
@@ -323,7 +324,7 @@ func TestEventFactsDecode(t *testing.T) {
 	if list, ok := categories.Strings(); !ok || !reflect.DeepEqual(list, []string{"sexual", "hate"}) {
 		t.Fatalf("%+v", categories)
 	}
-	if asset := flagged.Asset; asset.ID != "a" || asset.Classification.Status != ClassificationStatusCompleted || asset.Classification.Moderation.Status != ModerationStatusBlocked ||
+	if asset := flagged.Asset; asset.ID != "a" || asset.Classification.Status != ClassificationStatusCompleted || (asset.Classification.Moderation.Decision == nil || *asset.Classification.Moderation.Decision != ModerationDecisionBlocked) ||
 		asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
 		t.Fatalf("%+v", flagged)
 	}
@@ -331,10 +332,10 @@ func TestEventFactsDecode(t *testing.T) {
 	if err = page.Items[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OrganisationID != "user-1" {
 		t.Fatalf("%+v %v", usage, err)
 	}
-	if err = page.Items[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
+	if err = page.Items[1].Facts.Decode(&AssetClassifiedFacts{}); CodeOf(err) != "" {
 		t.Fatalf("unrelated keys are ignored, got %v", err)
 	}
-	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageFreeUploadsExhaustedFacts{}); ErrorCode(err) != CodeSDKInvalidResponse {
+	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageFreeUploadsExhaustedFacts{}); CodeOf(err) != CodeSDKInvalidResponse {
 		t.Fatalf("mismatched value: %v", err)
 	}
 }
@@ -352,7 +353,7 @@ func TestEventFactsDecodeTeamAPIKeyAndUsageEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	types := []string{EventAPIKeyDeleted, EventProjectMemberLeft, EventUploadPresetDailyLimitReached, EventUsageUploadsPaused, EventProjectTransferred, EventConnectorDisabled}
+	types := []EventType{EventAPIKeyDeleted, EventProjectMemberLeft, EventUploadPresetDailyLimitReached, EventUsageUploadsPaused, EventProjectTransferred, EventConnectorDisabled}
 	for i, want := range types {
 		if page.Items[i].Type != want {
 			t.Fatalf("item %d type %q, want %q", i, page.Items[i].Type, want)
@@ -404,7 +405,7 @@ func TestEventFactsDecodeAssetDecisionsAndBatchRemovals(t *testing.T) {
 		t.Fatal(err)
 	}
 	var automated AssetDecisionFacts
-	if err = page.Items[0].Facts.Decode(&automated); err != nil || page.Items[0].Actor != (Actor{Type: ActorAutomated}) || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.Note != nil {
+	if err = page.Items[0].Facts.Decode(&automated); err != nil || page.Items[0].Actor.Type != ActorAutomated || page.Items[0].Actor.ID != nil || !reflect.DeepEqual(automated.FlaggedCategories, []Category{CategoryViolence}) || automated.Note != nil {
 		t.Fatalf("automated %+v %+v %v", page.Items[0].Actor, automated, err)
 	}
 	var reviewed AssetDecisionFacts
@@ -430,13 +431,21 @@ func TestReportPolicySnapshotDecode(t *testing.T) {
 		t.Fatalf("lost category snapshot: %#v", category)
 	}
 	rule := category.Settings.Restrictions[0]
-	if !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{1, 0}) {
+	if !reflect.DeepEqual(rule.Unless, []Qualifier{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{1, 0}) {
 		t.Fatalf("lost condition snapshot: %#v %#v", rule, category.Source)
 	}
 	if links := policy.LinkSafety.Links; len(links) != 1 || links[0].URL != "https://example.com/login" || *links[0].FinalURL != "https://phish.example/" || links[0].Redirects != 1 || links[0].Verdict != LinkVerdictPhishing {
 		t.Fatalf("lost link-safety links: %#v", policy.LinkSafety)
 	}
-	if *policy.AutomatedStatus != ModerationStatusPurged || *policy.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.FlaggedCategories, []string{"violence"}) {
+	if *policy.AutomatedStatus != ModerationDecisionPurged || *policy.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.FlaggedCategories, []Category{"violence"}) {
 		t.Fatalf("lost decision snapshot: %#v", policy)
 	}
+}
+
+// sameJSON reports whether two models encode alike. Decoded models keep their RawJSON, so a
+// model built in a test never equals one decoded from JSON with reflect.DeepEqual.
+func sameJSON(a, b any) bool {
+	x, errX := json.Marshal(a)
+	y, errY := json.Marshal(b)
+	return errX == nil && errY == nil && bytes.Equal(x, y)
 }

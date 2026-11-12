@@ -2,114 +2,124 @@ package calmlens
 
 import "encoding/json"
 
-// Event types. Type is a plain string so event types added later still decode.
+// EventType is an event's type.
+type EventType string
+
+// Event types.
 const (
-	EventAssetUploaded                 = "asset.uploaded"
-	EventAssetClassified               = "asset.classified"
-	EventAssetAllowed                  = "asset.allowed"
-	EventAssetLimited                  = "asset.limited"
-	EventAssetAgeRestricted            = "asset.age-restricted"
-	EventAssetRegionRestricted         = "asset.region-restricted"
-	EventAssetBlocked                  = "asset.blocked"
-	EventAssetPurged                   = "asset.purged"
-	EventAssetFailed                   = "asset.failed"
-	EventAssetProgressUpdated          = "asset.progress-updated"
-	EventAssetDeleted                  = "asset.deleted"
-	EventAssetContentRemoved           = "asset.content-removed"
-	EventAssetRetried                  = "asset.retried"
-	EventAssetRerunRequested           = "asset.rerun-requested"
-	EventAssetHashMatched              = "asset.hash-matched"
-	EventAssetReviewRequested          = "asset.review-requested"
-	EventAssetReviewCompleted          = "asset.review-completed"
-	EventUsageFreeUploadsExhausted     = "usage.free-uploads-exhausted"
-	EventUsageUploadsPaused            = "usage.uploads-paused"
-	EventUploadPresetDailyLimitReached = "upload-preset.daily-limit-reached"
-	EventProjectMemberJoined           = "project.member-joined"
-	EventProjectMemberRemoved          = "project.member-removed"
-	EventProjectMemberLeft             = "project.member-left"
-	EventProjectMemberRoleChanged      = "project.member-role-changed"
-	EventProjectInvitationSent         = "project.invitation-sent"
-	EventProjectTransferred            = "project.transferred"
-	EventAPIKeyCreated                 = "api-key.created"
-	EventAPIKeyRevoked                 = "api-key.revoked"
-	EventAPIKeyDeleted                 = "api-key.deleted"
-	EventConnectorDisabled             = "connector.disabled"
+	EventAssetUploaded                 EventType = "asset.uploaded"
+	EventAssetClassified               EventType = "asset.classified"
+	EventAssetAllowed                  EventType = "asset.allowed"
+	EventAssetLimited                  EventType = "asset.limited"
+	EventAssetAgeRestricted            EventType = "asset.age-restricted"
+	EventAssetRegionRestricted         EventType = "asset.region-restricted"
+	EventAssetBlocked                  EventType = "asset.blocked"
+	EventAssetPurged                   EventType = "asset.purged"
+	EventAssetFailed                   EventType = "asset.failed"
+	EventAssetProgressUpdated          EventType = "asset.progress-updated"
+	EventAssetDeleted                  EventType = "asset.deleted"
+	EventAssetContentRemoved           EventType = "asset.content-removed"
+	EventAssetRetried                  EventType = "asset.retried"
+	EventAssetRerunRequested           EventType = "asset.rerun-requested"
+	EventAssetHashMatched              EventType = "asset.hash-matched"
+	EventAssetReviewRequested          EventType = "asset.review-requested"
+	EventAssetReviewCompleted          EventType = "asset.review-completed"
+	EventUsageFreeUploadsExhausted     EventType = "usage.free-uploads-exhausted"
+	EventUsageUploadsPaused            EventType = "usage.uploads-paused"
+	EventUploadPresetDailyLimitReached EventType = "upload-preset.daily-limit-reached"
+	EventProjectMemberJoined           EventType = "project.member-joined"
+	EventProjectMemberRemoved          EventType = "project.member-removed"
+	EventProjectMemberLeft             EventType = "project.member-left"
+	EventProjectMemberRoleChanged      EventType = "project.member-role-changed"
+	EventProjectInvitationSent         EventType = "project.invitation-sent"
+	EventProjectTransferred            EventType = "project.transferred"
+	EventAPIKeyCreated                 EventType = "api-key.created"
+	EventAPIKeyRevoked                 EventType = "api-key.revoked"
+	EventAPIKeyDeleted                 EventType = "api-key.deleted"
+	EventConnectorDisabled             EventType = "connector.disabled"
 )
+
+// Severity is how much an event needs attention.
+type Severity string
 
 // Event severities.
 const (
-	SeverityLow  = "low"
-	SeverityHigh = "high"
+	SeverityLow  Severity = "low"
+	SeverityHigh Severity = "high"
 )
 
-// Registered fact keys. Each event type documents which keys it carries; FactTest marks a
-// test send. Who caused an event is its Actor, not a fact. Webhook, Slack and email deliveries
-// and the public events feed leave out facts that hold personal or account data (names, email
-// addresses, the project owner's ID), so those keys never appear on events you receive from them.
+// EventFactKey is the key of an event fact.
+type EventFactKey string
+
+// Registered fact keys. Each event type documents which keys it carries; FactTest marks a test
+// send. Who caused an event is its Actor, not a fact. Webhook, Slack and email deliveries and the
+// public events feed leave out facts that hold personal or account data (names, email addresses,
+// the project owner's ID), so those keys never appear on events you receive from them.
 const (
-	FactAssetName                = "asset-name"
-	FactAssetType                = "asset-type"
-	FactFileFormat               = "file-format"
-	FactModerationStatus         = "moderation-status"
-	FactFlaggedCategories        = "flagged-categories"
-	FactNote                     = "note"
-	FactPreviousStatus           = "previous-status"
-	FactFailureReason            = "failure-reason"
-	FactBatchID                  = "batch-id"
-	FactLimit                    = "limit"
-	FactUsed                     = "used"
-	FactOrganisationID           = "organisation-id"
-	FactOrganisationName         = "organisation-name"
-	FactPreviousOrganisationID   = "previous-organisation-id"
-	FactPreviousOrganisationName = "previous-organisation-name"
-	FactMethod                   = "method"
-	FactAPIKeysRevoked           = "api-keys-revoked"
-	FactConnectorsPaused         = "connectors-paused"
-	FactMemberUserID             = "member-user-id"
-	FactMemberName               = "member-name"
-	FactRole                     = "role"
-	FactConnectorID              = "connector-id"
-	FactConnectorName            = "connector-name"
-	FactConnectorType            = "connector-type"
-	FactConsecutiveFailures      = "consecutive-failures"
-	FactLastError                = "last-error"
-	FactResumesAt                = "resumes-at"
-	FactReason                   = "reason"
-	FactPresetID                 = "preset-id"
-	FactPresetName               = "preset-name"
-	FactDailyLimit               = "daily-limit"
-	FactPreviousRole             = "previous-role"
-	FactKeyID                    = "key-id"
-	FactKeyName                  = "key-name"
-	FactCompletedSections        = "completed-sections"
-	FactTotalSections            = "total-sections"
-	FactAppliedToAsset           = "applied-to-asset"
-	FactAutomatedStatus          = "automated-status"
-	FactChildAsset               = "child-asset"
-	FactChildStatus              = "child-status"
-	FactCreatedByName            = "created-by-name"
-	FactDecision                 = "decision"
-	FactDeletedByName            = "deleted-by-name"
-	FactDistance                 = "distance"
-	FactHashListID               = "hash-list-id"
-	FactHashListName             = "hash-list-name"
-	FactInviteeEmail             = "invitee-email"
-	FactMatchAction              = "match-action"
-	FactParentAsset              = "parent-asset"
-	FactRegion                   = "region"
-	FactReviewID                 = "review-id"
-	FactReviewReason             = "review-reason"
-	FactReviewerName             = "reviewer-name"
-	FactRevokedByName            = "revoked-by-name"
-	FactRule                     = "rule"
-	FactStatus                   = "status"
-	FactUncertainCategories      = "uncertain-categories"
-	FactTest                     = "test"
+	FactAssetName                EventFactKey = "asset-name"
+	FactAssetType                EventFactKey = "asset-type"
+	FactFileFormat               EventFactKey = "file-format"
+	FactModerationStatus         EventFactKey = "moderation-status"
+	FactFlaggedCategories        EventFactKey = "flagged-categories"
+	FactNote                     EventFactKey = "note"
+	FactPreviousStatus           EventFactKey = "previous-status"
+	FactFailureReason            EventFactKey = "failure-reason"
+	FactBatchID                  EventFactKey = "batch-id"
+	FactLimit                    EventFactKey = "limit"
+	FactUsed                     EventFactKey = "used"
+	FactOrganisationID           EventFactKey = "organisation-id"
+	FactOrganisationName         EventFactKey = "organisation-name"
+	FactPreviousOrganisationID   EventFactKey = "previous-organisation-id"
+	FactPreviousOrganisationName EventFactKey = "previous-organisation-name"
+	FactMethod                   EventFactKey = "method"
+	FactAPIKeysRevoked           EventFactKey = "api-keys-revoked"
+	FactConnectorsPaused         EventFactKey = "connectors-paused"
+	FactMemberUserID             EventFactKey = "member-user-id"
+	FactMemberName               EventFactKey = "member-name"
+	FactRole                     EventFactKey = "role"
+	FactConnectorID              EventFactKey = "connector-id"
+	FactConnectorName            EventFactKey = "connector-name"
+	FactConnectorType            EventFactKey = "connector-type"
+	FactConsecutiveFailures      EventFactKey = "consecutive-failures"
+	FactLastError                EventFactKey = "last-error"
+	FactResumesAt                EventFactKey = "resumes-at"
+	FactReason                   EventFactKey = "reason"
+	FactPresetID                 EventFactKey = "preset-id"
+	FactPresetName               EventFactKey = "preset-name"
+	FactDailyLimit               EventFactKey = "daily-limit"
+	FactPreviousRole             EventFactKey = "previous-role"
+	FactKeyID                    EventFactKey = "key-id"
+	FactKeyName                  EventFactKey = "key-name"
+	FactCompletedSections        EventFactKey = "completed-sections"
+	FactTotalSections            EventFactKey = "total-sections"
+	FactAppliedToAsset           EventFactKey = "applied-to-asset"
+	FactAutomatedStatus          EventFactKey = "automated-status"
+	FactChildAsset               EventFactKey = "child-asset"
+	FactChildStatus              EventFactKey = "child-status"
+	FactCreatedByName            EventFactKey = "created-by-name"
+	FactDecision                 EventFactKey = "decision"
+	FactDeletedByName            EventFactKey = "deleted-by-name"
+	FactDistance                 EventFactKey = "distance"
+	FactHashListID               EventFactKey = "hash-list-id"
+	FactHashListName             EventFactKey = "hash-list-name"
+	FactInviteeEmail             EventFactKey = "invitee-email"
+	FactMatchAction              EventFactKey = "match-action"
+	FactParentAsset              EventFactKey = "parent-asset"
+	FactRegion                   EventFactKey = "region"
+	FactReviewID                 EventFactKey = "review-id"
+	FactReviewReason             EventFactKey = "review-reason"
+	FactReviewerName             EventFactKey = "reviewer-name"
+	FactRevokedByName            EventFactKey = "revoked-by-name"
+	FactRule                     EventFactKey = "rule"
+	FactStatus                   EventFactKey = "status"
+	FactUncertainCategories      EventFactKey = "uncertain-categories"
+	FactTest                     EventFactKey = "test"
 )
 
 // EventAsset is a snapshot of an asset's processing, moderation and content status when the
 // event was created.
 type EventAsset struct {
+	responseJSON
 	ID             string                   `json:"id"`
 	ExternalID     *string                  `json:"externalId,omitempty"`
 	UploadPresetID *string                  `json:"uploadPresetId,omitempty"`
@@ -120,12 +130,14 @@ type EventAsset struct {
 
 // EventAssetClassification is the asset's classification status when the event was created.
 type EventAssetUpload struct {
-	Status string `json:"status"`
+	responseJSON
+	Status UploadStatus `json:"status"`
 }
 
 type EventAssetClassification struct {
+	responseJSON
 	// Status is one of the ClassificationStatus constants.
-	Status string `json:"status"`
+	Status ClassificationStatus `json:"status"`
 	// TestInput is whether the results came from one of the project's test inputs rather than
 	// analysing the content. Never use test results, such as age ranges, for real decisions.
 	TestInput  bool                 `json:"testInput"`
@@ -134,14 +146,16 @@ type EventAssetClassification struct {
 
 // EventAssetModeration is the asset's moderation status when the event was created.
 type EventAssetModeration struct {
-	// Status is one of the ModerationStatus constants.
-	Status string `json:"status"`
+	responseJSON
+	// Decision is nil until a moderation decision is in force.
+	Decision *ModerationDecision `json:"decision"`
 }
 
 // EventAssetContent is whether CalmLens held the asset's content when the event was created.
 type EventAssetContent struct {
+	responseJSON
 	// Status is one of the ContentStatus constants.
-	Status string `json:"status"`
+	Status ContentStatus `json:"status"`
 }
 
 // EventFact is one registered fact of an event. URL, when present, is a stable link that opens
@@ -151,9 +165,10 @@ type EventAssetContent struct {
 // number, boolean, string list or null); numbers are json.Number. Read it with Text, Int64,
 // Bool or Strings, or decode every fact at once with EventFacts.Decode.
 type EventFact struct {
-	Key   string  `json:"key"`
-	Value any     `json:"value"`
-	URL   *string `json:"url,omitempty"`
+	responseJSON
+	Key   EventFactKey `json:"key"`
+	Value any          `json:"value"`
+	URL   *string      `json:"url,omitempty"`
 }
 
 // Text returns a string value.
@@ -205,7 +220,7 @@ func (f EventFact) Strings() ([]string, bool) {
 type EventFacts []EventFact
 
 // Get returns the fact with key.
-func (facts EventFacts) Get(key string) (EventFact, bool) {
+func (facts EventFacts) Get(key EventFactKey) (EventFact, bool) {
 	for _, fact := range facts {
 		if fact.Key == key {
 			return fact, true
@@ -217,7 +232,7 @@ func (facts EventFacts) Get(key string) (EventFact, bool) {
 // GetEventFact returns the value of one of event's facts by key, the first when the key repeats,
 // or nil when the event doesn't carry it. A fact's URL, when it has one, is on the fact in
 // event.Facts.
-func GetEventFact(event *Event, key string) any {
+func GetEventFact(event *Event, key EventFactKey) any {
 	if event == nil {
 		return nil
 	}
@@ -228,8 +243,8 @@ func GetEventFact(event *Event, key string) any {
 // GetEventFacts returns event's facts as values by key, such as
 // {"flagged-categories": ["hate"]}. A key the event repeats keeps its first value, as
 // GetEventFact reads it.
-func GetEventFacts(event *Event) map[string]any {
-	values := map[string]any{}
+func GetEventFacts(event *Event) map[EventFactKey]any {
+	values := map[EventFactKey]any{}
 	if event == nil {
 		return values
 	}
@@ -254,7 +269,7 @@ func (facts EventFacts) IsTest() bool {
 // Decode copies fact values into out, a pointer to a struct whose json tags are fact keys,
 // such as *AssetClassifiedFacts. Facts without a matching field are ignored.
 func (facts EventFacts) Decode(out any) error {
-	values := make(map[string]any, len(facts))
+	values := make(map[EventFactKey]any, len(facts))
 	for _, fact := range facts {
 		values[fact.Key] = fact.Value
 	}
@@ -270,9 +285,9 @@ func (facts EventFacts) Decode(out any) error {
 
 // AssetUploadedFacts are the facts of EventAssetUploaded.
 type AssetUploadedFacts struct {
-	AssetName  *string `json:"asset-name"`
-	AssetType  *string `json:"asset-type"`
-	FileFormat *string `json:"file-format"`
+	AssetName  *string    `json:"asset-name"`
+	AssetType  *AssetType `json:"asset-type"`
+	FileFormat *string    `json:"file-format"`
 }
 
 // AssetClassifiedFacts are the facts of EventAssetClassified. FlaggedCategories are the parent
@@ -280,10 +295,10 @@ type AssetUploadedFacts struct {
 // ModerationStatus is the status the policy decided (a ModerationStatus constant other than
 // pending); a reviewer's earlier decision on the asset keeps precedence.
 type AssetClassifiedFacts struct {
-	AssetName         *string  `json:"asset-name"`
-	AssetType         *string  `json:"asset-type"`
-	FlaggedCategories []string `json:"flagged-categories"`
-	ModerationStatus  string   `json:"moderation-status"`
+	AssetName         *string          `json:"asset-name"`
+	AssetType         *AssetType       `json:"asset-type"`
+	FlaggedCategories []Category       `json:"flagged-categories"`
+	ModerationStatus  ModerationStatus `json:"moderation-status"`
 }
 
 // AssetDecisionFacts are the facts of EventAssetAllowed, EventAssetLimited,
@@ -293,10 +308,10 @@ type AssetClassifiedFacts struct {
 // FlaggedCategories, when present, are the parent policy categories whose findings decided the
 // status. Note is set only for reviewer decisions.
 type AssetDecisionFacts struct {
-	AssetName         *string  `json:"asset-name"`
-	AssetType         *string  `json:"asset-type"`
-	FlaggedCategories []string `json:"flagged-categories"`
-	Note              *string  `json:"note"`
+	AssetName         *string    `json:"asset-name"`
+	AssetType         *AssetType `json:"asset-type"`
+	FlaggedCategories []Category `json:"flagged-categories"`
+	Note              *string    `json:"note"`
 }
 
 // AssetRerunRequestedFacts are the facts of EventAssetRerunRequested, recorded when the event's
@@ -305,29 +320,29 @@ type AssetDecisionFacts struct {
 // constant other than pending), which stands until the re-run's EventAssetClassified and
 // asset.<status> events report the new one; a failed re-run keeps it.
 type AssetRerunRequestedFacts struct {
-	AssetName        *string `json:"asset-name"`
-	AssetType        *string `json:"asset-type"`
-	ModerationStatus string  `json:"moderation-status"`
+	AssetName        *string          `json:"asset-name"`
+	AssetType        *AssetType       `json:"asset-type"`
+	ModerationStatus ModerationStatus `json:"moderation-status"`
 }
 
 // AssetFailedFacts are the facts of EventAssetFailed.
 type AssetFailedFacts struct {
-	AssetName *string `json:"asset-name"`
-	AssetType *string `json:"asset-type"`
+	AssetName *string    `json:"asset-name"`
+	AssetType *AssetType `json:"asset-type"`
 	// PreviousStatus is the classification status (a ClassificationStatus constant) before the failure.
 	PreviousStatus *string `json:"previous-status"`
 	// FailureReason is why processing failed (an AssetFailureReason constant).
-	FailureReason string `json:"failure-reason"`
+	FailureReason AssetFailureReason `json:"failure-reason"`
 }
 
 // AssetProgressUpdatedFacts are the facts of EventAssetProgressUpdated, sent while long audio or
 // video analysed in sections finishes more of them. CompletedSections and TotalSections match the
 // asset's AssetClassification.Progress.
 type AssetProgressUpdatedFacts struct {
-	AssetName         *string `json:"asset-name"`
-	AssetType         *string `json:"asset-type"`
-	CompletedSections int64   `json:"completed-sections"`
-	TotalSections     int64   `json:"total-sections"`
+	AssetName         *string    `json:"asset-name"`
+	AssetType         *AssetType `json:"asset-type"`
+	CompletedSections int64      `json:"completed-sections"`
+	TotalSections     int64      `json:"total-sections"`
 }
 
 // UsageFreeUploadsExhaustedFacts are the facts of EventUsageFreeUploadsExhausted.
@@ -348,33 +363,35 @@ type ProjectMemberJoinedFacts struct {
 	Role         string  `json:"role"`
 }
 
-// Values of FactConnectorType. ConnectorDisabledFacts.ConnectorType is a plain string so types
-// added later still decode.
+// ConnectorType is the kind of a connector, the value of FactConnectorType.
+type ConnectorType string
+
+// Values of FactConnectorType. ConnectorDisabledFacts.
 const (
-	ConnectorTypeInApp   = "in-app"
-	ConnectorTypeWebhook = "webhook"
-	ConnectorTypeSlack   = "slack"
-	ConnectorTypeEmail   = "email"
+	ConnectorTypeInApp   ConnectorType = "in-app"
+	ConnectorTypeWebhook ConnectorType = "webhook"
+	ConnectorTypeSlack   ConnectorType = "slack"
+	ConnectorTypeEmail   ConnectorType = "email"
 )
 
 // ConnectorDisabledFacts are the facts of EventConnectorDisabled, sent when deliveries to a
 // connector kept failing and it was turned off. ConnectorType is a ConnectorType constant.
 // LastError stays in the portal and is nil on webhook deliveries.
 type ConnectorDisabledFacts struct {
-	ConnectorID         string  `json:"connector-id"`
-	ConnectorName       string  `json:"connector-name"`
-	ConnectorType       string  `json:"connector-type"`
-	ConsecutiveFailures int64   `json:"consecutive-failures"`
-	LastError           *string `json:"last-error"`
+	ConnectorID         string        `json:"connector-id"`
+	ConnectorName       string        `json:"connector-name"`
+	ConnectorType       ConnectorType `json:"connector-type"`
+	ConsecutiveFailures int64         `json:"consecutive-failures"`
+	LastError           *string       `json:"last-error"`
 }
 
 // AssetRemovedFacts are the facts of EventAssetDeleted, EventAssetContentRemoved and
 // EventAssetRetried. BatchID, on the deletions and content removals an Assets.Batch operation
 // causes, is its BatchAssetsResponse.BatchID; nil otherwise.
 type AssetRemovedFacts struct {
-	AssetName *string `json:"asset-name"`
-	AssetType *string `json:"asset-type"`
-	BatchID   *string `json:"batch-id"`
+	AssetName *string    `json:"asset-name"`
+	AssetType *AssetType `json:"asset-type"`
+	BatchID   *string    `json:"batch-id"`
 }
 
 // UsageUploadsPausedFacts are the facts of EventUsageUploadsPaused. Reason is "spend-limit",
@@ -415,26 +432,29 @@ type ProjectInvitationSentFacts struct {
 	Role string `json:"role"`
 }
 
+// TransferMethod is how a project was transferred, the value of FactMethod.
+type TransferMethod string
+
 // Values of FactMethod on EventProjectTransferred.
 const (
 	// TransferMethodHandover is a project an owner of the receiving organisation accepted from
 	// another organisation.
-	TransferMethodHandover = "handover"
+	TransferMethodHandover TransferMethod = "handover"
 	// TransferMethodMove is a project someone who owns both organisations moved.
-	TransferMethodMove = "move"
+	TransferMethodMove TransferMethod = "move"
 )
 
 // ProjectTransferredFacts are the facts of EventProjectTransferred, sent when the project moved
 // to another organisation. Method is TransferMethodHandover or TransferMethodMove; a handover
 // revokes APIKeysRevoked of the project's API keys and pauses ConnectorsPaused of its connectors.
 type ProjectTransferredFacts struct {
-	PreviousOrganisationID   string `json:"previous-organisation-id"`
-	PreviousOrganisationName string `json:"previous-organisation-name"`
-	OrganisationID           string `json:"organisation-id"`
-	OrganisationName         string `json:"organisation-name"`
-	Method                   string `json:"method"`
-	APIKeysRevoked           int64  `json:"api-keys-revoked"`
-	ConnectorsPaused         int64  `json:"connectors-paused"`
+	PreviousOrganisationID   string         `json:"previous-organisation-id"`
+	PreviousOrganisationName string         `json:"previous-organisation-name"`
+	OrganisationID           string         `json:"organisation-id"`
+	OrganisationName         string         `json:"organisation-name"`
+	Method                   TransferMethod `json:"method"`
+	APIKeysRevoked           int64          `json:"api-keys-revoked"`
+	ConnectorsPaused         int64          `json:"connectors-paused"`
 }
 
 // APIKeyCreatedFacts are the facts of EventAPIKeyCreated.

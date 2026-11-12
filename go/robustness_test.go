@@ -36,7 +36,7 @@ func TestLensLockRespectsDeadline(t *testing.T) {
 	defer cancel()
 	start := time.Now()
 	_, err = client.EnsureLens(ctx, EnsureLensOptions{Identifier: "other"})
-	if !errors.Is(err, context.DeadlineExceeded) || ErrorCode(err) != CodeSDKTimeout || time.Since(start) > time.Second {
+	if !errors.Is(err, context.DeadlineExceeded) || CodeOf(err) != CodeSDKTimeout || time.Since(start) > time.Second {
 		t.Fatalf("waiting for the lens lock ignored the deadline: %v", err)
 	}
 	close(release)

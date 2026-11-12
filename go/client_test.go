@@ -227,7 +227,7 @@ func TestMultipartLeavesTheWaitChoiceToTheServer(t *testing.T) {
 	// A declared image total above the maximum is rejected before any byte is sent.
 	huge := int64(21 * 1024 * 1024)
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", TotalSizeInBytes: &huge, Part: &Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
-	if ErrorCode(err) != CodeUploadTooLarge || len(h.calls) != 1 {
+	if CodeOf(err) != CodeUploadTooLarge || len(h.calls) != 1 {
 		t.Fatal(err)
 	}
 	// A refusal raised before sending has no HTTP status, and names the plan's 20 MiB limit.
@@ -238,7 +238,7 @@ func TestMultipartLeavesTheWaitChoiceToTheServer(t *testing.T) {
 	// A part under 5 MiB that is not the last is refused before sending; a small final image part
 	// that is the whole upload is sent.
 	_, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Part: Content{PartNumber: 2, Bytes: make([]byte, 1024)}})
-	if ErrorCode(err) != CodeInvalidUploadPayload || len(h2.calls) != 2 {
+	if CodeOf(err) != CodeInvalidUploadPayload || len(h2.calls) != 2 {
 		t.Fatal(err)
 	}
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Part: &Content{Type: "image/png", IsFinal: true, Bytes: make([]byte, 1024)}})
@@ -281,7 +281,7 @@ func TestIdempotencyKeysAreSentAndReusedAcrossRetries(t *testing.T) {
 	if h.last().Header.Get("Idempotency-Key") == key {
 		t.Fatal("a new call reused the previous key")
 	}
-	if _, err = c.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", IdempotencyKey: "mine", Part: Content{PartNumber: 2, IsFinal: true, Bytes: []byte("x")}}); err != nil || h.last().Header.Get("Idempotency-Key") != "mine" {
+	if _, err = c.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Params: Params{IdempotencyKey: "mine"}, Part: Content{PartNumber: 2, IsFinal: true, Bytes: []byte("x")}}); err != nil || h.last().Header.Get("Idempotency-Key") != "mine" {
 		t.Fatal("caller key not sent", err)
 	}
 }
@@ -318,7 +318,7 @@ func TestErrors(t *testing.T) {
 	if asset != nil || !errors.As(err, &failure) || failure.Code != CodeAssetNotFound || failure.Status != 404 || failure.Details["x"] != json.Number("1") || failure.RequestID != "req_1" || !IsNotFound(err) || IsRetryable(err) {
 		t.Fatal(asset, err)
 	}
-	if message := err.Error(); !strings.Contains(message, CodeAssetNotFound) || !strings.Contains(message, "404") || !strings.Contains(message, "req_1") {
+	if message := err.Error(); !strings.Contains(message, string(CodeAssetNotFound)) || !strings.Contains(message, "404") || !strings.Contains(message, "req_1") {
 		t.Fatal(message)
 	}
 	// Without the X-Request-Id header, the request ID comes from the error body.
@@ -339,10 +339,10 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 		t.Fatal(asset, err)
 	}
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x", Metadata: []MetadataItem{{ID: "bad", Value: math.NaN()}}, Content: &Content{Type: "text/plain", PlainText: Ptr("x")}})
-	if ErrorCode(err) != CodeSDKInvalidArgument || errors.Unwrap(err) == nil {
+	if CodeOf(err) != CodeSDKInvalidArgument || errors.Unwrap(err) == nil {
 		t.Fatal(err)
 	}
-	if _, err = c.EnsureLens(ctx, EnsureLensOptions{Identifier: "x", Transform: JSON{"bad": math.Inf(1)}}); ErrorCode(err) != CodeSDKInvalidArgument {
+	if _, err = c.EnsureLens(ctx, EnsureLensOptions{Identifier: "x", Transform: JSON{"bad": math.Inf(1)}}); CodeOf(err) != CodeSDKInvalidArgument {
 		t.Fatal(err)
 	}
 	if len(h.calls) != 0 {
@@ -352,13 +352,16 @@ func TestLocalFailuresAreSDKErrors(t *testing.T) {
 
 func TestResponsesKeepUnknownFieldsAndIntegerPrecision(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"status": "future-status", "raw": JSON{"categories": JSON{"x": JSON{"status": "future-status"}}}}}}
+	h.result = JSON{"id": "a", "content": JSON{"image": JSON{"big": json.Number("9007199254740993")}}, "newField": "kept", "visibility": "unlisted", "classification": JSON{"moderation": JSON{"decision": "future-status", "raw": JSON{"categories": JSON{"x": JSON{"status": "future-status"}}}}}}
 	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Raw.Categories["x"].Status != "future-status" {
-		t.Fatalf("%#v", asset.Raw)
+	// Unknown fields stay on the model that has them, nested models included, with their numbers
+	// as sent.
+	if string(asset.ExtraFields()["newField"]) != `"kept"` || string(asset.Content.ExtraFields()["image"]) != `{"big":9007199254740993}` ||
+		!strings.Contains(string(asset.RawJSON()), `"newField":"kept"`) || asset.Classification.ExtraFields() != nil || asset.Visibility != "unlisted" || (asset.Classification.Moderation.Decision == nil || *asset.Classification.Moderation.Decision != "future-status") || asset.Classification.Moderation.Raw.Categories["x"].Status != "future-status" {
+		t.Fatalf("%s", asset.RawJSON())
 	}
 }
 
@@ -385,12 +388,12 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 		{status: 200, result: JSON{"items": []JSON{{"id": "1"}, {"id": "2"}}, "hasMore": true, "nextCursor": "next-token"}},
 		{status: 200, result: JSON{"items": []JSON{{"id": "3"}}, "hasMore": false}},
 	}
-	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("classification.moderation.status==allowed")})
+	it := c.Assets.ListAll(ListAssetsOptions{PageSize: 2, Filter: Ptr("classification.moderation.decision==allowed")})
 	ids := []string{}
 	for it.Next(ctx) {
 		ids = append(ids, it.Asset().ID)
 	}
-	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "classification.moderation.status==allowed" {
+	if it.Err() != nil || fmt.Sprint(ids) != "[1 2 3]" || h.calls[1].URL.Query().Get("cursor") != "next-token" || h.calls[1].URL.Query().Get("filter") != "classification.moderation.decision==allowed" {
 		t.Fatal(ids, it.Err())
 	}
 	h.calls = nil
@@ -402,7 +405,7 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 	children := c.Assets.ListChildrenAll(ListAssetChildrenOptions{AssetID: "p"})
 	children.All(ctx)(func(asset Asset, err error) bool {
 		if err != nil {
-			ids = append(ids, ErrorCode(err))
+			ids = append(ids, string(CodeOf(err)))
 		} else {
 			ids = append(ids, asset.ID)
 		}
@@ -417,7 +420,7 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 		{status: 200, result: JSON{"items": []JSON{{"id": "e2"}}, "nextCursor": "c2", "hasMore": false}},
 	}
 	// Each page keeps the filters its cursor belongs to; the types go as one comma-separated value.
-	events := c.Events.ListAll(ListEventsOptions{Cursor: "c0", Types: []string{EventAssetBlocked, EventAssetPurged}, AssetID: "asset-1"})
+	events := c.Events.ListAll(ListEventsOptions{Cursor: "c0", Types: []EventType{EventAssetBlocked, EventAssetPurged}, AssetID: "asset-1"})
 	ids = nil
 	for events.Next(ctx) {
 		ids = append(ids, events.Event().ID)
@@ -440,7 +443,7 @@ func storedLens(id string, definition EnsureLensOptions) Lens {
 // Only what can't be sent as a header is refused; the API decides whether a key is real.
 func TestNewServerClientChecksTheAPIKeyCanBeAHeader(t *testing.T) {
 	for _, key := range []string{"clé", "key\x7f", "key\tvalue"} {
-		if _, err := NewServerClient(Options{APIKey: key, ProjectID: "project-1"}); ErrorCode(err) != CodeSDKInvalidConfig {
+		if _, err := NewServerClient(Options{APIKey: key, ProjectID: "project-1"}); CodeOf(err) != CodeSDKInvalidConfig {
 			t.Errorf("%q: %v", key, err)
 		}
 	}
@@ -578,7 +581,7 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		t.Fatal(endpoint, err)
 	}
 	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, Transform: "width=1", TransformOptions: ImageTransformOptions{Width: Ptr(1)}})
-	if ErrorCode(err) != CodeSDKInvalidArgument {
+	if CodeOf(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected Transform and TransformOptions error", err)
 	}
 	// Struct options are encoded through their JSON field names; numbers follow JavaScript's String(n).
@@ -593,16 +596,16 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		t.Fatal(endpoint, err)
 	}
 	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, TransformOptions: JSON{"width": math.NaN()}})
-	if ErrorCode(err) != CodeSDKInvalidArgument {
+	if CodeOf(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected non-finite option error", err)
 	}
 	for _, options := range []JSON{{"Width": 1}, {"border": JSON{"bad-name": 1}}, {"quality": nil}} {
 		_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, TransformOptions: options})
-		if ErrorCode(err) != CodeSDKInvalidArgument {
+		if CodeOf(err) != CodeSDKInvalidArgument {
 			t.Fatal("expected invalid option error", options, err)
 		}
 	}
-	res, err := c.CDN.Serve(context.Background(), CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetID: "a"}, Headers: http.Header{"X-Api-Key": {"wrong"}, "Range": {"bytes=0-1"}}})
+	res, err := c.CDN.Serve(context.Background(), CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetID: "a"}, Params: Params{Headers: http.Header{"X-Api-Key": {"wrong"}, "Range": {"bytes=0-1"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -614,7 +617,7 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 func TestUnknownCoverageAndReportFields(t *testing.T) {
 	var a Asset
 	err := json.Unmarshal([]byte(`{"classification":{"moderation":{"provider":"x","flaggedCategories":[],"regions":[],"raw":{"categories":{"violence":{"status":"not-evaluated","reason":"unsupported"}}}}}}`), &a)
-	if err != nil || a.Classification.Moderation.Raw.Categories["violence"].Score != nil || a.Classification.Moderation.Extra["provider"] != "x" {
+	if err != nil || a.Classification.Moderation.Raw.Categories["violence"].Score != nil || string(a.Classification.Moderation.ExtraFields()["provider"]) != `"x"` {
 		t.Fatal(a, err)
 	}
 }
@@ -649,10 +652,10 @@ func fakeClock(c *ServerClient, h *harness) {
 func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
-	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": nil}}}
 	_, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(2 * time.Second)})
 	var failure *Error
-	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
+	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != nil {
 		t.Fatal(err)
 	}
 	// The last wait is cut short and no request starts at the deadline.
@@ -662,7 +665,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	// The default timeout is 60s, and waits grow by 1.5 up to 2s.
 	h.calls, h.slept = nil, nil
 	_, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if ErrorCode(err) != CodeSDKTimeout {
+	if CodeOf(err) != CodeSDKTimeout {
 		t.Fatal(err)
 	}
 	total := time.Duration(0)
@@ -673,7 +676,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 		t.Fatal(h.slept, total, len(h.calls))
 	}
 	h.calls = nil
-	if _, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(-time.Second)}); ErrorCode(err) != CodeSDKInvalidArgument || len(h.calls) != 0 {
+	if _, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(-time.Second)}); CodeOf(err) != CodeSDKInvalidArgument || len(h.calls) != 0 {
 		t.Fatal(err, len(h.calls))
 	}
 }
@@ -681,8 +684,8 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 func TestWaitForDecisionWaitsWhileQueuedOrProcessingEvenOnceDecided(t *testing.T) {
 	c, h := setup(t)
 	fakeClock(c, h)
-	asset := func(classification, moderation string) reply {
-		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": classification, "moderation": JSON{"status": moderation}}}}
+	asset := func(classification ClassificationStatus, moderation ModerationStatus) reply {
+		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": classification, "moderation": JSON{"decision": moderation}}}}
 	}
 	h.next = []reply{
 		asset(ClassificationStatusQueued, ModerationStatusPending),
@@ -690,7 +693,7 @@ func TestWaitForDecisionWaitsWhileQueuedOrProcessingEvenOnceDecided(t *testing.T
 		asset(ClassificationStatusCompleted, ModerationStatusBlocked),
 	}
 	got, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
-	if err != nil || got.Classification.Status != ClassificationStatusCompleted || got.Classification.Moderation.Status != ModerationStatusBlocked || len(h.calls) != 3 {
+	if err != nil || got.Classification.Status != ClassificationStatusCompleted || (got.Classification.Moderation.Decision == nil || *got.Classification.Moderation.Decision != ModerationDecisionBlocked) || len(h.calls) != 3 {
 		t.Fatal(got, err, len(h.calls))
 	}
 	// A failed asset is settled too.
@@ -703,7 +706,7 @@ func TestWaitForDecisionWaitsWhileQueuedOrProcessingEvenOnceDecided(t *testing.T
 func TestWaitForDecisionCancelsTheInFlightLookup(t *testing.T) {
 	c, _ := setup(t)
 	requests := 0
-	c.http.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+	c.http.(*http.Client).Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		requests++
 		<-request.Context().Done()
 		return nil, request.Context().Err()
@@ -719,7 +722,7 @@ func TestWaitForDecisionCancelsTheInFlightLookup(t *testing.T) {
 
 func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 	c, h := setup(t)
-	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"decision": nil}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Cancel while waiting between checks; the real sleep then returns the context error.
@@ -728,41 +731,64 @@ func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 		return sleep(ctx, d)
 	}
 	_, err := c.Assets.WaitForDecision(ctx, WaitForDecisionOptions{AssetID: "a"})
-	if ErrorCode(err) != CodeSDKCancelled || !errors.Is(err, context.Canceled) || len(h.calls) != 1 {
+	if CodeOf(err) != CodeSDKCancelled || !errors.Is(err, context.Canceled) || len(h.calls) != 1 {
 		t.Fatal(err, len(h.calls))
 	}
 	h.calls = nil
-	if _, err = c.Assets.WaitForDecision(ctx, WaitForDecisionOptions{AssetID: "a"}); ErrorCode(err) != CodeSDKCancelled || len(h.calls) != 0 {
+	if _, err = c.Assets.WaitForDecision(ctx, WaitForDecisionOptions{AssetID: "a"}); CodeOf(err) != CodeSDKCancelled || len(h.calls) != 0 {
 		t.Fatal("cancelled context still checked", err, len(h.calls))
 	}
 }
 
-func TestWithRequestOptionsChangesRetriesAndSharesTheLensCache(t *testing.T) {
+func TestParamsChangeOneCall(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: Ptr(true)}
-	h.result = JSON{"lenses": []Lens{storedLens("l", lens)}}
-	if _, err := c.EnsureLens(ctx, lens); err != nil {
-		t.Fatal(err)
-	}
-	once, err := c.WithRequestOptions(RequestOptions{MaxRetries: Ptr(0)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = once.EnsureLens(ctx, lens); err != nil || len(h.calls) != 1 {
-		t.Fatal("the lens cache is not shared", err, len(h.calls))
-	}
+	// MaxRetries 0 stops the retry the client would make; the next call retries again.
 	h.next = []reply{{status: 503, result: []byte("busy")}, {status: 503, result: []byte("busy")}}
-	if _, err = once.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); ErrorCode(err) != CodeSDKHTTPError || len(h.calls) != 2 {
+	if _, err := c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a", Params: Params{MaxRetries: Ptr(0)}}); CodeOf(err) != CodeSDKHTTPError || len(h.calls) != 1 {
 		t.Fatal("MaxRetries 0 retried", err, len(h.calls))
 	}
-	// The original client keeps its retries.
 	h.next = []reply{{status: 503, result: []byte("busy")}}
-	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err != nil || len(h.calls) != 4 {
-		t.Fatal("the original client changed", err, len(h.calls))
+	if _, err := c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a"}); err != nil || len(h.calls) != 3 {
+		t.Fatal("the next call kept MaxRetries 0", err, len(h.calls))
 	}
-	if _, err = c.WithRequestOptions(RequestOptions{Timeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidConfig {
+	// Headers are added but can't replace the SDK's; Extra joins the JSON body without replacing a
+	// declared field, and the query of a request without a body.
+	params := Params{Headers: http.Header{"X-Trace": {"t-1"}, "X-Api-Key": {"wrong"}}, Extra: map[string]any{"futureField": 1, "name": "ignored"}}
+	if _, err := c.Folders.Create(ctx, CreateFolderOptions{Name: "Photos", Params: params}); err != nil {
 		t.Fatal(err)
+	}
+	if got := h.last().Header; got.Get("X-Trace") != "t-1" || got.Get("X-Api-Key") != "key" {
+		t.Fatal(got)
+	}
+	if body := h.body(); fmt.Sprint(body["futureField"]) != "1" || body["name"] != "Photos" {
+		t.Fatal(body)
+	}
+	if _, err := c.Folders.List(ctx, ListFoldersOptions{Params: Params{Extra: map[string]any{"futureFilter": "x"}}}); err != nil || h.last().URL.Query().Get("futureFilter") != "x" {
+		t.Fatal(err, h.last().URL)
+	}
+	// IdempotencyKey is sent, makes a POST retryable and is reported on the response.
+	h.next = []reply{{status: 503, result: []byte("busy")}}
+	folder, err := c.Folders.Create(ctx, CreateFolderOptions{Name: "Retried", Params: Params{IdempotencyKey: "key-1"}})
+	if err != nil || h.last().Header.Get("Idempotency-Key") != "key-1" || folder.LastResponse == nil || folder.LastResponse.IdempotencyKey != "key-1" {
+		t.Fatal(folder, err)
+	}
+	if _, err = c.Assets.Retrieve(ctx, AssetIDOptions{AssetID: "a", Params: Params{Timeout: -time.Second}}); CodeOf(err) != CodeSDKInvalidArgument {
+		t.Fatal(err)
+	}
+}
+
+func TestLastResponseHoldsTheResponse(t *testing.T) {
+	c, h := setup(t)
+	h.header = http.Header{"X-Request-Id": {"req_9"}}
+	asset, err := c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"})
+	if err != nil || asset.LastResponse == nil || asset.LastResponse.StatusCode != 200 || asset.LastResponse.RequestID != "req_9" || asset.LastResponse.Header.Get("X-Request-Id") != "req_9" {
+		t.Fatal(asset, err)
+	}
+	h.result = JSON{"items": []JSON{{"id": "f"}}, "ancestors": []JSON{}, "hasMore": false, "nextCursor": nil}
+	page, err := c.Folders.List(context.Background(), ListFoldersOptions{})
+	if err != nil || page.LastResponse == nil || page.LastResponse.RequestID != "req_9" || page.Items[0].LastResponse != nil {
+		t.Fatal(page, err)
 	}
 }
 
@@ -782,13 +808,13 @@ func TestUploadTimeoutBoundsBinaryUploadsOnly(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer time.AfterFunc(2*time.Second, cancel).Stop()
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "clip", Content: &Content{Type: "audio/mpeg", Bytes: []byte("ID3")}})
-	if ErrorCode(err) != CodeSDKTimeout {
+	if CodeOf(err) != CodeSDKTimeout {
 		t.Fatal("binary upload not bounded", err)
 	}
 	if _, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "note", Content: &Content{Type: "text/plain", PlainText: Ptr("hi")}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = NewServerClient(Options{APIKey: "key", ProjectID: "p", UploadTimeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidConfig {
+	if _, err = NewServerClient(Options{APIKey: "key", ProjectID: "p", UploadTimeout: -time.Second}); CodeOf(err) != CodeSDKInvalidConfig {
 		t.Fatal(err)
 	}
 }
@@ -817,7 +843,7 @@ func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
 		t.Fatal("sent", len(h.calls))
 	}
 	// At the limit the upload is sent in one request (a stream is never split into parts).
-	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": "processing", "moderation": JSON{"status": "pending"}}}
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": "processing", "moderation": JSON{"decision": nil}}}
 	size := int64(10 * 1024 * 1024)
 	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Content: &Content{Type: "image/png", Data: io.MultiReader(bytes.NewReader(make([]byte, size))), SizeInBytes: &size}}); err != nil {
 		t.Fatal(err)
@@ -850,7 +876,7 @@ func TestGetAssetInfoKeepsOrReplacesTheURLsClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = c.CDN.GetAssetInfo(ctx, "https://cdn.calmlens.com/v1/assets/project-1/sig_00", GetAssetInfoOptions{})
-	if ErrorCode(err) != CodeSignedURLExpired {
+	if CodeOf(err) != CodeSignedURLExpired {
 		t.Fatal(err)
 	}
 	want := []string{
@@ -863,7 +889,7 @@ func TestGetAssetInfoKeepsOrReplacesTheURLsClaims(t *testing.T) {
 			t.Errorf("request %d: %s with key %q, want %s without a key", i+1, got, request.header.Get("X-Api-Key"), want[i])
 		}
 	}
-	if _, err = c.CDN.GetAssetInfo(ctx, "/assets/project-1/asset-1", GetAssetInfoOptions{}); ErrorCode(err) != CodeSDKInvalidArgument {
+	if _, err = c.CDN.GetAssetInfo(ctx, "/assets/project-1/asset-1", GetAssetInfoOptions{}); CodeOf(err) != CodeSDKInvalidArgument {
 		t.Fatal("relative URL:", err)
 	}
 }
