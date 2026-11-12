@@ -151,7 +151,7 @@ pub(crate) fn assert_transform_options(options: &Value) -> crate::Result<()> {
         crate::ErrorCode::InvalidArgument,
         format!(
             "Transform options are invalid: {}. Set the options themselves, such as \
-             ImageTransformOptions {{ width: Some(640), format: Some(ImageFormat::Webp), .. }}.",
+             ImageTransformOptions::new().width(640).format(ImageFormat::Webp).",
             problems.join("; ")
         ),
     )

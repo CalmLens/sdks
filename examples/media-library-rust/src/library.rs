@@ -387,12 +387,15 @@ pub fn lens_definitions() -> Vec<LensDefinition> {
     let lens = |identifier: &str, name: &str, fit: &str, width: u32, height: Option<u32>| {
         LensDefinition::new(identifier, name, "image")
             .active(true)
-            .transform(ImageTransformOptions {
-                fit: Some(fit.into()),
-                width: Some(width),
-                height,
-                format: Some("webp".into()),
-                ..Default::default()
+            .transform({
+                let options = ImageTransformOptions::new()
+                    .fit(fit)
+                    .width(width)
+                    .format("webp");
+                match height {
+                    Some(height) => options.height(height),
+                    None => options,
+                }
             })
     };
     vec![

@@ -489,14 +489,10 @@ fn lens_transform_decodes_typed_image_options() {
 
 #[test]
 fn typed_image_transform_serializes_to_wire_options_and_selector() {
-    let options = ImageTransformOptions {
-        format: Some(ImageFormat::Avif),
-        gravity: Some(GravityPosition::Entropy.into()),
-        trim: Some(Trim::Edges(
-            TrimEdges::new().left(3.0).border(TrimBorder::Enabled(true)),
-        )),
-        ..Default::default()
-    };
+    let options = ImageTransformOptions::new()
+        .format(ImageFormat::Avif)
+        .gravity(GravityPosition::Entropy)
+        .trim(TrimEdges::new().left(3.0).border(TrimBorder::Enabled(true)));
     assert_eq!(
         serde_json::to_value(&options).unwrap(),
         json!({ "format": "avif", "gravity": "entropy", "trim": { "left": 3.0, "border": true } })
@@ -505,13 +501,13 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
         CdnTransform::from(options).selector().unwrap(),
         "format=avif,gravity=entropy,trim.border=true,trim.left=3"
     );
-    let quality = CdnTransform::from(ImageTransformOptions {
-        dpr: Some(2.0),
-        anim: Some(false),
-        quality: Some(ImageQualityLevel::High.into()),
-        background: Some("#FFAA00".into()),
-        ..Default::default()
-    });
+    let quality = CdnTransform::from(
+        ImageTransformOptions::new()
+            .dpr(2.0)
+            .anim(false)
+            .quality(ImageQualityLevel::High)
+            .background("#FFAA00"),
+    );
     assert_eq!(
         quality.selector().unwrap(),
         "anim=false,background=ffaa00,dpr=2,quality=high"

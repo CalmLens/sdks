@@ -5549,7 +5549,7 @@ pub struct FileMetadataLocation {
 /// A direct CDN transform, applied in one pass: a selector string or structured
 /// [`ImageTransformOptions`]. With a lens, its options replace the lens's.
 ///
-/// `"width=320".into()` and `ImageTransformOptions { .. }.into()` both convert into it.
+/// `"width=320".into()` and `ImageTransformOptions::new().width(320).into()` both convert into it.
 /// Structured options serialize to a selector such as `fit=cover,width=640`: option keys
 /// sorted, nested objects as dotted keys (`border.color`), hex colours without `#` and values
 /// percent-encoded, so equal transforms share a URL.
@@ -6143,6 +6143,7 @@ string_enum! {
 /// Image transform options; set only what you need.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ImageTransformOptions {
     /// The output format. Leave it out to serve the best format the browser accepts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -6207,6 +6208,114 @@ pub struct ImageTransformOptions {
     /// Options this SDK version does not know, as received in a lens.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
+}
+
+impl ImageTransformOptions {
+    /// No options set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The output format. Leave it out to serve the best format the browser accepts.
+    pub fn format(mut self, value: impl Into<ImageFormat>) -> Self {
+        self.format = Some(value.into());
+        self
+    }
+    /// The width in pixels, 1 to 10,000 after `dpr`. With a size and no `fit`, the image scales down.
+    pub fn width(mut self, value: u32) -> Self {
+        self.width = Some(value);
+        self
+    }
+    /// The height in pixels, 1 to 10,000 after `dpr`.
+    pub fn height(mut self, value: u32) -> Self {
+        self.height = Some(value);
+        self
+    }
+    /// The pixel density, 1 to 3: multiplies the width, height and border width.
+    pub fn dpr(mut self, value: f64) -> Self {
+        self.dpr = Some(value);
+        self
+    }
+    /// `false` serves the first frame of an animated GIF or WebP.
+    pub fn anim(mut self, value: bool) -> Self {
+        self.anim = Some(value);
+        self
+    }
+    /// The background colour, such as `#ffffff`, for padding and transparency.
+    pub fn background(mut self, value: impl Into<String>) -> Self {
+        self.background = Some(value.into());
+        self
+    }
+    /// The blur radius.
+    pub fn blur(mut self, value: f64) -> Self {
+        self.blur = Some(value);
+        self
+    }
+    /// A border drawn around the image.
+    pub fn border(mut self, value: impl Into<ImageBorder>) -> Self {
+        self.border = Some(value.into());
+        self
+    }
+    /// The brightness factor.
+    pub fn brightness(mut self, value: f64) -> Self {
+        self.brightness = Some(value);
+        self
+    }
+    /// The contrast factor.
+    pub fn contrast(mut self, value: f64) -> Self {
+        self.contrast = Some(value);
+        self
+    }
+    /// The quality: 1 to 100, or a level. Lossy output defaults to `high`.
+    pub fn quality(mut self, value: impl Into<ImageQuality>) -> Self {
+        self.quality = Some(value.into());
+        self
+    }
+    /// How the image fits the `width` and `height`.
+    pub fn fit(mut self, value: impl Into<ImageFit>) -> Self {
+        self.fit = Some(value.into());
+        self
+    }
+    /// Flips the image horizontally (`h`), vertically (`v`) or both (`hv`).
+    pub fn flip(mut self, value: impl Into<ImageFlip>) -> Self {
+        self.flip = Some(value.into());
+        self
+    }
+    /// The gamma.
+    pub fn gamma(mut self, value: f64) -> Self {
+        self.gamma = Some(value);
+        self
+    }
+    /// `foreground` removes the background.
+    pub fn segment(mut self, value: impl Into<ImageSegment>) -> Self {
+        self.segment = Some(value.into());
+        self
+    }
+    /// Where to keep when cropping: a side, `face`, `auto`, or a point.
+    pub fn gravity(mut self, value: impl Into<Gravity>) -> Self {
+        self.gravity = Some(value.into());
+        self
+    }
+    /// The clockwise rotation in degrees.
+    pub fn rotate(mut self, value: u32) -> Self {
+        self.rotate = Some(value);
+        self
+    }
+    /// The saturation factor.
+    pub fn saturation(mut self, value: f64) -> Self {
+        self.saturation = Some(value);
+        self
+    }
+    /// The sharpen amount.
+    pub fn sharpen(mut self, value: f64) -> Self {
+        self.sharpen = Some(value);
+        self
+    }
+    /// Trims the edges: `border` trims a detected border, or give edges and sizes.
+    pub fn trim(mut self, value: impl Into<Trim>) -> Self {
+        self.trim = Some(value.into());
+        self
+    }
 }
 // </generated: image-transform-options>
 
