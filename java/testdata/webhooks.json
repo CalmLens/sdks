@@ -1288,6 +1288,1627 @@
         "facts": []
       },
       "isTest": false
+    },
+    {
+      "name": "every event type: asset.uploaded",
+      "body": "{\"id\":\"evt_assetuploadedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.uploaded\",\"severity\":\"low\",\"title\":\"beach.jpg uploaded\",\"description\":\"Added to the project as an image asset.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"file-format\",\"value\":\"jpg\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=4a567162766dbd343b9ccf5d2ded5c22f48ac670a45c970990c463d3c38d08f8",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetuploadedxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "api-key",
+          "id": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+        },
+        "type": "asset.uploaded",
+        "severity": "low",
+        "title": "beach.jpg uploaded",
+        "description": "Added to the project as an image asset.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "processing",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "file-format",
+            "value": "jpg"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.classified",
+      "body": "{\"id\":\"evt_assetclassifiedxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.classified\",\"severity\":\"low\",\"title\":\"beach.jpg classified\",\"description\":\"Classification finished. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"moderation-status\",\"value\":\"age-restricted\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=e0ff34ea4f789d96d563d7d2820c604cbb01ffd64ef0eeba73cf47ddac5e0800",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetclassifiedxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.classified",
+        "severity": "low",
+        "title": "beach.jpg classified",
+        "description": "Classification finished. Possible violations: sexual.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "limited"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "moderation-status",
+            "value": "age-restricted"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.region-restricted",
+      "body": "{\"id\":\"evt_assetregionrestricte\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.region-restricted\",\"severity\":\"low\",\"title\":\"photo.jpg region restricted\",\"description\":\"Regional status: age-restricted in GB (gb-adult-content).\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"asset-name\",\"value\":\"photo.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"region\",\"value\":\"GB\"},{\"key\":\"rule\",\"value\":\"gb-adult-content\"},{\"key\":\"status\",\"value\":\"age-restricted\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=5a7a86c6c2a5d16968144fd6ac303f3c7930782fea24e872757846d23a643cfe",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetregionrestricte",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.region-restricted",
+        "severity": "low",
+        "title": "photo.jpg region restricted",
+        "description": "Regional status: age-restricted in GB (gb-adult-content).",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "region",
+            "value": "GB"
+          },
+          {
+            "key": "rule",
+            "value": "gb-adult-content"
+          },
+          {
+            "key": "status",
+            "value": "age-restricted"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.allowed",
+      "body": "{\"id\":\"evt_assetallowedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.allowed\",\"severity\":\"low\",\"title\":\"beach.jpg allowed\",\"description\":\"Delivered normally.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=9eb1f4ead1ed23791912aa6c133c15232188c131e746dcd436a701ecd78e2198",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetallowedxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.allowed",
+        "severity": "low",
+        "title": "beach.jpg allowed",
+        "description": "Delivered normally.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": []
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.limited",
+      "body": "{\"id\":\"evt_assetlimitedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.limited\",\"severity\":\"low\",\"title\":\"beach.jpg limited\",\"description\":\"Delivered normally, marked for reduced reach. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=8fded351327f750dccb4cc2072ca504efd74ef908d46529fca1a5d0ea30242d7",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetlimitedxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.limited",
+        "severity": "low",
+        "title": "beach.jpg limited",
+        "description": "Delivered normally, marked for reduced reach. Possible violations: sexual.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "limited"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.age-restricted",
+      "body": "{\"id\":\"evt_assetagerestrictedxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.age-restricted\",\"severity\":\"high\",\"title\":\"beach.jpg age-restricted\",\"description\":\"Delivery requires `viewerClaims.ageConfirmed=true`, including requests using signed URLs or API keys. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"age-restricted\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=871741205d1271783ad7c49e1e79c1e5357caa6d014e203caf27bc94852d404a",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetagerestrictedxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.age-restricted",
+        "severity": "high",
+        "title": "beach.jpg age-restricted",
+        "description": "Delivery requires `viewerClaims.ageConfirmed=true`, including requests using signed URLs or API keys. Possible violations: sexual.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "age-restricted"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.blocked",
+      "body": "{\"id\":\"evt_assetblockedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=a9fb10bbb2ef3870780212e02cd38076fedd63e30996a96a76364112ed551398",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetblockedxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "beach.jpg blocked",
+        "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "blocked"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.purged",
+      "body": "{\"id\":\"evt_assetpurgedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.purged\",\"severity\":\"high\",\"title\":\"beach.jpg purged\",\"description\":\"No longer delivered. Its content was deleted. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"purged\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=df3349a4cd1681a6eaadd7587bcf246213438de3930499e89523081a4ac516eb",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetpurgedxxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.purged",
+        "severity": "high",
+        "title": "beach.jpg purged",
+        "description": "No longer delivered. Its content was deleted. Possible violations: sexual.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "purged"
+            }
+          },
+          "content": {
+            "status": "removed"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "sexual"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.failed",
+      "body": "{\"id\":\"evt_assetfailedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.failed\",\"severity\":\"high\",\"title\":\"clip.mp4 failed to process\",\"description\":\"Processing stopped with an error. Retry the asset, or contact support if it keeps failing.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"failed\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"clip.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"previous-status\",\"value\":\"processing\"},{\"key\":\"failure-reason\",\"value\":\"duration-limit\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=2bc68b82a0d689c6681880be72e87efc357a4e7f85d555af998aef2e50cf306d",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetfailedxxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.failed",
+        "severity": "high",
+        "title": "clip.mp4 failed to process",
+        "description": "Processing stopped with an error. Retry the asset, or contact support if it keeps failing.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "failed",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "clip.mp4"
+          },
+          {
+            "key": "asset-type",
+            "value": "video"
+          },
+          {
+            "key": "previous-status",
+            "value": "processing"
+          },
+          {
+            "key": "failure-reason",
+            "value": "duration-limit"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.progress-updated",
+      "body": "{\"id\":\"evt_assetprogressupdated\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.progress-updated\",\"severity\":\"low\",\"title\":\"lecture.mp4 is 20% analysed\",\"description\":\"13 of 63 sections are done. Its decision follows once all are.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"lecture.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"completed-sections\",\"value\":13},{\"key\":\"total-sections\",\"value\":63},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=25a4be8a4476a898b8d0671a450d54abbc708a73982d4dbdcbf610a7bf43252c",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetprogressupdated",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.progress-updated",
+        "severity": "low",
+        "title": "lecture.mp4 is 20% analysed",
+        "description": "13 of 63 sections are done. Its decision follows once all are.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "processing",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "lecture.mp4"
+          },
+          {
+            "key": "asset-type",
+            "value": "video"
+          },
+          {
+            "key": "completed-sections",
+            "value": 13
+          },
+          {
+            "key": "total-sections",
+            "value": 63
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.deleted",
+      "body": "{\"id\":\"evt_assetdeletedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.deleted\",\"severity\":\"low\",\"title\":\"beach.jpg deleted\",\"description\":\"The asset and its stored content were deleted.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=18e1d9dac3eb82ef5985a84a74f448b69a4330bf4c4132f1ccb706e663b0e313",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetdeletedxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "api-key",
+          "id": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+        },
+        "type": "asset.deleted",
+        "severity": "low",
+        "title": "beach.jpg deleted",
+        "description": "The asset and its stored content were deleted.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "removed"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.content-removed",
+      "body": "{\"id\":\"evt_assetcontentremovedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.content-removed\",\"severity\":\"low\",\"title\":\"beach.jpg content removed\",\"description\":\"The stored content was removed. The asset and its classification results remain.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=2fa8ca31b0e88ad7e2827980b679ce9edcb5bb0d7d6a2534ea22d8c7a3fb2d51",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetcontentremovedx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "api-key",
+          "id": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+        },
+        "type": "asset.content-removed",
+        "severity": "low",
+        "title": "beach.jpg content removed",
+        "description": "The stored content was removed. The asset and its classification results remain.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "removed"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.retried",
+      "body": "{\"id\":\"evt_assetretriedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.retried\",\"severity\":\"low\",\"title\":\"beach.jpg retried\",\"description\":\"The asset was queued for processing again.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=ec5399e0b6a7a4cd3fcd3b03079e399b31785cb127a54c127b913de7d5af3270",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetretriedxxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "asset.retried",
+        "severity": "low",
+        "title": "beach.jpg retried",
+        "description": "The asset was queued for processing again.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "processing",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.rerun-requested",
+      "body": "{\"id\":\"evt_assetrerunrequestedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.rerun-requested\",\"severity\":\"low\",\"title\":\"beach.jpg re-run requested\",\"description\":\"Moderation was requested again under the current policy. The asset keeps its decision until the re-run decides it.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"moderation-status\",\"value\":\"limited\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=f5034f46febbdf6e7de9b23b30f004c85f5b4746feb91848c0487e17dce3380d",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetrerunrequestedx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "api-key",
+          "id": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+        },
+        "type": "asset.rerun-requested",
+        "severity": "low",
+        "title": "beach.jpg re-run requested",
+        "description": "Moderation was requested again under the current policy. The asset keeps its decision until the re-run decides it.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "limited"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "moderation-status",
+            "value": "limited"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.review-requested",
+      "body": "{\"id\":\"evt_assetreviewrequested\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.review-requested\",\"severity\":\"low\",\"title\":\"beach.jpg is waiting for review\",\"description\":\"Its decision was uncertain for harassment, so it was added to the human review queue.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"automated-status\",\"value\":\"allowed\"},{\"key\":\"review-reason\",\"value\":\"uncertain\"},{\"key\":\"uncertain-categories\",\"value\":[\"harassment\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=baeb298d2dacdc3f3cfe4d8c07880cd94bb841a3f7082b4cc9c0bc8ed86cb636",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetreviewrequested",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.review-requested",
+        "severity": "low",
+        "title": "beach.jpg is waiting for review",
+        "description": "Its decision was uncertain for harassment, so it was added to the human review queue.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "automated-status",
+            "value": "allowed"
+          },
+          {
+            "key": "review-reason",
+            "value": "uncertain"
+          },
+          {
+            "key": "uncertain-categories",
+            "value": [
+              "harassment"
+            ]
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.review-completed",
+      "body": "{\"id\":\"evt_assetreviewcompleted\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.review-completed\",\"severity\":\"low\",\"title\":\"Review completed\",\"description\":\"A reviewer completed a queued review, whether confirming or changing the asset's decision.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"review-id\",\"value\":\"rev_8Xm3Rk2Lq7Vt9Wb4Np6C\"},{\"key\":\"decision\",\"value\":\"allowed\"},{\"key\":\"applied-to-asset\",\"value\":false},{\"key\":\"note\",\"value\":null},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=4e06675f6004a4cfb6ff43e0c51035a83a8e8ae06f5e6d91f462881d03851cd7",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetreviewcompleted",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "asset.review-completed",
+        "severity": "low",
+        "title": "Review completed",
+        "description": "A reviewer completed a queued review, whether confirming or changing the asset's decision.",
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "review-id",
+            "value": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C"
+          },
+          {
+            "key": "decision",
+            "value": "allowed"
+          },
+          {
+            "key": "applied-to-asset",
+            "value": false
+          },
+          {
+            "key": "note",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.hash-matched",
+      "body": "{\"id\":\"evt_assethashmatchedxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.hash-matched\",\"severity\":\"high\",\"title\":\"beach.jpg matched Banned images\",\"description\":\"Its hash is 4 bits from a listed image, so it was blocked.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"hash-list-id\",\"value\":\"hl_5Xk3Rm9Lq2Vt8Wb4Np7C\"},{\"key\":\"hash-list-name\",\"value\":\"Banned images\"},{\"key\":\"distance\",\"value\":4},{\"key\":\"match-action\",\"value\":\"block\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=3bfb2bd1b08d87f26a961f8e640513775a5f75ebf777196516b2d9bda72181b0",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assethashmatchedxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.hash-matched",
+        "severity": "high",
+        "title": "beach.jpg matched Banned images",
+        "description": "Its hash is 4 bits from a listed image, so it was blocked.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "beach.jpg"
+          },
+          {
+            "key": "asset-type",
+            "value": "image"
+          },
+          {
+            "key": "hash-list-id",
+            "value": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C"
+          },
+          {
+            "key": "hash-list-name",
+            "value": "Banned images"
+          },
+          {
+            "key": "distance",
+            "value": 4
+          },
+          {
+            "key": "match-action",
+            "value": "block"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: usage.free-uploads-exhausted",
+      "body": "{\"id\":\"evt_usagefreeuploadsexha\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"system\",\"id\":null},\"type\":\"usage.free-uploads-exhausted\",\"severity\":\"high\",\"title\":\"Free uploads used\",\"description\":\"The organisation has used all 100 free uploads. New uploads are blocked until billing is set up.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"limit\",\"value\":100},{\"key\":\"used\",\"value\":100},{\"key\":\"organisation-id\",\"value\":\"org_3hQ7tLk2Vb9XpR4mWc8N\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=8b587a6b831b202633b9f2bfa1410bfad9d2b46d78977f02f54370d6a9121354",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_usagefreeuploadsexha",
+        "projectId": "project-1",
+        "actor": {
+          "type": "system",
+          "id": null
+        },
+        "type": "usage.free-uploads-exhausted",
+        "severity": "high",
+        "title": "Free uploads used",
+        "description": "The organisation has used all 100 free uploads. New uploads are blocked until billing is set up.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "limit",
+            "value": 100
+          },
+          {
+            "key": "used",
+            "value": 100
+          },
+          {
+            "key": "organisation-id",
+            "value": "org_3hQ7tLk2Vb9XpR4mWc8N"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: usage.uploads-paused",
+      "body": "{\"id\":\"evt_usageuploadspausedxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"system\",\"id\":null},\"type\":\"usage.uploads-paused\",\"severity\":\"high\",\"title\":\"Uploads paused\",\"description\":\"A usage limit of the project's organisation was reached. New uploads are paused until 2026-11-01.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"reason\",\"value\":\"usage-cap\"},{\"key\":\"resumes-at\",\"value\":1793491200000},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=c3ff89ea9458ef843c47728dd721733d134fe85bdb60958fe3fcca4df557c602",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_usageuploadspausedxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "system",
+          "id": null
+        },
+        "type": "usage.uploads-paused",
+        "severity": "high",
+        "title": "Uploads paused",
+        "description": "A usage limit of the project's organisation was reached. New uploads are paused until 2026-11-01.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "reason",
+            "value": "usage-cap"
+          },
+          {
+            "key": "resumes-at",
+            "value": 1793491200000
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: upload-preset.daily-limit-reached",
+      "body": "{\"id\":\"evt_uploadpresetdailylim\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"system\",\"id\":null},\"type\":\"upload-preset.daily-limit-reached\",\"severity\":\"low\",\"title\":\"A client reached Profile photos’s daily limit\",\"description\":\"A client used all 500 uploads it can make each day. Its uploads resume when the day resets; other clients can still upload.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"preset-id\",\"value\":\"preset_4Lk8Qw2Xm9Rt5Vb3Nc7P\"},{\"key\":\"preset-name\",\"value\":\"Profile photos\"},{\"key\":\"daily-limit\",\"value\":500},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=51b43b8305b0e9933d05fb76865b85f2154e2ffd6b8ef5fccc8c65a6020446b5",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_uploadpresetdailylim",
+        "projectId": "project-1",
+        "actor": {
+          "type": "system",
+          "id": null
+        },
+        "type": "upload-preset.daily-limit-reached",
+        "severity": "low",
+        "title": "A client reached Profile photos’s daily limit",
+        "description": "A client used all 500 uploads it can make each day. Its uploads resume when the day resets; other clients can still upload.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "preset-id",
+            "value": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
+          },
+          {
+            "key": "preset-name",
+            "value": "Profile photos"
+          },
+          {
+            "key": "daily-limit",
+            "value": 500
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.member-joined",
+      "body": "{\"id\":\"evt_projectmemberjoinedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.member-joined\",\"severity\":\"low\",\"title\":\"alex@example.com joined the project\",\"description\":\"Joined with the editor role.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"member-user-id\",\"value\":\"user_7Tq2Wm9Lk4Xr8Vb3Np6C\"},{\"key\":\"member-name\",\"value\":\"alex@example.com\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=32a7a1bb31d955e8e008e74512afd38512403e8b818577d25def2af1746e2b4b",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projectmemberjoinedx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.member-joined",
+        "severity": "low",
+        "title": "alex@example.com joined the project",
+        "description": "Joined with the editor role.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "member-user-id",
+            "value": "user_7Tq2Wm9Lk4Xr8Vb3Np6C"
+          },
+          {
+            "key": "member-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.member-removed",
+      "body": "{\"id\":\"evt_projectmemberremoved\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.member-removed\",\"severity\":\"low\",\"title\":\"alex@example.com was removed\",\"description\":\"Their access to the project was removed.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"member-user-id\",\"value\":\"user_7Tq2Wm9Lk4Xr8Vb3Np6C\"},{\"key\":\"member-name\",\"value\":\"alex@example.com\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=ed09c8de897053ebf422a151de796c59269470a20f44679244b38ca482edec95",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projectmemberremoved",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.member-removed",
+        "severity": "low",
+        "title": "alex@example.com was removed",
+        "description": "Their access to the project was removed.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "member-user-id",
+            "value": "user_7Tq2Wm9Lk4Xr8Vb3Np6C"
+          },
+          {
+            "key": "member-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.member-left",
+      "body": "{\"id\":\"evt_projectmemberleftxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.member-left\",\"severity\":\"low\",\"title\":\"alex@example.com left the project\",\"description\":\"They left the project themselves.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"member-user-id\",\"value\":\"user_7Tq2Wm9Lk4Xr8Vb3Np6C\"},{\"key\":\"member-name\",\"value\":\"alex@example.com\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=38b12d0531d0881ac5220fa24015f3e21baaf89d9d40efdd92ded18f5f45bc28",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projectmemberleftxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.member-left",
+        "severity": "low",
+        "title": "alex@example.com left the project",
+        "description": "They left the project themselves.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "member-user-id",
+            "value": "user_7Tq2Wm9Lk4Xr8Vb3Np6C"
+          },
+          {
+            "key": "member-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.member-role-changed",
+      "body": "{\"id\":\"evt_projectmemberrolecha\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.member-role-changed\",\"severity\":\"low\",\"title\":\"alex@example.com's access changed\",\"description\":\"Changed from viewer to editor.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"member-user-id\",\"value\":\"user_7Tq2Wm9Lk4Xr8Vb3Np6C\"},{\"key\":\"member-name\",\"value\":\"alex@example.com\"},{\"key\":\"previous-role\",\"value\":\"viewer\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=2e10ca1887c5a76e132cac50068d43534ca09e9465675a046d161c1650d0f79c",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projectmemberrolecha",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.member-role-changed",
+        "severity": "low",
+        "title": "alex@example.com's access changed",
+        "description": "Changed from viewer to editor.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "member-user-id",
+            "value": "user_7Tq2Wm9Lk4Xr8Vb3Np6C"
+          },
+          {
+            "key": "member-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "previous-role",
+            "value": "viewer"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.invitation-sent",
+      "body": "{\"id\":\"evt_projectinvitationsen\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.invitation-sent\",\"severity\":\"low\",\"title\":\"alex@example.com was invited\",\"description\":\"Invited with the editor role.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"invitee-email\",\"value\":\"alex@example.com\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=2b634c423780f12266ebd29ada0770aa5be82d77eae7dff474424268e8b28a81",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projectinvitationsen",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.invitation-sent",
+        "severity": "low",
+        "title": "alex@example.com was invited",
+        "description": "Invited with the editor role.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "invitee-email",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: project.transferred",
+      "body": "{\"id\":\"evt_projecttransferredxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"project.transferred\",\"severity\":\"high\",\"title\":\"Moved to Acme\",\"description\":\"Handed over from Studio North. 2 API keys were revoked and 1 connector was paused.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"previous-organisation-id\",\"value\":\"org_7Vb3Xk9Lm2Qt4Wp8Nc5R\"},{\"key\":\"previous-organisation-name\",\"value\":\"Studio North\"},{\"key\":\"organisation-id\",\"value\":\"org_3hQ7tLk2Vb9XpR4mWc8N\"},{\"key\":\"organisation-name\",\"value\":\"Acme\"},{\"key\":\"method\",\"value\":\"handover\"},{\"key\":\"api-keys-revoked\",\"value\":2},{\"key\":\"connectors-paused\",\"value\":1},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=390264ae6b359f6feb024842824daefbafc15596034b0ac364062a496e3c7693",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_projecttransferredxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "project.transferred",
+        "severity": "high",
+        "title": "Moved to Acme",
+        "description": "Handed over from Studio North. 2 API keys were revoked and 1 connector was paused.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "previous-organisation-id",
+            "value": "org_7Vb3Xk9Lm2Qt4Wp8Nc5R"
+          },
+          {
+            "key": "previous-organisation-name",
+            "value": "Studio North"
+          },
+          {
+            "key": "organisation-id",
+            "value": "org_3hQ7tLk2Vb9XpR4mWc8N"
+          },
+          {
+            "key": "organisation-name",
+            "value": "Acme"
+          },
+          {
+            "key": "method",
+            "value": "handover"
+          },
+          {
+            "key": "api-keys-revoked",
+            "value": 2
+          },
+          {
+            "key": "connectors-paused",
+            "value": 1
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: api-key.created",
+      "body": "{\"id\":\"evt_apikeycreatedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"api-key.created\",\"severity\":\"low\",\"title\":\"Production server created\",\"description\":\"Created by alex@example.com.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"key-id\",\"value\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},{\"key\":\"key-name\",\"value\":\"Production server\"},{\"key\":\"role\",\"value\":\"editor\"},{\"key\":\"created-by-name\",\"value\":\"alex@example.com\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=19f9859f8f4a7001edd112c8719f926467f71b6ef3eef5f72f3e059aaaf61f64",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_apikeycreatedxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "api-key.created",
+        "severity": "low",
+        "title": "Production server created",
+        "description": "Created by alex@example.com.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "key-id",
+            "value": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+          },
+          {
+            "key": "key-name",
+            "value": "Production server"
+          },
+          {
+            "key": "role",
+            "value": "editor"
+          },
+          {
+            "key": "created-by-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: api-key.revoked",
+      "body": "{\"id\":\"evt_apikeyrevokedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"api-key.revoked\",\"severity\":\"low\",\"title\":\"Production server revoked\",\"description\":\"Revoked by alex@example.com. It can no longer be used.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"key-id\",\"value\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},{\"key\":\"key-name\",\"value\":\"Production server\"},{\"key\":\"revoked-by-name\",\"value\":\"alex@example.com\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=5e74daa078c6e25eea9dac03fa55376588f39ac6a7ab9964f32d68780121aae1",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_apikeyrevokedxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "api-key.revoked",
+        "severity": "low",
+        "title": "Production server revoked",
+        "description": "Revoked by alex@example.com. It can no longer be used.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "key-id",
+            "value": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+          },
+          {
+            "key": "key-name",
+            "value": "Production server"
+          },
+          {
+            "key": "revoked-by-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: api-key.deleted",
+      "body": "{\"id\":\"evt_apikeydeletedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"api-key.deleted\",\"severity\":\"low\",\"title\":\"Production server deleted\",\"description\":\"Deleted by alex@example.com. It can no longer be used.\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"key-id\",\"value\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},{\"key\":\"key-name\",\"value\":\"Production server\"},{\"key\":\"deleted-by-name\",\"value\":\"alex@example.com\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=d834b0b11a632af05851a6403c66750d5d2c90be59980a59b6754be3ffb70958",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_apikeydeletedxxxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "user",
+          "id": "user_4Rk9Xm2Lq7Vt3Wb8Np6C"
+        },
+        "type": "api-key.deleted",
+        "severity": "low",
+        "title": "Production server deleted",
+        "description": "Deleted by alex@example.com. It can no longer be used.",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "key-id",
+            "value": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
+          },
+          {
+            "key": "key-name",
+            "value": "Production server"
+          },
+          {
+            "key": "deleted-by-name",
+            "value": "alex@example.com"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: connector.disabled",
+      "body": "{\"id\":\"evt_connectordisabledxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"system\",\"id\":null},\"type\":\"connector.disabled\",\"severity\":\"high\",\"title\":\"Moderation alerts was turned off\",\"description\":\"10 deliveries in a row have failed. Last error: HTTP 500 Internal Server Error\",\"assetId\":null,\"assetSequence\":null,\"asset\":null,\"facts\":[{\"key\":\"connector-id\",\"value\":\"conn_6Rb2Xk9Lm4Qt7Wp3Nv8C\"},{\"key\":\"connector-name\",\"value\":\"Moderation alerts\"},{\"key\":\"connector-type\",\"value\":\"webhook\"},{\"key\":\"consecutive-failures\",\"value\":10},{\"key\":\"last-error\",\"value\":\"HTTP 500 Internal Server Error\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=0e57017d0155604832da7b29955d58ee2dc968cab43112e2d21a5829c7622d1f",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_connectordisabledxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "system",
+          "id": null
+        },
+        "type": "connector.disabled",
+        "severity": "high",
+        "title": "Moderation alerts was turned off",
+        "description": "10 deliveries in a row have failed. Last error: HTTP 500 Internal Server Error",
+        "assetId": null,
+        "assetSequence": null,
+        "asset": null,
+        "facts": [
+          {
+            "key": "connector-id",
+            "value": "conn_6Rb2Xk9Lm4Qt7Wp3Nv8C"
+          },
+          {
+            "key": "connector-name",
+            "value": "Moderation alerts"
+          },
+          {
+            "key": "connector-type",
+            "value": "webhook"
+          },
+          {
+            "key": "consecutive-failures",
+            "value": 10
+          },
+          {
+            "key": "last-error",
+            "value": "HTTP 500 Internal Server Error"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
     }
   ],
   "testFacts": [
