@@ -81,7 +81,7 @@ final class Assets extends Resource
     public function search(array $params, array $requestOptions = []): AssetSearchResults
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(AssetSearchResults::class, $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request));
+        return $this->model(AssetSearchResults::class, $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request));
     }
 
     /**
@@ -97,7 +97,7 @@ final class Assets extends Resource
     public function list(array $params = [], array $requestOptions = []): Collection
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::collection(Collection::class, Asset::class, $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(Collection::class, Asset::class, $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -111,7 +111,7 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return self::collection(Collection::class, Asset::class, $this->session->request('GET', $path . '/children', query: $api, options: $request), fn (array $next) => $this->listChildren($next, $requestOptions), $params);
+        return $this->collection(Collection::class, Asset::class, $this->session->request('GET', $path . '/children', query: $api, options: $request), fn (array $next) => $this->listChildren($next, $requestOptions), $params);
     }
 
     /**
@@ -128,7 +128,7 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->session->project(ltrim($this->path($api, 'assets', 'assetId'), '/'));
-        return self::collection(Collection::class, TimelineSegment::class, $this->session->request('GET', $path . '/timeline', query: $api, options: $request), fn (array $next) => $this->listTimeline($next, $requestOptions), $params);
+        return $this->collection(Collection::class, TimelineSegment::class, $this->session->request('GET', $path . '/timeline', query: $api, options: $request), fn (array $next) => $this->listTimeline($next, $requestOptions), $params);
     }
 
     /** Yields every asset `list` would, fetching pages as needed. */
@@ -172,7 +172,7 @@ final class Assets extends Resource
     public function retrieve(array $params, array $requestOptions = []): Asset
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Asset::class, $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request));
+        return $this->model(Asset::class, $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request));
     }
 
     /**
@@ -188,7 +188,7 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return self::model(Asset::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
+        return $this->model(Asset::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
 
     /**
@@ -199,7 +199,7 @@ final class Assets extends Resource
     public function retry(array $params, array $requestOptions = []): Asset
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Asset::class, $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request));
+        return $this->model(Asset::class, $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request));
     }
 
     /**
@@ -219,7 +219,7 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return self::model(Asset::class, $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request));
+        return $this->model(Asset::class, $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request));
     }
 
     /**
@@ -241,7 +241,7 @@ final class Assets extends Resource
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
         $body = !empty($api['rerun']) ? ['rerun' => true] : new \stdClass();
-        return self::model(Asset::class, $this->session->request('POST', $path . '/explain', body: $body, options: $request));
+        return $this->model(Asset::class, $this->session->request('POST', $path . '/explain', body: $body, options: $request));
     }
 
     /**
@@ -257,7 +257,7 @@ final class Assets extends Resource
     public function removeContent(array $params, array $requestOptions = []): Asset
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Asset::class, $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request));
+        return $this->model(Asset::class, $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request));
     }
 
     /**
@@ -292,7 +292,7 @@ final class Assets extends Resource
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         self::validateBatch($api);
         $body = ['assetIds' => $api['assetIds'], 'operation' => $api['operation']];
-        return self::model(AssetBatch::class, $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request));
+        return $this->model(AssetBatch::class, $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request));
     }
 
     /** Refuses a batch the API would reject for its size, an ID or the operation (`sdk/invalid-argument`). */
@@ -324,7 +324,7 @@ final class Assets extends Resource
         if (!array_key_exists('folderId', $api)) {
             Values::invalid('folderId is required (null moves to root)');
         }
-        return self::model(Asset::class, $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request));
+        return $this->model(Asset::class, $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request));
     }
 
     /**
@@ -337,7 +337,7 @@ final class Assets extends Resource
      */
     public function create(array $params, array $requestOptions = []): Asset
     {
-        return Asset::constructFrom($this->submit($params, $requestOptions, false));
+        return Asset::constructFrom($this->submit($params, $requestOptions, false))->withLastResponse($this->session->lastResponse);
     }
 
     /**
@@ -352,7 +352,7 @@ final class Assets extends Resource
         if (isset($params['content']['plainText']) && (!is_string($params['content']['plainText']) || trim($params['content']['plainText']) === '')) {
             Values::invalid('Text must not be blank', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
-        return Asset::constructFrom($this->submit($params, $requestOptions, true));
+        return Asset::constructFrom($this->submit($params, $requestOptions, true))->withLastResponse($this->session->lastResponse);
     }
 
     /** @return array<string, mixed> the uploaded asset */
@@ -539,7 +539,7 @@ final class Assets extends Resource
             $query['wait'] = $api['wait'];
         }
         return Asset::constructFrom(self::asset($this->session->request('POST', $path . '/part', query: $query, raw: $body,
-            headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true)));
+            headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true)))->withLastResponse($this->session->lastResponse);
     }
 
     /**
@@ -586,7 +586,7 @@ final class Assets extends Resource
             $classification = $asset['classification'] ?? [];
             $status = $classification['moderation']['status'] ?? null;
             if (in_array($classification['status'] ?? null, ['completed', 'failed'], true)) {
-                return self::model(Asset::class, $asset);
+                return $this->model(Asset::class, $asset);
             }
             if ($remaining <= 0) {
                 break;
