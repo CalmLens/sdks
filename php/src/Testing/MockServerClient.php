@@ -1938,7 +1938,7 @@ final class MockServerClient
     /** Keyword search fields, in the order matches are reported, and where each value sits in the asset. */
     private const SEARCH_FIELDS = ['name' => ['name'], 'id' => ['id'], 'externalId' => ['externalId'],
         'description' => ['description'], 'tags' => ['tags'], 'type' => ['type'], 'content.format' => ['content', 'format'],
-        'content.extension' => ['content', 'extension'], 'classification.moderation.decision' => ['classification', 'moderation', 'status']];
+        'content.extension' => ['content', 'extension'], 'classification.moderation.status' => ['classification', 'moderation', 'status']];
 
     /**
      * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8

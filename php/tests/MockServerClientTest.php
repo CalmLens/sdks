@@ -246,9 +246,9 @@ final class MockServerClientTest extends TestCase
         }
         $names = fn (string $filter) => array_column($client->assets->list(['filter' => $filter])['items'], 'name');
         self::assertSame(['note-b.txt', 'note-a.txt'], $names('name==note-*'));
-        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.decision==blocked,name==note-a.txt'));
-        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.decision=out=(allowed,blocked)'));
-        self::assertSame(['photo.png'], $names('classification.moderation.decision=in=("blocked")'));
+        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.status==blocked,name==note-a.txt'));
+        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.status=out=(allowed,blocked)'));
+        self::assertSame(['photo.png'], $names('classification.moderation.status=in=("blocked")'));
     }
 
     public function testFailNextRequestSimulatesConnectionFailuresAndApiErrors(): void
