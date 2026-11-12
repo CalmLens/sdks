@@ -18,12 +18,6 @@ use CalmLens\Model\UploadToken;
 use CalmLens\ModerationContext;
 use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Exception\ConnectTimeoutException;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Promise\Create;
-use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -178,7 +172,7 @@ final class MockServerClient
     /** The client's API key: a CDN request without it, as `fetchCdn` sends, has no grants. */
     private string $apiKey;
     /** Sends a CDN request through the mock without the API key, for `fetchCdn`. */
-    private Client $browser;
+    private MockHttpClient $browser;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
     /** Every API cursor list returns this many items unless `pageSize` says otherwise. */
@@ -234,10 +228,9 @@ final class MockServerClient
         $this->createId = \Closure::fromCallable($createId ?? fn (string $prefix): string => Values::id($prefix));
         $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
         $this->apiKey = $apiKey ?? 'mock-key';
-        $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
-        $this->browser = new Client(['handler' => $stack]);
+        $this->browser = new MockHttpClient(fn (RequestInterface $request): ResponseInterface => $this->handle($request));
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
-            httpClient: new Client(['handler' => $stack]), maxResponseBytes: $maxResponseBytes,
+            httpClient: $this->browser, maxResponseBytes: $maxResponseBytes,
             uploadTimeout: $uploadTimeout, partSizeBytes: $partSizeBytes);
         $session = (fn (): Session => $this->session)->call($this->client);
         $session->sleep = function (float $seconds): void { $this->elapsed += $seconds; };
@@ -575,7 +568,7 @@ final class MockServerClient
     }
 
     /** Records the request with the status it is answered with, null when it fails without a response. */
-    private function handle(RequestInterface $request): PromiseInterface
+    private function handle(RequestInterface $request): ResponseInterface
     {
         $body = (string) $request->getBody();
         $request = $request->withBody(\GuzzleHttp\Psr7\Utils::streamFor($body));
@@ -587,7 +580,7 @@ final class MockServerClient
             $this->history[] = new RecordedRequest($recorded->method, $recorded->path, $recorded->query,
                 isset($answer) && $answer instanceof ResponseInterface ? $answer->getStatusCode() : null, $request);
         }
-        return $answer instanceof ResponseInterface ? Create::promiseFor($answer) : Create::rejectionFor($answer);
+        return $answer instanceof ResponseInterface ? $answer : throw $answer;
     }
 
     private function answer(RequestInterface $request, string $body, bool $cdn, string $path): ResponseInterface|\Throwable
@@ -665,13 +658,7 @@ final class MockServerClient
         if (isset(ErrorCodes::STATUSES[$failure])) {
             return $this->error($failure, "Simulated $failure", null, $details, $retryAfter === null ? [] : ['Retry-After' => (string) $retryAfter]);
         }
-        if ($failure !== 'timeout') {
-            return new ConnectException('Simulated network failure', $request);
-        }
-        // Guzzle 8 throws a timeout class; Guzzle 7 a ConnectException carrying cURL's timeout errno.
-        return class_exists(ConnectTimeoutException::class)
-            ? new ConnectTimeoutException('Simulated timeout', $request)
-            : new ConnectException('Simulated timeout', $request, null, ['errno' => 28]);
+        return $failure === 'timeout' ? new MockNetworkException($request, 'Simulated timeout', true) : new MockNetworkException($request);
     }
 
     /** Fails the request being answered with an API error; the status defaults to the code's. */
@@ -1522,8 +1509,8 @@ final class MockServerClient
     public function fetchCdn(string $url): ResponseInterface
     {
         try {
-            return $this->browser->send(new \GuzzleHttp\Psr7\Request('GET', $url), ['http_errors' => false, 'allow_redirects' => false]);
-        } catch (\GuzzleHttp\Exception\TransferException $error) {
+            return $this->browser->sendRequest(new \GuzzleHttp\Psr7\Request('GET', $url));
+        } catch (\Psr\Http\Client\ClientExceptionInterface $error) {
             throw CalmLensException::create(SdkErrorCodes::TRANSPORT_ERROR, 'Request failed', previous: $error);
         }
     }

@@ -13,6 +13,7 @@ use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
 use CalmLens\Testing\Classification;
 use CalmLens\Testing\MockDecision;
+use CalmLens\Testing\MockHttpClient;
 use CalmLens\Testing\MockModerationInput;
 use CalmLens\Testing\MockServerClient;
 use CalmLens\UploadTokens;
@@ -212,7 +213,33 @@ final class ContractTest extends TestCase
     public static function errors(): iterable
     {
         foreach (self::fixtures('errors') as $entry) {
-            yield $entry['code'] => [$entry];
+            yield $entry['code'] . ' ' . $entry['status'] => [$entry];
+        }
+    }
+
+    /** The PHP class of each error kind, by kind ID, and the kind's parent (surface.json errorKinds). */
+    private static function errorKinds(): array
+    {
+        return array_column(self::fixtures('surface')['errorKinds'], null, 'id');
+    }
+
+    /** The error is of `kind` and of each of its parents. */
+    private static function assertKind(string $kind, \Throwable $error, string $label = ''): void
+    {
+        $kinds = self::errorKinds();
+        for ($id = $kind; $id !== null; $id = $kinds[$id]['parent']) {
+            self::assertInstanceOf($kinds[$id]['names']['php'], $error, trim("$label $id"));
+        }
+    }
+
+    public function testEveryErrorKindNamesAPhpClassBeneathItsParent(): void
+    {
+        foreach (self::errorKinds() as $id => $kind) {
+            $class = $kind['names']['php'];
+            self::assertTrue(class_exists($class), "$id: $class");
+            if ($kind['parent'] !== null) {
+                self::assertSame(self::errorKinds()[$kind['parent']]['names']['php'], get_parent_class($class), $id);
+            }
         }
     }
 
@@ -235,18 +262,15 @@ final class ContractTest extends TestCase
     public function testSharedApiErrorBecomesATypedError(array $entry): void
     {
         $response = $entry['response'];
-        $client = new ServerClient('key', 'project-1', maxRetries: 0, httpClient: new Client(['handler' => fn () => Create::promiseFor(
-            new Response($response['status'], $response['headers'], json_encode($response['body'])))]));
+        $body = array_key_exists('bodyText', $response) ? $response['bodyText'] : json_encode($response['body']);
+        $client = new ServerClient('key', 'project-1', maxRetries: 0,
+            httpClient: new MockHttpClient(fn () => new Response($response['status'], $response['headers'], $body)));
         try {
             self::invoke($client, $entry['operation'], $entry['args']);
             self::fail($entry['operation'] . ' succeeded');
         } catch (CalmLensException $error) {
             self::assertSameJson($entry['expected'], self::errorFields($error));
-            $class = [400 => Exception\BadRequestException::class, 401 => Exception\AuthenticationException::class,
-                403 => Exception\PermissionDeniedException::class, 404 => Exception\NotFoundException::class,
-                409 => Exception\ConflictException::class, 429 => Exception\RateLimitException::class][$entry['status']]
-                ?? ($entry['status'] >= 500 ? Exception\ServerException::class : Exception\ApiException::class);
-            self::assertInstanceOf($class, $error);
+            self::assertKind($entry['kind'], $error);
         }
     }
 
@@ -637,8 +661,11 @@ final class ContractTest extends TestCase
                     if ($container === '$_SERVER' && array_filter($headers, 'is_array') !== []) {
                         continue; // PHP's server joins repeated headers itself; covered by the other containers.
                     }
-                    self::assertSame($entry['valid'], Webhooks::verify($entry['body'], null, null, $entry['secret'], now: $entry['now'], headers: $values), $container);
+                    self::assertSame($entry['valid'], Webhooks::verifyHeaders($entry['body'], $values, $entry['secret'], now: $entry['now']), $container);
                 }
+                // The same headers on a PSR-7 server request.
+                $request = new ServerRequest('POST', '/webhooks', array_map(fn ($value) => (array) $value, $headers), $entry['body']);
+                self::assertSame($entry['valid'], Webhooks::verifyRequest($request, $entry['secret'], now: $entry['now']), 'PSR-7 request');
                 return;
             case 'parseErrors':
                 try {
@@ -669,8 +696,10 @@ final class ContractTest extends TestCase
                 self::assertSameJson($entry['payload'], Webhooks::toPayload($entry['event']));
                 $headers = Webhooks::createHeaders($entry['body'], $entry['deliveryId'], $entry['secret'], $entry['timestampSeconds']);
                 self::assertSameJson($entry['headers'], $headers);
-                $event = Webhooks::parseEvent($entry['body'], null, null, $entry['secret'], now: $entry['timestampSeconds'], headers: $headers);
+                $event = Webhooks::parseEventHeaders($entry['body'], $headers, $entry['secret'], now: $entry['timestampSeconds']);
                 self::assertSameJson($entry['payload'], $event);
+                $request = new ServerRequest('POST', '/webhooks', $headers, $entry['body']);
+                self::assertSameJson($entry['payload'], Webhooks::parseRequest($request, $entry['secret'], now: $entry['timestampSeconds']));
                 self::assertSame($entry['isTest'], Webhooks::isTest($event));
                 return;
         }
@@ -753,6 +782,10 @@ final class ContractTest extends TestCase
             CalmLensException::create($entry['code'], status: $entry['status'])] as $error) {
             self::assertSame($entry['retryable'], $error->isRetryable(), $error::class);
             self::assertSame($entry['local'], $error->isLocal(), $error::class);
+        }
+        // An SDK code PHP never raises (`sdk/no-fetch`, `sdk/cancelled`) has no kind to check here.
+        if (!str_starts_with($entry['code'], 'sdk/') || self::notApplicable('errors.sdkCode.' . substr($entry['code'], 4)) === null) {
+            self::assertKind($entry['kind'], CalmLensException::create($entry['code'], status: $entry['status']));
         }
     }
 
@@ -1247,6 +1280,7 @@ final class ContractTest extends TestCase
             self::fail('Expected ' . $fixture['error']);
         } catch (CalmLensException $error) {
             self::assertSame($fixture['error'], $error->errorCode);
+            self::assertKind($fixture['kind'], $error);
             self::assertTrue($error->isLocal());
             self::assertNull($error->status);
             self::assertNull($error->requestId);

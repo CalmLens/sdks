@@ -88,6 +88,21 @@ final class ObjectsTest extends TestCase
         self::assertSame(['parentId=parent&pageSize=1', 'parentId=parent&pageSize=1&cursor=c2'], $queries);
     }
 
+    public function testNextPageFetchesTheFollowingPageAndIsEmptyAfterTheLast(): void
+    {
+        $mock = new MockTransport();
+        $mock->enqueueJson(['items' => [['id' => 'f1']], 'nextCursor' => 'c2', 'hasMore' => true, 'ancestors' => []])
+            ->enqueueJson(['items' => [['id' => 'f2']], 'nextCursor' => null, 'hasMore' => false, 'ancestors' => []]);
+        $first = $mock->client()->folders->list();
+        self::assertTrue($first->hasNextPage());
+        $second = $first->nextPage();
+        self::assertSame(['f2'], array_map(fn (Folder $folder) => $folder->id, $second->items));
+        self::assertFalse($second->hasNextPage());
+        self::assertTrue($second->nextPage()->isEmpty());
+        self::assertSame(0, $mock->pending());
+        self::assertCount(2, $mock->requests());
+    }
+
     public function testAutoPagingStopsAtARepeatedCursor(): void
     {
         $mock = new MockTransport();

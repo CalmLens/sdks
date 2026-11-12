@@ -341,15 +341,45 @@ final class ClientTest extends TestCase
         $body = json_encode(Webhooks::toPayload($event));
         $headers = Webhooks::createHeaders($body, 'delivery-1', 'secret', 1760000000);
         self::assertSame(['delivery-1', '1760000000'], [$headers[Webhooks::DELIVERY_HEADER], $headers[Webhooks::TIMESTAMP_HEADER]]);
-        $parsed = Webhooks::parseEvent($body, null, null, 'secret', now: 1760000000, headers: $headers);
+        $parsed = Webhooks::parseEventHeaders($body, $headers, 'secret', now: 1760000000);
         self::assertSame(['evt_00000000000000000001', 'asset.allowed', 'project-1', 'low', 'asset.allowed', null, true],
             [$parsed['id'], $parsed['type'], $parsed['projectId'], $parsed['severity'], $parsed['title'], $parsed['assetId'], Webhooks::isTest($parsed)]);
         $server = ['HTTP_X_CALMLENS_SIGNATURE' => $headers[Webhooks::SIGNATURE_HEADER], 'HTTP_X_CALMLENS_TIMESTAMP' => '1760000000'];
-        self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $server));
+        self::assertTrue(Webhooks::verifyHeaders($body, $server, 'secret', now: 1760000000));
         $psr = ['X-CalmLens-Signature' => [$headers[Webhooks::SIGNATURE_HEADER]], 'X-CalmLens-Timestamp' => ['1760000000']];
-        self::assertTrue(Webhooks::verify($body, null, null, 'secret', now: 1760000000, headers: $psr));
-        self::assertFalse(Webhooks::verify($body, null, null, 'secret', now: 1760000000 + Webhooks::SIGNATURE_TOLERANCE_SECONDS + 1, headers: $psr));
-        $rejected = $this->error('sdk/invalid-webhook-signature', fn () => Webhooks::parseEvent($body . ' ', null, null, 'secret', now: 1760000000, headers: $headers));
+        self::assertTrue(Webhooks::verifyHeaders($body, $psr, 'secret', now: 1760000000));
+        self::assertFalse(Webhooks::verifyHeaders($body, $psr, 'secret', now: 1760000000 + Webhooks::SIGNATURE_TOLERANCE_SECONDS + 1));
+        $rejected = $this->error('sdk/invalid-webhook-signature', fn () => Webhooks::parseEventHeaders($body . ' ', $headers, 'secret', now: 1760000000));
         self::assertInstanceOf(Exception\WebhookVerificationException::class, $rejected);
+    }
+
+    /** Any PSR-18 client sends the requests; its network failures are retried and then raised as `sdk/transport-error`. */
+    public function testAnyPsr18ClientSendsRequestsAndItsNetworkFailuresAreConnectionErrors(): void
+    {
+        $sent = [];
+        $http = new class ($sent) implements \Psr\Http\Client\ClientInterface {
+            public function __construct(private array &$sent) {}
+            public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface
+            {
+                $this->sent[] = $request;
+                if (count($this->sent) < 3) {
+                    throw new class ($request) extends \RuntimeException implements \Psr\Http\Client\NetworkExceptionInterface {
+                        public function __construct(private \Psr\Http\Message\RequestInterface $request) { parent::__construct('down'); }
+                        public function getRequest(): \Psr\Http\Message\RequestInterface { return $this->request; }
+                    };
+                }
+                return new Response(200, ['Content-Type' => 'application/json'], '{"id":"folder-1","name":"A"}');
+            }
+        };
+        $client = new ServerClient('key', 'project-1', maxRetries: 2, httpClient: $http);
+        (fn () => $this->session->sleep = static function (float $seconds): void {})->call($client);
+        self::assertSame('folder-1', $client->folders->retrieve(['folderId' => 'folder-1'])->id);
+        self::assertCount(3, $sent);
+        self::assertSame('key', $sent[2]->getHeaderLine('X-Api-Key'));
+
+        $failing = new ServerClient('key', 'project-1', maxRetries: 0, httpClient: new \CalmLens\Testing\MockHttpClient(
+            fn ($request) => throw new \CalmLens\Testing\MockNetworkException($request)));
+        $error = $this->error('sdk/transport-error', fn () => $failing->folders->retrieve(['folderId' => 'folder-1']));
+        self::assertInstanceOf(Exception\ConnectionException::class, $error);
     }
 }

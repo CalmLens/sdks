@@ -224,7 +224,7 @@ final class MockServerClientTest extends TestCase
             ["$base/{$video['id']}/hls/index.m3u8", 404, 'asset/no-rendered-version'],
             ["$base/{$video['id']}/hls/video-720p.m3u8", 404, 'asset/no-rendered-version']];
         foreach ($cases as [$url, $status, $code]) {
-            $response = $http->request('GET', $url, ['http_errors' => false]);
+            $response = $http->sendRequest(new \GuzzleHttp\Psr7\Request('GET', $url));
             self::assertSame([$status, $code], [$response->getStatusCode(), json_decode((string) $response->getBody(), true)['code'] ?? null], $url);
         }
         // Unlike the stream, the embed page serves every asset type that may be delivered.
@@ -262,7 +262,7 @@ final class MockServerClientTest extends TestCase
             self::fail('Expected a transport error');
         } catch (Exception\ConnectionException $error) {
             self::assertSame('sdk/transport-error', $error->errorCode);
-            self::assertInstanceOf(\GuzzleHttp\Exception\ConnectException::class, $error->getPrevious());
+            self::assertInstanceOf(\CalmLens\Testing\MockNetworkException::class, $error->getPrevious());
         }
         $this->assertTimeout(fn () => $client->assets->list());
         try {
@@ -451,10 +451,12 @@ final class MockServerClientTest extends TestCase
                 + ($key === null ? [] : ['Idempotency-Key' => $key])]);
     }
 
+    /** A Guzzle client in front of the mock's PSR-18 client, for sending hand-built requests to it. */
     private static function http(MockServerClient $mock): \GuzzleHttp\ClientInterface
     {
         $session = (fn () => $this->session)->call($mock->client());
-        return (fn () => $this->http)->call($session);
+        $psr = (fn () => $this->http)->call($session);
+        return new \GuzzleHttp\Client(['handler' => fn ($request) => \GuzzleHttp\Promise\Create::promiseFor($psr->sendRequest($request))]);
     }
 
     /** @return array{0: int, 1: ?string, 2: mixed} the status, error code and details of a response */
