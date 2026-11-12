@@ -6,6 +6,7 @@ namespace CalmLens;
 
 use CalmLens\Internal\Values;
 use CalmLens\Model\Event;
+use Psr\Http\Message\ServerRequestInterface;
 
 final class Webhooks
 {
@@ -62,18 +63,16 @@ final class Webhooks
     }
 
     /**
-     * Returns true when the exact raw `payload` is a delivery signed with `secret`. A null
-     * `signature` or `timestamp` is read from `headers`: request headers (names compared
-     * case-insensitively; values may be strings or PSR-7 style lists) or `$_SERVER`.
+     * Returns true when the exact raw `payload` is a delivery signed with `secret`: `signature` is the
+     * `X-CalmLens-Signature` header and `timestamp` the `X-CalmLens-Timestamp` header (Unix seconds),
+     * within `toleranceSeconds` of `now`. Use `verifyHeaders` or `verifyRequest` to read the headers
+     * for you.
      */
-    public static function verify(string $payload, ?string $signature, string|int|null $timestamp,
-        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null,
-        array $headers = []): bool
+    public static function verify(string $payload, string $signature, string|int $timestamp,
+        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): bool
     {
-        $signature ??= self::header($headers, self::SIGNATURE_HEADER);
-        $timestamp ??= self::header($headers, self::TIMESTAMP_HEADER);
         $stamp = trim((string) $timestamp);
-        if ($secret === '' || !$signature || !preg_match('/^[0-9]+$/D', $stamp) || $toleranceSeconds < 0
+        if ($secret === '' || $signature === '' || !preg_match('/^[0-9]+$/D', $stamp) || $toleranceSeconds < 0
             || abs(($now ?? time()) - (float) $stamp) > $toleranceSeconds) {
             return false;
         }
@@ -88,16 +87,74 @@ final class Webhooks
     }
 
     /**
-     * Verifies the exact raw bytes before parsing; preserves unknown event types and fields.
-     * Throws `Exception\WebhookVerificationException`.
+     * `verify` with the signature and timestamp read from `headers`: request headers (names compared
+     * case-insensitively; values may be strings or PSR-7 style lists) or `$_SERVER`. A delivery
+     * without them is not verified.
+     *
+     * @param array<array-key, mixed> $headers
      */
-    public static function parseEvent(string $payload, ?string $signature, string|int|null $timestamp,
-        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null,
-        array $headers = []): Event
+    public static function verifyHeaders(string $payload, array $headers, #[\SensitiveParameter] string $secret,
+        int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): bool
     {
-        if (!self::verify($payload, $signature, $timestamp, $secret, $toleranceSeconds, $now, $headers)) {
+        return self::verify($payload, self::header($headers, self::SIGNATURE_HEADER) ?? '',
+            self::header($headers, self::TIMESTAMP_HEADER) ?? '', $secret, $toleranceSeconds, $now);
+    }
+
+    /** `verify` for a PSR-7 server request: its exact body bytes and its signature headers. */
+    public static function verifyRequest(ServerRequestInterface $request, #[\SensitiveParameter] string $secret,
+        int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): bool
+    {
+        return self::verifyHeaders(self::body($request), $request->getHeaders(), $secret, $toleranceSeconds, $now);
+    }
+
+    /**
+     * Verifies the exact raw bytes before parsing, as `verify` does, and returns the event; preserves
+     * unknown event types and fields. Throws `Exception\WebhookVerificationException`:
+     * `sdk/invalid-webhook-signature` for a delivery not signed with `secret` or outside the
+     * tolerance, `sdk/invalid-webhook-payload` for a signed body that isn't an event.
+     */
+    public static function parseEvent(string $payload, string $signature, string|int $timestamp,
+        #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): Event
+    {
+        if (!self::verify($payload, $signature, $timestamp, $secret, $toleranceSeconds, $now)) {
             throw CalmLensException::create('sdk/invalid-webhook-signature', 'Webhook signature or timestamp is invalid');
         }
+        return self::decode($payload);
+    }
+
+    /**
+     * `parseEvent` with the signature and timestamp read from `headers`, as `verifyHeaders` reads them.
+     *
+     * @param array<array-key, mixed> $headers
+     */
+    public static function parseEventHeaders(string $payload, array $headers, #[\SensitiveParameter] string $secret,
+        int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): Event
+    {
+        if (!self::verifyHeaders($payload, $headers, $secret, $toleranceSeconds, $now)) {
+            throw CalmLensException::create('sdk/invalid-webhook-signature', 'Webhook signature or timestamp is invalid');
+        }
+        return self::decode($payload);
+    }
+
+    /** `parseEvent` for a PSR-7 server request: its exact body bytes and its signature headers. */
+    public static function parseRequest(ServerRequestInterface $request, #[\SensitiveParameter] string $secret,
+        int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null): Event
+    {
+        return self::parseEventHeaders(self::body($request), $request->getHeaders(), $secret, $toleranceSeconds, $now);
+    }
+
+    /** A request's body bytes from the start, however much of it was already read. */
+    private static function body(ServerRequestInterface $request): string
+    {
+        $body = $request->getBody();
+        if ($body->isSeekable()) {
+            $body->rewind();
+        }
+        return $body->getContents();
+    }
+
+    private static function decode(string $payload): Event
+    {
         try {
             $object = json_decode($payload, false, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $error) {

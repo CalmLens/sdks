@@ -5,23 +5,18 @@ declare(strict_types=1);
 namespace CalmLens\Testing;
 
 use CalmLens\ServerClient;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Utils;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /** FIFO offline responses through the real SDK serialization, validation and error handling. */
 final class MockTransport
 {
-    private MockHandler $handler;
+    /** @var list<ResponseInterface|\Throwable> */
+    private array $queue = [];
+    /** @var list<array{request: RequestInterface, response: ?ResponseInterface}> */
     private array $history = [];
-
-    public function __construct()
-    {
-        $this->handler = new MockHandler();
-    }
 
     public function enqueueJson(mixed $body, int $status = 200, array $headers = []): self
     {
@@ -30,19 +25,23 @@ final class MockTransport
 
     public function enqueue(ResponseInterface|\Throwable $response): self
     {
-        $this->handler->append($response);
+        $this->queue[] = $response;
         return $this;
     }
 
     public function client(string $projectId = 'project-1'): ServerClient
     {
-        $stack = HandlerStack::create($this->handler);
-        $stack->push(Middleware::mapRequest(function ($request) {
+        $http = new MockHttpClient(function (RequestInterface $request): ResponseInterface {
             // Consume uploads in offline tests too, validating their byte count and freezing a snapshot.
-            return $request->withBody(\GuzzleHttp\Psr7\Utils::streamFor($request->getBody()->getContents()));
-        }));
-        $stack->push(Middleware::history($this->history));
-        return new ServerClient('test-key', $projectId, maxRetries: 0, httpClient: new Client(['handler' => $stack]));
+            $request = $request->withBody(Utils::streamFor($request->getBody()->getContents()));
+            $answer = array_shift($this->queue) ?? throw new \OutOfBoundsException('MockTransport has no queued response');
+            $this->history[] = ['request' => $request, 'response' => $answer instanceof ResponseInterface ? $answer : null];
+            if ($answer instanceof \Throwable) {
+                throw $answer;
+            }
+            return $answer;
+        });
+        return new ServerClient('test-key', $projectId, maxRetries: 0, httpClient: $http);
     }
 
     /** @return list<RecordedRequest> every request sent, oldest first, with the status it was answered with. */
@@ -52,5 +51,5 @@ final class MockTransport
             ServerClient::DEFAULT_BASE_URL, ServerClient::DEFAULT_CDN_BASE_URL), $this->history);
     }
 
-    public function pending(): int { return count($this->handler); }
+    public function pending(): int { return count($this->queue); }
 }

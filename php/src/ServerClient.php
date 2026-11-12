@@ -7,7 +7,7 @@ namespace CalmLens;
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
 use CalmLens\Model\Lens;
-use GuzzleHttp\ClientInterface;
+use Psr\Http\Client\ClientInterface;
 
 /**
  * @phpstan-import-type LensType from Types
@@ -47,6 +47,9 @@ final class ServerClient
     private Session $session;
 
     /**
+     * @param ?ClientInterface $httpClient the PSR-18 client that sends requests; by default the one
+     *   installed (found with php-http/discovery), such as Guzzle. The timeouts below apply per
+     *   attempt when it is Guzzle; configure another client's timeouts on that client.
      * @param float $timeout seconds each API request attempt may take, reading the response included.
      * @param ?float $uploadTimeout seconds each binary upload attempt (file content and multipart
      *   parts) may take; none by default, since files may be large. Text uploads use `timeout`.

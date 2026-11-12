@@ -1,15 +1,20 @@
 # CalmLens PHP SDK
 
 Server-side PHP client for [CalmLens](https://calmlens.com) content moderation, storage and CDN
-delivery, built on Guzzle 7 or 8 and PSR-7 streams.
+delivery. It sends requests with any PSR-18 HTTP client, such as Guzzle, and takes PSR-7 streams.
 
-PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later is required because of PHP2Shell (CVE-2026-109618, CVE-2026-109619).
+It requires PHP 8.2 or later. Run a PHP release with the PHP2Shell fixes (CVE-2026-109618,
+CVE-2026-109619): 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later, or a distribution build that backports them.
 
 ## Installation
 
 ```bash
-composer require calmlens/sdk
+composer require calmlens/sdk guzzlehttp/guzzle
 ```
+
+The client finds an installed PSR-18 client, or takes one as `httpClient`. With Guzzle, the
+client's `timeout`, `connectTimeout` and `uploadTimeout` apply to each attempt; configure another
+client's timeouts on that client.
 
 The
 [Laravel comment board](https://github.com/CalmLens/sdks/tree/main/examples/comment-board-laravel)

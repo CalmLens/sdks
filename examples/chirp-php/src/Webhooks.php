@@ -31,7 +31,7 @@ final class Webhooks
         }
         try {
             // The exact raw bytes: never a re-encoded copy of the parsed JSON.
-            $event = CalmLensWebhooks::parseEvent($rawBody, $signature, $timestamp, $this->secret);
+            $event = CalmLensWebhooks::parseEvent($rawBody, $signature ?? '', $timestamp ?? '', $this->secret);
         } catch (CalmLensException $error) {
             // A forged or stale delivery is 401; a verified body that is not an event is 400.
             return $error->errorCode === SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? 401 : 400;

@@ -20,3 +20,18 @@ yield every item across pages. `events->list` returns an `EventCollection` and `
 Request options, such as `idempotencyKey`, `timeout` and `maxRetries`, are now each method's
 second argument, apart from its params: `$client->assets->create([...], ['idempotencyKey' => $key])`.
 Webhooks::parseEvent returns an `Event`, and the `Webhooks` helpers take an `Event` or an array.
+
+The client sends requests with any PSR-18 HTTP client: pass one as `httpClient`, or the installed
+one is found for you. Guzzle is no longer a dependency; install it, or another PSR-18 client,
+alongside the SDK. With Guzzle, `timeout`, `connectTimeout` and `uploadTimeout` apply to each
+attempt. `Testing\MockHttpClient` scripts responses as a PSR-18 client, and
+`Testing\MockNetworkException` simulates a connection failure or timeout.
+
+Webhooks take a PSR-7 server request: `Webhooks::parseRequest($request, $secret)` and
+`Webhooks::verifyRequest`. `parseEvent` and `verify` now take the signature and timestamp as
+strings; `parseEventHeaders` and `verifyHeaders` read them from request headers or `$_SERVER`.
+
+API errors with status 413 and 422 raise `PayloadTooLargeException` and
+`UnprocessableEntityException`, and `TimeoutException` no longer extends `ConnectionException`.
+
+The SDK requires PHP 8.2 or later, so distribution builds that backport security fixes install.

@@ -6,10 +6,11 @@ namespace CalmLens\Internal;
 
 use CalmLens\CalmLensException;
 use CalmLens\Version;
-use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Request;
+use Http\Discovery\Exception\NotFoundException;
+use Http\Discovery\Psr18ClientDiscovery;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
@@ -43,7 +44,11 @@ final class Session
         private array $defaults,
         ?ClientInterface $http = null,
     ) {
-        $this->http = $http ?? new Client();
+        try {
+            $this->http = $http ?? Psr18ClientDiscovery::find();
+        } catch (NotFoundException $error) {
+            throw CalmLensException::create('sdk/invalid-config', 'No PSR-18 HTTP client is installed: pass httpClient, or install one such as guzzlehttp/guzzle', previous: $error);
+        }
         $this->sleep = static function (float $seconds): void { usleep((int) round($seconds * 1_000_000)); };
         $this->clock = static fn (): float => hrtime(true) / 1e9;
         self::validateOptions($defaults, 'sdk/invalid-config');
@@ -165,15 +170,36 @@ final class Session
         return (int) round($delay / 2 + mt_rand() / mt_getrandmax() * ($delay / 2));
     }
 
-    /** Guzzle 8 names transport timeouts by class; Guzzle 7 reports cURL's CURLE_OPERATION_TIMEDOUT (28). */
-    private static function isTimeout(TransferException $error): bool
+    /**
+     * Whether a transport failure was a timeout: Guzzle 8 names timeouts by class, Guzzle 7 reports
+     * cURL's CURLE_OPERATION_TIMEDOUT (28), and the SDK's mocks say so themselves.
+     */
+    private static function isTimeout(ClientExceptionInterface $error): bool
     {
         foreach (['ConnectTimeoutException', 'NetworkTimeoutException', 'ResponseTimeoutException'] as $class) {
             if (is_a($error, "GuzzleHttp\\Exception\\$class")) {
                 return true;
             }
         }
+        if ($error instanceof \CalmLens\Testing\MockNetworkException) {
+            return $error->timeout;
+        }
         return method_exists($error, 'getHandlerContext') && ($error->getHandlerContext()['errno'] ?? null) === 28;
+    }
+
+    /**
+     * Sends one attempt. Guzzle gets the attempt's timeouts and never follows redirects or throws for
+     * an HTTP status; another PSR-18 client applies the timeouts it was configured with.
+     */
+    private function send(Request $request, ?float $timeout, float $connectTimeout, bool $stream): ResponseInterface
+    {
+        if ($this->http instanceof \GuzzleHttp\ClientInterface) {
+            return $this->http->send($request, [
+                'http_errors' => false, 'allow_redirects' => false, 'timeout' => $timeout ?? 0,
+                'connect_timeout' => $connectTimeout, 'read_timeout' => $timeout ?? 0, 'stream' => $stream,
+            ]);
+        }
+        return $this->http->sendRequest($request);
     }
 
     /** `$apiKey` false sends the request without the API key, as a browser loading a CDN URL. */
@@ -196,14 +222,11 @@ final class Session
             $attemptTimeout = $remaining === null ? $settings['timeout'] : min($remaining, $settings['timeout'] ?? INF);
             $again = $retryable && $attempt < $settings['maxRetries'];
             try {
-                $response = $this->http->send(new Request($method, $url, $headers, $body), [
-                    'http_errors' => false, 'allow_redirects' => false,
-                    'timeout' => $attemptTimeout ?? 0, 'connect_timeout' => min($settings['connectTimeout'], $remaining ?? INF),
-                    'read_timeout' => $attemptTimeout ?? 0, 'stream' => $cdn,
-                ]);
+                $response = $this->send(new Request($method, $url, $headers, $body), $attemptTimeout,
+                    min($settings['connectTimeout'], $remaining ?? INF), $cdn);
             } catch (\InvalidArgumentException $error) {
                 throw CalmLensException::create('sdk/invalid-argument', $error->getMessage(), previous: $error);
-            } catch (TransferException $error) {
+            } catch (ClientExceptionInterface $error) {
                 $timeout = self::isTimeout($error);
                 $failure = CalmLensException::create($timeout ? 'sdk/timeout' : 'sdk/transport-error',
                     $timeout ? 'Request timed out' : 'Request failed', previous: $error);

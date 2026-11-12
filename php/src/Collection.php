@@ -62,6 +62,30 @@ class Collection extends CalmLensObject
         return $this->count() === 0;
     }
 
+    /** Whether a page follows this one: `hasMore`, and for a list a cursor and items to page past. */
+    public function hasNextPage(): bool
+    {
+        return $this->hasMore === true && (static::FEED
+            || (is_string($this->nextCursor) && $this->nextCursor !== '' && !$this->isEmpty()));
+    }
+
+    /**
+     * The page after this one, fetched with the same params and the next `cursor`, or an empty page
+     * when none follows, as the API would return beyond the last page.
+     */
+    public function nextPage(): static
+    {
+        if (!$this->hasNextPage() || $this->fetch === null) {
+            return static::page(['items' => [], 'nextCursor' => null, 'hasMore' => false], null);
+        }
+        if (!is_string($this->nextCursor) || $this->nextCursor === '') {
+            throw CalmLensException::create('sdk/invalid-response', 'A page with more to follow has no cursor');
+        }
+        $params = $this->params;
+        $params['cursor'] = $this->nextCursor;
+        return ($this->fetch)($params);
+    }
+
     /**
      * Yields this page and each page after it, fetching them as needed. A list stops without a next
      * cursor, when `hasMore` is false or at an empty page; an event feed when `hasMore` is false. A
@@ -79,7 +103,7 @@ class Collection extends CalmLensObject
         $page = $this;
         do {
             $next = $page->nextCursor;
-            $more = $page->hasMore === true && (static::FEED || (is_string($next) && $next !== '' && !$page->isEmpty()));
+            $more = $page->hasNextPage();
             if ($more) {
                 if (!is_string($next) || $next === '') {
                     throw CalmLensException::create('sdk/invalid-response', 'A page with more to follow has no cursor');
@@ -94,9 +118,7 @@ class Collection extends CalmLensObject
             if (!$more || $page->fetch === null) {
                 return;
             }
-            $params = $page->params;
-            $params['cursor'] = $next;
-            $page = ($page->fetch)($params);
+            $page = $page->nextPage();
         } while (true);
     }
 

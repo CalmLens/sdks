@@ -13,10 +13,10 @@ final class WebhookController
     public function __invoke(Request $request)
     {
         try {
-            $event = Webhooks::parseEvent(
+            // The exact raw body, with the signature headers read from the request.
+            $event = Webhooks::parseEventHeaders(
                 $request->getContent(),
-                $request->header(Webhooks::SIGNATURE_HEADER),
-                $request->header(Webhooks::TIMESTAMP_HEADER),
+                $request->headers->all(),
                 (string) config('calmlens.webhook_secret'),
             );
         } catch (CalmLensException $error) {
