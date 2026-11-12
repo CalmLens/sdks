@@ -5,7 +5,7 @@ const projectId = "project-1";
 const asset = {
   id: "asset-1",
   upload: { status: "completed" },
-  classification: { status: "completed", moderation: { status: "allowed" } },
+  classification: { status: "completed", moderation: { decision: "allowed" } },
 };
 const text = { name: "note.txt", content: { plainText: "hello", type: "text/plain" } };
 

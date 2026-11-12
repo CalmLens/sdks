@@ -373,11 +373,11 @@ describe("UploadController", () => {
     upload: { status: "completed", partsReceived: null },
     classification:
       status === "failed"
-        ? { status: "failed", failureReason: "processing-error", moderation: { status: "pending" } }
+        ? { status: "failed", failureReason: "processing-error", moderation: { decision: null } }
         : {
             status: status === "pending" ? "processing" : "completed",
             failureReason: null,
-            moderation: { status },
+            moderation: { decision: status === "pending" ? null : status },
           },
   });
 

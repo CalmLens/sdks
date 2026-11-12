@@ -62,7 +62,7 @@ for (const kind of ["node", "binary"] as const) {
       expect(result.stderr).toBe("");
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain(asset.id);
-      expect(result.stdout).toContain(asset.classification.moderation.status);
+      expect(result.stdout).toContain(asset.classification.moderation.decision);
       expect(received).toEqual({
         path: `/v1/projects/${projectId}/assets`,
         // Text goes as a JSON body, never as raw bytes with its fields in the URL.

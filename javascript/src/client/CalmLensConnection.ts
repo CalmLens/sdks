@@ -373,6 +373,11 @@ const hasStringStatus = (value: unknown): boolean =>
   typeof value === "object" &&
   typeof (value as { status?: unknown }).status === "string";
 
+const hasDecision = (data: Partial<Asset>): boolean => {
+  const decision = data.classification?.moderation?.decision;
+  return decision === null || typeof decision === "string";
+};
+
 const isAsset = (data: unknown): data is Asset =>
   !!data &&
   typeof data === "object" &&
@@ -380,7 +385,7 @@ const isAsset = (data: unknown): data is Asset =>
   !!(data as { id: string }).id &&
   hasStringStatus((data as { classification?: unknown }).classification) &&
   hasStringStatus((data as { upload?: unknown }).upload) &&
-  typeof (data as Partial<Asset>).classification?.moderation?.status === "string";
+  hasDecision(data as Partial<Asset>);
 
 const isUploadedAsset = (data: unknown): data is UploadedAsset =>
   !!data &&

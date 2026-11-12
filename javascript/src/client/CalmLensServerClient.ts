@@ -594,7 +594,7 @@ export default class CalmLensServerClient {
 
       /**
        * Waits until an asset is settled, its `classification.status` `completed` (with its
-       * decision in `classification.moderation.status`) or `failed`, and returns that asset,
+       * decision in `classification.moderation.decision`) or `failed`, and returns that asset,
        * checking every few seconds. A `queued` or `processing` asset is still waiting, even when a
        * reviewer has already decided it. Rejects with `sdk/timeout` if it is not settled within
        * `timeoutMs` (default 60000). Webhooks report decisions without polling.

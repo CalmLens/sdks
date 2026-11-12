@@ -16,12 +16,12 @@ describe("assets.classify", () => {
         return Response.json({
           id: "asset",
           upload: { status: "completed" },
-          classification: { status: "completed", moderation: { status: "allowed" } },
+          classification: { status: "completed", moderation: { decision: "allowed" } },
         });
       },
     });
     const asset = await client.text.classify({ text: "hello" });
-    expect(asset.classification.moderation.status).toBe("allowed");
+    expect(asset.classification.moderation.decision).toBe("allowed");
     expect([...request!.url.searchParams]).toEqual([["wait", "true"]]);
     expect(request!.body).toEqual({
       name: "text",
@@ -36,7 +36,7 @@ describe("assets.classify", () => {
       return Response.json({
         id: "asset-id",
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { status: "allowed" } },
+        classification: { status: "completed", moderation: { decision: "allowed" } },
       });
     };
     const client = new CalmLensServerClient({ apiKey: "test-api-key", projectId, uploadFetch });
@@ -52,7 +52,7 @@ describe("assets.classify", () => {
       content: { plainText: "Lovely photo!", type: "text/plain" },
     });
 
-    expect(asset.classification.moderation.status).toBe("allowed");
+    expect(asset.classification.moderation.decision).toBe("allowed");
     expect(requests).toHaveLength(1);
     const [{ url, init }] = requests;
     const headers = new Headers(init?.headers);
@@ -82,7 +82,7 @@ describe("assets.classify", () => {
         return Response.json({
           id: "asset-id",
           upload: { status: "completed" },
-          classification: { status: "completed", moderation: { status: "allowed" } },
+          classification: { status: "completed", moderation: { decision: "allowed" } },
         });
       },
     });
@@ -126,7 +126,7 @@ describe("assets.classify", () => {
     });
 
     expect(asset.type).toBe("plaintext-document");
-    expect(asset.classification.moderation.status).toBe("blocked");
+    expect(asset.classification.moderation.decision).toBe("blocked");
     expect(asset.externalId).toBe("c-1");
   });
 });

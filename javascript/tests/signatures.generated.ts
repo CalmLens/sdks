@@ -67,9 +67,9 @@ export function checkSignatures(client: CalmLensServerClient): void {
   void client.assets.search({"query":"a red car at night","mode":"semantic","pageSize":10});
   void client.assets.search({"query":"a red car at night","mode":"hybrid","pageSize":10});
   void client.assets.list({});
-  void client.assets.list({"pageSize":20,"filter":"classification.moderation.status==allowed;folderId==folder-1","cursor":"example"});
-  void client.assets.list({"pageSize":1,"filter":"classification.moderation.status==allowed;folderId==folder-1"});
-  void client.assets.list({"pageSize":20,"filter":"classification.moderation.status==allowed;folderId==folder-1","sort":"createdAt"});
+  void client.assets.list({"pageSize":20,"filter":"classification.moderation.decision==allowed;folderId==folder-1","cursor":"example"});
+  void client.assets.list({"pageSize":1,"filter":"classification.moderation.decision==allowed;folderId==folder-1"});
+  void client.assets.list({"pageSize":20,"filter":"classification.moderation.decision==allowed;folderId==folder-1","sort":"createdAt"});
   void client.assets.list({"pageSize":20,"filter":"example"});
   void client.assets.listChildren({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"});
   // @ts-expect-error assets.listChildren requires assetId

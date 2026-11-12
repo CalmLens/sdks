@@ -95,7 +95,7 @@ describe("MockCalmLensServerClient", () => {
     expect(asset.id).toBe("asset_987fcdeb51a243d7b890");
     expect(asset.type).toBe("image");
     expect(asset.classification.status).toBe("processing");
-    expect(asset.classification.moderation.status).toBe("pending");
+    expect(asset.classification.moderation.decision).toBe(null);
     expect(asset.content).toMatchObject({ status: "stored", format: "image/png" });
     expect(asset.visibility).toBe("public");
     await expect(client.assets.retrieve({ assetId: asset.id })).resolves.toEqual(asset);
@@ -774,7 +774,7 @@ describe("MockCalmLensServerClient", () => {
       client.assets.waitForDecision({ assetId: pending.id, timeoutMs: 0 }),
     ).rejects.toMatchObject({
       code: "sdk/timeout",
-      details: { classificationStatus: "processing", moderationStatus: "pending" },
+      details: { classificationStatus: "processing", moderationStatus: null },
     });
 
     const decidedClient = createClient({
@@ -787,7 +787,7 @@ describe("MockCalmLensServerClient", () => {
     expect(await decidedClient.assets.waitForDecision({ assetId: queued.id })).toMatchObject({
       id: queued.id,
       upload: { status: "completed" },
-      classification: { status: "failed", moderation: { status: "pending" } },
+      classification: { status: "failed", moderation: { decision: null } },
     });
     await expect(
       decidedClient.assets.waitForDecision({ assetId: "missing" }),
@@ -809,7 +809,7 @@ describe("MockCalmLensServerClient", () => {
     await Promise.all([
       complete,
       expect(decision).resolves.toMatchObject({
-        classification: { moderation: { status: "allowed" } },
+        classification: { moderation: { decision: "allowed" } },
       }),
     ]);
   });
@@ -823,7 +823,7 @@ describe("MockCalmLensServerClient", () => {
     const live = new AbortController();
     expect(
       await client.assets.waitForDecision({ assetId: asset.id, signal: live.signal }),
-    ).toMatchObject({ id: asset.id, classification: { moderation: { status: "blocked" } } });
+    ).toMatchObject({ id: asset.id, classification: { moderation: { decision: "blocked" } } });
 
     const waiting = createClient();
     const pending = await waiting.assets.create({
@@ -852,7 +852,7 @@ describe("MockCalmLensServerClient", () => {
     const retried = await client.assets.retry({ assetId: asset.id });
     expect(retried.classification.status).toBe("processing");
     expect(retried.classification.failureReason).toBeNull();
-    expect(retried.classification.moderation.status).toBe("pending");
+    expect(retried.classification.moderation.decision).toBe(null);
     await expect(client.assets.retry({ assetId: asset.id })).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_NOT_RETRYABLE.getId(),
     });
@@ -897,7 +897,7 @@ describe("MockCalmLensServerClient", () => {
 
     const explained = await client.assets.explain({ assetId: asset.id });
     expect(explained.classification.moderation?.explanationComplete).toBe(true);
-    expect(explained.classification.moderation.status).toBe("blocked");
+    expect(explained.classification.moderation.decision).toBe("blocked");
 
     await databaseStorage.updateAsset({
       ...explained,
@@ -913,11 +913,11 @@ describe("MockCalmLensServerClient", () => {
 
     const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
     expect(rerun.classification.status).toBe("completed");
-    expect(rerun.classification.moderation.status).toBe("blocked");
+    expect(rerun.classification.moderation.decision).toBe("blocked");
     // A failed re-run keeps the decision and leaves nothing to complete.
     const kept = await client.completeProcessing(asset.id, "failed");
     expect(kept.classification.status).toBe("completed");
-    expect(kept.classification.moderation.status).toBe("blocked");
+    expect(kept.classification.moderation.decision).toBe("blocked");
     await expect(client.completeProcessing(asset.id)).rejects.toMatchObject({
       code: "sdk/invalid-argument",
     });
@@ -934,9 +934,9 @@ describe("MockCalmLensServerClient", () => {
     });
 
     const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
-    expect(rerun.classification.moderation.status).toBe("blocked");
+    expect(rerun.classification.moderation.decision).toBe("blocked");
     const stored = await client.assets.retrieve({ assetId: asset.id });
-    expect(stored.classification.moderation.status).toBe("allowed");
+    expect(stored.classification.moderation.decision).toBe("allowed");
   });
 
   it("removes content but keeps the record, and deletes assets", async () => {
@@ -951,7 +951,7 @@ describe("MockCalmLensServerClient", () => {
 
     const removed = await client.assets.removeContent({ assetId: asset.id });
     expect(removed.id).toBe(asset.id);
-    expect(removed.classification.moderation.status).toBe("allowed");
+    expect(removed.classification.moderation.decision).toBe("allowed");
     expect(removed.content).toMatchObject({
       status: "removed",
       removalReason: "requested",
@@ -1184,12 +1184,12 @@ describe("MockCalmLensAppClient", () => {
     const good = await app.assets.create({ name: "good.png", content: photo });
     const bad = await app.assets.create({ name: "bad.png", content: photo });
 
-    expect([good, bad].map((upload) => upload.classification.moderation?.status)).toEqual([
+    expect([good, bad].map((upload) => upload.classification.moderation?.decision)).toEqual([
       "allowed",
       "blocked",
     ]);
     expect(
-      (await app.assets.retrieve({ assetId: good.id })).classification.moderation?.status,
+      (await app.assets.retrieve({ assetId: good.id })).classification.moderation?.decision,
     ).toBe("allowed");
     const served = await app.server.cdn.serve({ assetId: good.id });
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));

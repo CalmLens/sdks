@@ -121,8 +121,8 @@ export type AssetClassification = Omit<
   moderation: AssetModeration;
 };
 /** An asset's moderation state. */
-export type AssetModeration = Omit<SharedAssetModeration, "status" | "manualReviews"> & {
-  status: AssetModerationStatus;
+export type AssetModeration = Omit<SharedAssetModeration, "decision" | "manualReviews"> & {
+  decision: AssetModerationDecision | null;
   manualReviews: Array<
     Omit<SharedAssetModeration["manualReviews"][number], "decision"> & {
       decision: AssetModerationDecision;
@@ -414,7 +414,7 @@ export interface UploadedAsset {
     /** Why processing failed; `null` unless `status` is `failed`. */
     failureReason: AssetClassificationFailureReason | null;
     /** The moderation decision, present only when the preset shows decisions to uploaders. */
-    moderation?: { status: AssetModerationStatus };
+    moderation?: { decision: AssetModerationDecision | null };
   };
 }
 

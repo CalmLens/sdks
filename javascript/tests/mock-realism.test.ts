@@ -68,7 +68,7 @@ describe("MockCalmLensServerClient listing", () => {
     ]);
 
     const allowedByName = await client.assets.list({
-      filter: "classification.moderation.status==allowed",
+      filter: "classification.moderation.decision==allowed",
       sort: "createdAt",
     });
     expect(allowedByName.items.map((asset) => asset.name)).toEqual(["b-allowed", "c-allowed"]);
@@ -77,7 +77,7 @@ describe("MockCalmLensServerClient listing", () => {
     const either = await client.assets.list({ filter: "name==a-pending,name==c-allowed" });
     expect(either.items.map((asset) => asset.name).sort()).toEqual(["a-pending", "c-allowed"]);
     const both = await client.assets.list({
-      filter: "classification.moderation.status==allowed;name!=b-allowed",
+      filter: "classification.moderation.decision==allowed;name!=b-allowed",
     });
     expect(both.items.map((asset) => asset.name)).toEqual(["c-allowed"]);
   });
@@ -197,7 +197,7 @@ describe("MockCalmLensServerClient assets.decide", () => {
     ).toMatchObject({ code: "asset/content-purged", status: 409 });
     expect(
       (await client.assets.decide({ assetId: asset.id, decision: "blocked", note: "Keep blocked" }))
-        .classification.moderation.status,
+        .classification.moderation.decision,
     ).toBe("blocked");
 
     const uploading = await client.assets.create({
@@ -267,7 +267,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
     });
     // Started with classify, so the saved choice is to wait for the decision.
     expect(finished.classification.status).toBe("completed");
-    expect(finished.classification.moderation.status).toBe("allowed");
+    expect(finished.classification.moderation.decision).toBe("allowed");
     expect(
       await caught(
         client.assets.uploadPart({

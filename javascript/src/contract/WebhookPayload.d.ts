@@ -1,4 +1,4 @@
-import { i as Actor, n as EventAsset, r as TypedEvent, t as Event } from "./Event-J5A6q_Dd.js";
+import { i as Actor, n as EventAsset, r as TypedEvent, t as Event } from "./Event-C0t0Yxlc.js";
 import { i as EventFacts } from "./EventCatalog-CUiUuEsU.js";
 import * as zod from "zod";
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
@@ -46,14 +46,13 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
-        status: zod.ZodEnum<{
+        decision: zod.ZodNullable<zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
           limited: "limited";
-          pending: "pending";
           purged: "purged";
-        }>;
+        }>>;
       }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{
@@ -106,14 +105,13 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
-        status: zod.ZodEnum<{
+        decision: zod.ZodNullable<zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
           limited: "limited";
-          pending: "pending";
           purged: "purged";
-        }>;
+        }>>;
       }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{

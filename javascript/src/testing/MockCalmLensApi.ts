@@ -209,7 +209,7 @@ export interface MockUploadPreset {
   /** Accepted content types, such as `["image/*"]`. Defaults to any type. */
   allowedContentTypes?: string[];
   maxFileSizeInBytes?: number;
-  /** Return `classification.moderation.status` to the uploader. Defaults to `true`. */
+  /** Return `classification.moderation.decision` to the uploader. Defaults to `true`. */
   showDecisions?: boolean;
   /** Defaults to `public`. */
   visibility?: "public" | "private";
@@ -297,19 +297,20 @@ const toEventAsset = (asset: Asset) => ({
   classification: {
     status: asset.classification.status,
     testInput: asset.classification.testInput,
-    moderation: { status: asset.classification.moderation.status },
+    moderation: { decision: asset.classification.moderation.decision },
   },
   content: { status: asset.content.status },
 });
 
 /** The moderation status each `asset.<status>` event announces. */
-const ANNOUNCED_STATUS: Partial<Record<string, Asset["classification"]["moderation"]["status"]>> = {
-  "asset.allowed": "allowed",
-  "asset.limited": "limited",
-  "asset.age-restricted": "age-restricted",
-  "asset.blocked": "blocked",
-  "asset.purged": "purged",
-};
+const ANNOUNCED_STATUS: Partial<Record<string, Asset["classification"]["moderation"]["decision"]>> =
+  {
+    "asset.allowed": "allowed",
+    "asset.limited": "limited",
+    "asset.age-restricted": "age-restricted",
+    "asset.blocked": "blocked",
+    "asset.purged": "purged",
+  };
 
 /** A `moderate` answer or `completeProcessing` decision as a checked `MockDecision`. */
 const toDecision = (value: unknown): MockDecision => {
@@ -968,7 +969,7 @@ export class MockCalmLensApi {
     if (!asset) return this.pushEvent(input);
     const snapshot = toEventAsset(asset);
     const announced = ANNOUNCED_STATUS[input.type];
-    if (announced) snapshot.classification.moderation.status = announced;
+    if (announced) snapshot.classification.moderation.decision = announced;
     return this.pushEvent({ ...input, asset: snapshot } as MockEventInput);
   }
 
@@ -1059,8 +1060,8 @@ export class MockCalmLensApi {
     if (asset.upload.status === "uploading" || asset.classification.status === "processing") {
       throw fail(API_ERROR_CODES.ASSET_PROCESSING);
     }
-    const status = asset.classification.moderation.status;
-    if (decision !== "purged" && decision !== "blocked" && status === "pending") {
+    const status = asset.classification.moderation.decision;
+    if (decision !== "purged" && decision !== "blocked" && status === null) {
       throw fail(API_ERROR_CODES.ASSET_DECISION_NOT_ALLOWED);
     }
     if (status === decision) throw fail(API_ERROR_CODES.ASSET_DECISION_UNCHANGED);
@@ -2037,7 +2038,7 @@ export class MockCalmLensApi {
     const asset = await this.findOwnAsset(assetId);
     if (
       asset.classification.status !== "failed" ||
-      asset.classification.moderation.status !== "pending"
+      asset.classification.moderation.decision !== null
     ) {
       throw fail(API_ERROR_CODES.ASSET_NOT_RETRYABLE);
     }
@@ -2090,7 +2091,7 @@ export class MockCalmLensApi {
       facts: [
         assetNameFact(asset),
         { key: "asset-type", value: asset.type },
-        { key: "moderation-status", value: asset.classification.moderation.status },
+        { key: "moderation-status", value: asset.classification.moderation.decision },
       ],
     } as MockEventInput);
     const response = structuredClone(asset);
@@ -2451,7 +2452,7 @@ export class MockCalmLensApi {
         progress: null,
         testInput: false,
         moderation: {
-          status: "pending",
+          decision: null,
           manualReviews: [],
           automatedStatus: null,
           policy: null,
@@ -2796,7 +2797,7 @@ export class MockCalmLensApi {
         completedAt: decided ? now : null,
         moderation: {
           ...asset.classification.moderation,
-          status: decided ? outcome : "pending",
+          decision: decided ? outcome : null,
           ...report,
         },
       },
@@ -2855,7 +2856,7 @@ export class MockCalmLensApi {
         status: asset.classification.status,
         failureReason: asset.classification.failureReason,
         ...(preset.showDecisions !== false && {
-          moderation: { status: asset.classification.moderation.status },
+          moderation: { decision: asset.classification.moderation.decision },
         }),
       },
     });
@@ -3480,7 +3481,7 @@ export class MockCalmLensApi {
     const grants = hasApiKey ? this.grants : [];
     const folders = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
     const canDownload = () => permits(grants, "assets:download", asset.folderId ?? null, folders);
-    const status = asset.classification.moderation.status;
+    const status = asset.classification.moderation.decision;
     const isHead = request.method === "HEAD";
     const { rendered, preview } = asset.content;
     // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
@@ -3653,7 +3654,7 @@ export class MockCalmLensApi {
     } catch {
       return this.jsonResponse(400, { code: "viewer-claims/invalid" }, url);
     }
-    const status = asset.classification.moderation.status;
+    const status = asset.classification.moderation.decision;
     const restrictedInfo = isPrivate || status === "blocked" || status === "purged";
     if (restrictedInfo && !authorised)
       return this.jsonResponse(403, { code: "asset/not-available" }, url);

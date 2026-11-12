@@ -1,6 +1,6 @@
 import * as zod from "zod";
 declare const ASSET_SEARCH_MATCH_FIELD_SCHEMA: zod.ZodEnum<{
-  "classification.moderation.status": "classification.moderation.status";
+  "classification.moderation.decision": "classification.moderation.decision";
   "content.extension": "content.extension";
   "content.format": "content.format";
   description: "description";
@@ -97,14 +97,13 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       }, zod.core.$strip>>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
-        status: zod.ZodEnum<{
+        decision: zod.ZodNullable<zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
           limited: "limited";
-          pending: "pending";
           purged: "purged";
-        }>;
+        }>>;
         manualReviews: zod.ZodArray<zod.ZodObject<{
           id: zod.ZodString;
           decision: zod.ZodEnum<{
@@ -5146,7 +5145,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
   score: zod.ZodNumber;
   matchedFields: zod.ZodArray<zod.ZodEnum<{
-    "classification.moderation.status": "classification.moderation.status";
+    "classification.moderation.decision": "classification.moderation.decision";
     "content.extension": "content.extension";
     "content.format": "content.format";
     description: "description";

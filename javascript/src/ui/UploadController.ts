@@ -228,7 +228,7 @@ const checkedCustomUpload = (id: string, status?: AssetModerationStatus): Checke
  */
 const checkedPresetUpload = ({ id, classification }: UploadedAsset): CheckedAsset => ({
   id,
-  status: classification.moderation?.status,
+  status: classification.moderation ? (classification.moderation.decision ?? "pending") : undefined,
   settled: classification.status === "completed" || classification.status === "failed",
   failed: classification.status === "failed",
 });

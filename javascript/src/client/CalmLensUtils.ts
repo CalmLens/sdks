@@ -533,11 +533,11 @@ export const pollForDecision = async <A extends Asset = Asset>(
     const remaining = deadline - now();
     if (remaining <= 0) {
       throw new CalmLensError(SDK_ERROR_CODES.TIMEOUT, {
-        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (classification status: ${asset.classification.status}, moderation status: ${asset.classification.moderation.status})`,
+        message: `Asset ${asset.id} had no moderation decision after ${timeoutMs}ms (classification status: ${asset.classification.status}, moderation status: ${asset.classification.moderation.decision})`,
         details: {
           assetId: asset.id,
           classificationStatus: asset.classification.status,
-          moderationStatus: asset.classification.moderation.status,
+          moderationStatus: asset.classification.moderation.decision,
         },
       });
     }

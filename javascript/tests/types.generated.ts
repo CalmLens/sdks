@@ -670,7 +670,7 @@ type T_shared_25 = {
 };
 type T_shared_17 = { categories: T_shared_18; hashMatches: T_shared_25[] };
 type T_shared_5 = {
-  status: "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
+  decision: ("allowed" | "limited" | "age-restricted" | "blocked" | "purged") | null;
   manualReviews: T_shared_6[];
   automatedStatus: ("allowed" | "limited" | "age-restricted" | "blocked" | "purged") | null;
   source: ("policy" | "children" | "hash-list" | "mandatory-rule") | null;
@@ -832,12 +832,13 @@ type T_shared_44 = {
   createdAt: number;
   updatedAt?: number;
 };
+type T_shared_47 = {
+  decision: ("allowed" | "limited" | "age-restricted" | "blocked" | "purged") | null;
+};
 type T_shared_46 = {
   status: "queued" | "processing" | "completed" | "failed";
   testInput: boolean;
-  moderation: {
-    status: "pending" | "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
-  };
+  moderation: T_shared_47;
 };
 type T_shared_45 = {
   id: string;
@@ -847,7 +848,7 @@ type T_shared_45 = {
   classification: T_shared_46;
   content: { status: "temporary" | "stored" | "removed" };
 };
-type T_shared_47 = {
+type T_shared_48 = {
   key: "asset-type";
   value:
     | (
@@ -862,7 +863,7 @@ type T_shared_47 = {
     | null;
   url?: string;
 };
-type T_shared_48 = {
+type T_shared_49 = {
   key: "flagged-categories";
   value: (
     | "sexual"
@@ -876,17 +877,17 @@ type T_shared_48 = {
   )[];
   url?: string;
 };
-type T_shared_49 = {
+type T_shared_50 = {
   key: "child-status";
   value: "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
   url?: string;
 };
-type T_shared_50 = {
+type T_shared_51 = {
   key: "role";
   value: "admin" | "configurator" | "editor" | "viewer" | "custom" | "reviewer";
   url?: string;
 };
-type T_shared_51 = {
+type T_shared_52 = {
   id: string;
   projectId: string;
   name: string;
@@ -895,7 +896,7 @@ type T_shared_51 = {
   createdAt: number;
   updatedAt?: number;
 };
-type T_shared_52 = {
+type T_shared_53 = {
   id: string;
   projectId: string;
   hashListId: string;
@@ -905,52 +906,52 @@ type T_shared_52 = {
   assetId?: string | null;
   createdAt: number;
 };
-type T_shared_56 = {
+type T_shared_57 = {
   allowances: T_shared_13[];
   restrictions: T_shared_13[];
   action: "allow" | "limit" | "age-restrict" | "block" | "purge";
 };
-type T_shared_55 = {
-  sexual: T_shared_56;
-  violence: T_shared_56;
-  "self-harm": T_shared_56;
-  harassment: T_shared_56;
-  hate: T_shared_56;
-  "criminal-activity": T_shared_56;
-  "personal-information": T_shared_56;
-  profanity: T_shared_56;
+type T_shared_56 = {
+  sexual: T_shared_57;
+  violence: T_shared_57;
+  "self-harm": T_shared_57;
+  harassment: T_shared_57;
+  hate: T_shared_57;
+  "criminal-activity": T_shared_57;
+  "personal-information": T_shared_57;
+  profanity: T_shared_57;
 };
-type T_shared_54 = { categorySettings: T_shared_55 };
-type T_shared_57 = {
+type T_shared_55 = { categorySettings: T_shared_56 };
+type T_shared_58 = {
   id: "general-community" | "children-platform" | "education-support" | "wholesome-community";
   version: number;
   latestVersion: number;
   mode: "live" | "pinned" | "copy";
 };
-type T_shared_53 = {
+type T_shared_54 = {
   id: string;
   name: string;
   description: string;
-  settings: T_shared_54;
+  settings: T_shared_55;
   revision: number;
-  preset: T_shared_57 | null;
+  preset: T_shared_58 | null;
   projectIds: string[];
   createdAt: number;
   updatedAt?: number;
 };
-type T_shared_60 = {
+type T_shared_61 = {
   ocr?: { enabled: boolean } | null;
   personDetection?: { enabled: boolean } | null;
   faceDetection?: { enabled: boolean; ageEstimation?: boolean } | null;
   linkDetection?: { enabled: boolean } | null;
   streaming?: { enabled: boolean } | null;
 };
-type T_shared_59 = {
+type T_shared_60 = {
   retainContent?: boolean | null;
   storeSensitiveMetadata?: boolean | null;
-  features?: T_shared_60 | null;
+  features?: T_shared_61 | null;
 };
-type T_shared_58 = {
+type T_shared_59 = {
   id: string;
   projectId: string;
   createdByUserId?: string | null;
@@ -964,20 +965,20 @@ type T_shared_58 = {
   folderId?: string | null;
   policyId?: string | null;
   visibility: "public" | "private";
-  processingOptions?: T_shared_59 | null;
+  processingOptions?: T_shared_60 | null;
   revealDecision: boolean;
   dailyUploadLimit?: number | null;
   allowedOrigins?: string[] | null;
   createdAt: number;
   updatedAt?: number;
 };
-type T_shared_63 = {
+type T_shared_64 = {
   allowedSamplePercent: number;
   restrictedSamplePercent: number;
   uncertaintyMarginPercent: number;
   reviewMissingEvidence: boolean;
 };
-type T_shared_62 = {
+type T_shared_63 = {
   retainContent: boolean;
   optOutJurisdictions: "EU"[];
   blockUnmoderatedAssets: boolean;
@@ -987,10 +988,10 @@ type T_shared_62 = {
   aiMediaSearchEnabled: boolean;
   remoteUrlRule: { mode: "allow" | "deny"; domains: string[] } | null;
   websiteSubmissionsPerMinute: number | null;
-  humanReview: T_shared_63;
+  humanReview: T_shared_64;
 };
-type T_shared_61 = { projectId: string; revision: number; settings: T_shared_62 };
-type T_shared_65 = {
+type T_shared_62 = { projectId: string; revision: number; settings: T_shared_63 };
+type T_shared_66 = {
   id: string;
   title: string;
   description?: string;
@@ -998,7 +999,7 @@ type T_shared_65 = {
   icon: "tag" | "hash" | "user" | "folder" | "layers" | "photo" | "link";
   color: string;
 };
-type T_shared_64 = { projectId: string; revision: number; fields: T_shared_65[] };
+type T_shared_65 = { projectId: string; revision: number; fields: T_shared_66[] };
 
 export function checkTypes(): void {
   noMismatches<
@@ -1287,7 +1288,7 @@ export function checkTypes(): void {
             | "type"
             | "content.format"
             | "content.extension"
-            | "classification.moderation.status"
+            | "classification.moderation.decision"
             | "visual"
             | "transcript"
           )[];
@@ -1874,7 +1875,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "file-format"; value: string | null; url?: string }
                 | { key: "test"; value: boolean; url?: string }
               )[];
@@ -1893,9 +1894,9 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | {
                     key: "moderation-status";
                     value:
@@ -1929,7 +1930,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "parent-asset"; value: string; url?: string }
                 | {
                     key: "region";
@@ -1959,13 +1960,13 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | { key: "reviewer-name"; value: string | null; url?: string }
                 | { key: "note"; value: string | null; url?: string }
                 | { key: "child-asset"; value: string; url?: string }
-                | T_shared_49
+                | T_shared_50
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -1983,13 +1984,13 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | { key: "reviewer-name"; value: string | null; url?: string }
                 | { key: "note"; value: string | null; url?: string }
                 | { key: "child-asset"; value: string; url?: string }
-                | T_shared_49
+                | T_shared_50
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2007,13 +2008,13 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | { key: "reviewer-name"; value: string | null; url?: string }
                 | { key: "note"; value: string | null; url?: string }
                 | { key: "child-asset"; value: string; url?: string }
-                | T_shared_49
+                | T_shared_50
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2031,13 +2032,13 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | { key: "reviewer-name"; value: string | null; url?: string }
                 | { key: "note"; value: string | null; url?: string }
                 | { key: "child-asset"; value: string; url?: string }
-                | T_shared_49
+                | T_shared_50
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2055,13 +2056,13 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
-                | { key: "parent-asset"; value: string; url?: string }
                 | T_shared_48
+                | { key: "parent-asset"; value: string; url?: string }
+                | T_shared_49
                 | { key: "reviewer-name"; value: string | null; url?: string }
                 | { key: "note"; value: string | null; url?: string }
                 | { key: "child-asset"; value: string; url?: string }
-                | T_shared_49
+                | T_shared_50
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2079,7 +2080,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "parent-asset"; value: string; url?: string }
                 | {
                     key: "previous-status";
@@ -2120,7 +2121,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "completed-sections"; value: number; url?: string }
                 | { key: "total-sections"; value: number; url?: string }
                 | { key: "test"; value: boolean; url?: string }
@@ -2140,7 +2141,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "batch-id"; value: string; url?: string }
                 | { key: "test"; value: boolean; url?: string }
               )[];
@@ -2159,7 +2160,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "batch-id"; value: string; url?: string }
                 | { key: "test"; value: boolean; url?: string }
               )[];
@@ -2178,7 +2179,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2196,7 +2197,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | {
                     key: "moderation-status";
                     value: "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
@@ -2219,7 +2220,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "parent-asset"; value: string; url?: string }
                 | {
                     key: "automated-status";
@@ -2258,7 +2259,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "parent-asset"; value: string; url?: string }
                 | { key: "review-id"; value: string; url?: string }
                 | {
@@ -2286,7 +2287,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_47
+                | T_shared_48
                 | { key: "parent-asset"; value: string; url?: string }
                 | { key: "hash-list-id"; value: string; url?: string }
                 | { key: "hash-list-name"; value: string; url?: string }
@@ -2370,7 +2371,7 @@ export function checkTypes(): void {
               facts: (
                 | { key: "member-user-id"; value: string; url?: string }
                 | { key: "member-name"; value: string | null; url?: string }
-                | T_shared_50
+                | T_shared_51
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2389,7 +2390,7 @@ export function checkTypes(): void {
               facts: (
                 | { key: "member-user-id"; value: string; url?: string }
                 | { key: "member-name"; value: string | null; url?: string }
-                | T_shared_50
+                | T_shared_51
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2408,7 +2409,7 @@ export function checkTypes(): void {
               facts: (
                 | { key: "member-user-id"; value: string; url?: string }
                 | { key: "member-name"; value: string | null; url?: string }
-                | T_shared_50
+                | T_shared_51
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2432,7 +2433,7 @@ export function checkTypes(): void {
                     value: "admin" | "configurator" | "editor" | "viewer" | "custom" | "reviewer";
                     url?: string;
                   }
-                | T_shared_50
+                | T_shared_51
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2450,7 +2451,7 @@ export function checkTypes(): void {
               asset?: T_shared_45 | null;
               facts: (
                 | { key: "invitee-email"; value: string; url?: string }
-                | T_shared_50
+                | T_shared_51
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2614,7 +2615,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["list"]>,
-      { items: T_shared_51[]; nextCursor: string | null; hasMore: boolean },
+      { items: T_shared_52[]; nextCursor: string | null; hasMore: boolean },
       "hashLists.list result $"
     >
   >();
@@ -2628,7 +2629,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["retrieve"]>,
-      T_shared_51,
+      T_shared_52,
       "hashLists.retrieve result $"
     >
   >();
@@ -2642,7 +2643,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["create"]>,
-      T_shared_51,
+      T_shared_52,
       "hashLists.create result $"
     >
   >();
@@ -2656,7 +2657,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["update"]>,
-      T_shared_51,
+      T_shared_52,
       "hashLists.update result $"
     >
   >();
@@ -2677,7 +2678,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["listEntries"]>,
-      { items: T_shared_52[]; nextCursor: string | null; hasMore: boolean },
+      { items: T_shared_53[]; nextCursor: string | null; hasMore: boolean },
       "hashLists.listEntries result $"
     >
   >();
@@ -2697,7 +2698,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["hashLists"]["addEntry"]>,
-      T_shared_52,
+      T_shared_53,
       "hashLists.addEntry result $"
     >
   >();
@@ -2718,7 +2719,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["list"]>,
-      { items: T_shared_53[]; nextCursor: string | null; hasMore: boolean },
+      { items: T_shared_54[]; nextCursor: string | null; hasMore: boolean },
       "policies.list result $"
     >
   >();
@@ -2732,7 +2733,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["retrieve"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.retrieve result $"
     >
   >();
@@ -2742,7 +2743,7 @@ export function checkTypes(): void {
       {
         name?: string;
         description?: string;
-        settings?: T_shared_54;
+        settings?: T_shared_55;
         presetId?:
           | "general-community"
           | "children-platform"
@@ -2755,7 +2756,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["create"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.create result $"
     >
   >();
@@ -2767,7 +2768,7 @@ export function checkTypes(): void {
         revision: number;
         name?: string;
         description?: string;
-        settings?: T_shared_54;
+        settings?: T_shared_55;
       },
       "policies.update options $"
     >
@@ -2775,7 +2776,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["update"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.update result $"
     >
   >();
@@ -2789,7 +2790,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["reset"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.reset result $"
     >
   >();
@@ -2803,7 +2804,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["upgrade"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.upgrade result $"
     >
   >();
@@ -2817,7 +2818,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["setAutomaticUpdates"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.setAutomaticUpdates result $"
     >
   >();
@@ -2831,7 +2832,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["retrieveAssigned"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.retrieveAssigned result $"
     >
   >();
@@ -2845,7 +2846,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["policies"]["assign"]>,
-      T_shared_53,
+      T_shared_54,
       "policies.assign result $"
     >
   >();
@@ -2859,7 +2860,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["uploadPresets"]["list"]>,
-      { items: T_shared_58[]; nextCursor: string | null; hasMore: boolean },
+      { items: T_shared_59[]; nextCursor: string | null; hasMore: boolean },
       "uploadPresets.list result $"
     >
   >();
@@ -2878,7 +2879,7 @@ export function checkTypes(): void {
           folderId?: string | null;
           policyId?: string | null;
           visibility?: "public" | "private";
-          processingOptions?: T_shared_59 | null;
+          processingOptions?: T_shared_60 | null;
           revealDecision?: boolean;
           dailyUploadLimit?: number | null;
           allowedOrigins?: string[] | null;
@@ -2890,7 +2891,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["uploadPresets"]["ensure"]>,
-      { uploadPresets: T_shared_58[] },
+      { uploadPresets: T_shared_59[] },
       "uploadPresets.ensure result $"
     >
   >();
@@ -2904,7 +2905,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["projectSettings"]["get"]>,
-      T_shared_61,
+      T_shared_62,
       "projectSettings.get result $"
     >
   >();
@@ -2938,14 +2939,14 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["projectSettings"]["update"]>,
-      T_shared_61,
+      T_shared_62,
       "projectSettings.update result $"
     >
   >();
   noMismatches<
     Differences<
       Result<CalmLensServerClient["metadataFields"]["list"]>,
-      T_shared_64,
+      T_shared_65,
       "metadataFields.list result $"
     >
   >();
@@ -2969,7 +2970,7 @@ export function checkTypes(): void {
   noMismatches<
     Differences<
       Result<CalmLensServerClient["metadataFields"]["ensure"]>,
-      T_shared_64,
+      T_shared_65,
       "metadataFields.ensure result $"
     >
   >();

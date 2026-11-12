@@ -55,7 +55,7 @@ const recordingFetch = () => {
       classification: {
         status: "processing",
         failureReason: null,
-        moderation: { status: "pending" },
+        moderation: { decision: null },
       },
     });
   }) as typeof fetch;

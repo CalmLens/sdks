@@ -49,20 +49,20 @@ const image = await client.assets.create({
   content: { data: file, type: "image/jpeg" },
   externalId: "post-7",
 });
-console.log(image.classification.status, image.classification.moderation.status); // "processing" "pending"
+console.log(image.classification.status, image.classification.moderation.decision); // "processing" null
 ```
 
-| `classification.status`  | `classification.moderation.status` | Meaning                                                                                    |
-| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------ |
-| `completed`              | `allowed`                          | Safe to show.                                                                              |
-| `completed`              | `limited`                          | Delivered like `allowed`; reduce its reach, such as keeping it out of recommendations.     |
-| `completed`              | `age-restricted`                   | Delivered only with `viewerClaims.ageConfirmed=true`. Show it only to age-checked viewers. |
-| `completed`              | `blocked`                          | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                         |
-| `completed`              | `purged`                           | Your policy blocked it and deleted its content. Don't show it.                             |
-| `queued` or `processing` | `pending`                          | Still being received or classified.                                                        |
-| `failed`                 | `pending`                          | Processing failed; see `assets.retry`.                                                     |
+| `classification.status`  | `classification.moderation.decision` | Meaning                                                                                    |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `completed`              | `allowed`                            | Safe to show.                                                                              |
+| `completed`              | `limited`                            | Delivered like `allowed`; reduce its reach, such as keeping it out of recommendations.     |
+| `completed`              | `age-restricted`                     | Delivered only with `viewerClaims.ageConfirmed=true`. Show it only to age-checked viewers. |
+| `completed`              | `blocked`                            | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                         |
+| `completed`              | `purged`                             | Your policy blocked it and deleted its content. Don't show it.                             |
+| `queued` or `processing` | `null`                               | Still being received or classified.                                                        |
+| `failed`                 | `null`                               | Processing failed; see `assets.retry`.                                                     |
 
-The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision. Treat a status you don't recognise as not allowed. See [How CalmLens works](https://calmlens.com/docs/how-it-works).
+The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision. Treat a decision you don't recognise as not allowed. See [How CalmLens works](https://calmlens.com/docs/how-it-works).
 
 ## What you can do
 

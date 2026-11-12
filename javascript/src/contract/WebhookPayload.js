@@ -1315,7 +1315,7 @@ const ASSET_MODERATION_TIMELINE_SCHEMA = zod.object({ segmentCount: zod.number()
 /** A stricter delivery decision in one jurisdiction the project serves. */
 const ASSET_REGIONAL_DECISION_SCHEMA = zod.object({
 	region: JURISDICTION_SCHEMA.exclude(["global"]),
-	status: ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed"]).describe("The status in force in the region, stricter than `moderation.status`"),
+	status: ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed"]).describe("The status in force in the region, stricter than `moderation.decision`"),
 	rule: zod.string().describe("The mandatory rule that sets it"),
 	category: CLASSIFICATION_CATEGORY_SCHEMA.optional().describe("The category whose findings the rule acted on, when it acts on one")
 }).strict().meta(metaStore([docPropertyInfo({
@@ -1325,9 +1325,9 @@ const ASSET_REGIONAL_DECISION_SCHEMA = zod.object({
 const ASSESSMENT_FIELDS = MODERATION_ASSESSMENT_FIELDS_SCHEMA.shape;
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
-	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only with `viewerClaims.ageConfirmed: true` and any required private-asset access), `blocked` or `purged`. A reviewer's decision takes precedence."),
+	decision: ASSET_MODERATION_DECISION_SCHEMA.nullable().describe("The decision in force, which also decides delivery. `null` means no decision. A decision is `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only with `viewerClaims.ageConfirmed: true` and any required private-asset access), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
-	automatedStatus: ASSET_MODERATION_DECISION_SCHEMA.nullable().describe("The status automated moderation decided, `null` until it decides. Manual reviews can change `status` without changing this, so the two differ when a reviewer overrode the automated decision."),
+	automatedStatus: ASSET_MODERATION_DECISION_SCHEMA.nullable().describe("The status automated moderation decided, `null` until it decides. Manual reviews can change `decision` without changing this, so the two differ when a reviewer overrode the automated decision."),
 	source: ASSESSMENT_FIELDS.source.nullable().describe("What decided the automated status: the `policy`'s categories, the asset's `children`, a `hash-list` match, a `mandatory-rule` or `link-safety`. `null` until moderation decides."),
 	policy: DECISION_POLICY_SCHEMA.nullable().describe("The policy that made the automated decision: its ID, its `revision` then and the preset release it used. `null` until moderation decides."),
 	pendingReview: ASSET_PENDING_REVIEW_SCHEMA.nullable().describe("The review your human review queue is waiting for, set together with the automated decision that joined the queue. `null` when no review is waiting: once a reviewer decides it, or when the asset leaves the queue unreviewed because its content was removed."),
@@ -1354,7 +1354,7 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 	namedType: "AssetModeration"
 })]));
 const ASSET_CLASSIFICATION_SCHEMA = zod.object({
-	status: ASSET_CLASSIFICATION_STATUS_SCHEMA.describe("Where processing is: `queued` while the asset waits for its content (a multipart upload still receiving parts) or its turn, `processing`, then `completed` or `failed`. The asset is settled once it is `completed` or `failed`; a failed asset's `moderation.status` stays `pending`."),
+	status: ASSET_CLASSIFICATION_STATUS_SCHEMA.describe("Where processing is: `queued` while the asset waits for its content (a multipart upload still receiving parts) or its turn, `processing`, then `completed` or `failed`. The asset is settled once it is `completed` or `failed`. A failed asset has a `null` moderation decision unless a reviewer blocks or purges it."),
 	failureReason: ASSET_FAILURE_REASON_SCHEMA.nullable().describe("Why processing failed, while `status` is `failed`; otherwise `null`. See [Failure reasons](/docs/guides/asset-lifecycle#failure-reasons)."),
 	updatedAt: epoch("When classification state last changed"),
 	completedAt: epoch("When classification completed"),
@@ -1456,7 +1456,7 @@ STORED_ASSET_SCHEMA.pick({
 			progress: null,
 			testInput: false,
 			moderation: {
-				status: "allowed",
+				decision: "allowed",
 				manualReviews: [],
 				automatedStatus: "allowed",
 				policy: {
@@ -2840,7 +2840,7 @@ const EVENT_ASSET_SCHEMA = zod.object({
 	classification: zod.object({
 		status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
 		testInput: zod.boolean().describe("Whether the asset's results came from one of the project's test inputs, as `classification.testInput` on the asset"),
-		moderation: zod.object({ status: ASSET_MODERATION_STATUS_SCHEMA })
+		moderation: zod.object({ decision: ASSET_MODERATION_DECISION_SCHEMA.nullable() })
 	}),
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")
 });

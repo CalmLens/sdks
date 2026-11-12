@@ -6,7 +6,7 @@ const asset = {
   id: "asset-1",
   name: "a.txt",
   upload: { status: "completed" },
-  classification: { status: "done", moderation: { status: "allowed" } },
+  classification: { status: "done", moderation: { decision: "allowed" } },
 };
 
 const recordingFetch = () => {

@@ -507,7 +507,7 @@ const mockOutcome = async (option: string) => {
     name: "note.txt",
     content: { plainText: "hello", type: "text/plain" },
   });
-  return asset.classification.moderation.status;
+  return asset.classification.moderation.decision ?? "";
 };
 
 const present = async (capability: Capability): Promise<boolean> => {

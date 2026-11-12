@@ -149,7 +149,7 @@ export class MockDecision {
    * `flaggedCategories`. `requestedAt` is when a pending review joined the queue. `undefined` for
    * `pending` and `failed`.
    */
-  report(requestedAt = 0): Omit<AssetModeration, "status" | "manualReviews"> | undefined {
+  report(requestedAt = 0): Omit<AssetModeration, "decision" | "manualReviews"> | undefined {
     const status = this.status;
     if (status === "pending" || status === "failed") return undefined;
     const action = (score: number) =>

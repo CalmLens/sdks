@@ -101,9 +101,9 @@ export const MOCK_ASSET_FILTER_FIELDS: Readonly<
     nullable: true,
     operators: ["==", "!=", ">", ">=", "<", "<=", "=in=", "=out="],
   },
-  "classification.moderation.status": {
+  "classification.moderation.decision": {
     kind: "text",
-    nullable: false,
+    nullable: true,
     operators: ["==", "!=", ">", ">=", "<", "<=", "=in=", "=out="],
   },
   "content.status": {

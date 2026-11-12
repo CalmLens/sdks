@@ -362,7 +362,7 @@ describe("multipart binary field names", () => {
       return Response.json({
         id: assetId,
         upload: { status: "uploading" },
-        classification: { status: "queued", moderation: { status: "pending" } },
+        classification: { status: "queued", moderation: { decision: null } },
       });
     };
     const client = new CalmLensServerClient({

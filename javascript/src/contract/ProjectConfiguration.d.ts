@@ -1,2 +1,2 @@
-import { a as ProjectSettingsResource, n as EnsureUploadPresetInput, o as PublicProjectSettings, r as MetadataFieldsResource, s as PutProjectSettingsBody, t as EnsureMetadataFieldsBody } from "./ProjectConfiguration-DHu8U9cK.js";
+import { a as ProjectSettingsResource, n as EnsureUploadPresetInput, o as PublicProjectSettings, r as MetadataFieldsResource, s as PutProjectSettingsBody, t as EnsureMetadataFieldsBody } from "./ProjectConfiguration-B5EvQesr.js";
 export type { EnsureMetadataFieldsBody, EnsureUploadPresetInput, MetadataFieldsResource, ProjectSettingsResource, PublicProjectSettings, PutProjectSettingsBody };

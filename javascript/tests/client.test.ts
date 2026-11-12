@@ -23,7 +23,7 @@ describe("client identity and secrets", () => {
       Response.json({
         id: "a",
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { status: "allowed" } },
+        classification: { status: "completed", moderation: { decision: "allowed" } },
       }),
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
@@ -67,7 +67,7 @@ describe("browser guard", () => {
       Response.json({
         id: "a",
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { status: "allowed" } },
+        classification: { status: "completed", moderation: { decision: "allowed" } },
       }),
     );
     const client = new CalmLensServerClient({
@@ -113,7 +113,7 @@ describe("responses", () => {
         upload: { status: "completed" },
         classification: {
           status: "paused",
-          moderation: { status: "escalated" },
+          moderation: { decision: "escalated" },
         },
       }),
     );
@@ -123,7 +123,7 @@ describe("responses", () => {
       content: { plainText: "hi", type: "text/plain" },
     });
     expect(asset.classification.status).toBe("paused");
-    expect(asset.classification.moderation.status).toBe("escalated");
+    expect(asset.classification.moderation.decision).toBe("escalated");
     expect(asset.content.status).toBe("archived");
   });
 
@@ -133,7 +133,7 @@ describe("responses", () => {
         id: "a",
         description: "x".repeat(1000),
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { status: "allowed" } },
+        classification: { status: "completed", moderation: { decision: "allowed" } },
       }),
     );
     const client = new CalmLensServerClient({
@@ -169,7 +169,7 @@ const pagedFetch = () => {
     );
     const items = pages[pageIndex]!.map((id) => ({
       id,
-      classification: { moderation: { status: "allowed" } },
+      classification: { moderation: { decision: "allowed" } },
     }));
     return Response.json(
       {
@@ -191,7 +191,7 @@ describe("pagination", () => {
     const ids: string[] = [];
     for await (const asset of client.assets.list({
       pageSize: 2,
-      filter: "classification.moderation.status==allowed",
+      filter: "classification.moderation.decision==allowed",
     })) {
       ids.push(asset.id);
     }
@@ -204,7 +204,7 @@ describe("pagination", () => {
     ]);
     expect(
       listUrls.every(
-        (url) => url.searchParams.get("filter") === "classification.moderation.status==allowed",
+        (url) => url.searchParams.get("filter") === "classification.moderation.decision==allowed",
       ),
     ).toBe(true);
 
@@ -334,7 +334,7 @@ describe("lastResponse", () => {
       Response.json({
         id: "asset_1",
         upload: { status: "completed" },
-        classification: { status: "queued", moderation: { status: "pending" } },
+        classification: { status: "queued", moderation: { decision: null } },
       }),
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
@@ -374,7 +374,7 @@ describe("deadlines for large transfers", () => {
       JSON.stringify({
         id: "a",
         upload: { status: "completed" },
-        classification: { status: "processing", moderation: { status: "pending" } },
+        classification: { status: "processing", moderation: { decision: null } },
       }),
     );
     try {
@@ -446,17 +446,17 @@ describe("deadlines for large transfers", () => {
 });
 
 describe("assets.waitForDecision", () => {
-  const assetResponse = (processing: string, moderation = "pending") =>
+  const assetResponse = (processing: string, moderation: string | null = null) =>
     Response.json({
       id: "asset-1",
       upload: { status: "completed" },
-      classification: { status: processing, moderation: { status: moderation } },
+      classification: { status: processing, moderation: { decision: moderation } },
     });
 
   test("checks the asset until it has a decision, then returns the decided asset", async () => {
-    const states: Array<[string, string]> = [
-      ["processing", "pending"],
-      ["processing", "pending"],
+    const states: Array<[string, string | null]> = [
+      ["processing", null],
+      ["processing", null],
       ["completed", "age-restricted"],
     ];
     const { fetchImpl, requests } = recordingFetch(() => assetResponse(...states.shift()!));
@@ -464,7 +464,7 @@ describe("assets.waitForDecision", () => {
     const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
     expect(asset).toMatchObject({
       id: "asset-1",
-      classification: { moderation: { status: "age-restricted" } },
+      classification: { moderation: { decision: "age-restricted" } },
     });
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       "/v1/assets/asset-1",
@@ -474,23 +474,23 @@ describe("assets.waitForDecision", () => {
   });
 
   test("returns an asset whose processing failed without waiting for a decision", async () => {
-    const states: Array<[string, string]> = [
-      ["processing", "pending"],
-      ["failed", "pending"],
+    const states: Array<[string, string | null]> = [
+      ["processing", null],
+      ["failed", null],
     ];
     const { fetchImpl, requests } = recordingFetch(() => assetResponse(...states.shift()!));
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
     expect(asset).toMatchObject({
       upload: { status: "completed" },
-      classification: { status: "failed", moderation: { status: "pending" } },
+      classification: { status: "failed", moderation: { decision: null } },
     });
     expect(requests).toHaveLength(2);
   });
 
   test("keeps waiting while the asset is queued or processing, even once a reviewer decided it", async () => {
-    const states: Array<[string, string]> = [
-      ["queued", "pending"],
+    const states: Array<[string, string | null]> = [
+      ["queued", null],
       ["processing", "blocked"],
       ["completed", "blocked"],
     ];
@@ -498,7 +498,7 @@ describe("assets.waitForDecision", () => {
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
     expect(asset).toMatchObject({
-      classification: { status: "completed", moderation: { status: "blocked" } },
+      classification: { status: "completed", moderation: { decision: "blocked" } },
     });
     expect(requests).toHaveLength(3);
   });
@@ -514,7 +514,7 @@ describe("assets.waitForDecision", () => {
       details: {
         assetId: "asset-1",
         classificationStatus: "processing",
-        moderationStatus: "pending",
+        moderationStatus: null,
       },
     });
   });

@@ -206,14 +206,13 @@ declare const ASSET_UPLOAD_SCHEMA: zod.ZodObject<{
 type AssetUpload = zod.infer<typeof ASSET_UPLOAD_SCHEMA>;
 /** Findings and the policy/reviewer decision for the moderation capability. */
 declare const ASSET_MODERATION_SCHEMA: zod.ZodObject<{
-  status: zod.ZodEnum<{
+  decision: zod.ZodNullable<zod.ZodEnum<{
     "age-restricted": "age-restricted";
     allowed: "allowed";
     blocked: "blocked";
     limited: "limited";
-    pending: "pending";
     purged: "purged";
-  }>;
+  }>>;
   manualReviews: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodString;
     decision: zod.ZodEnum<{
@@ -5031,14 +5030,13 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>>;
   testInput: zod.ZodBoolean;
   moderation: zod.ZodObject<{
-    status: zod.ZodEnum<{
+    decision: zod.ZodNullable<zod.ZodEnum<{
       "age-restricted": "age-restricted";
       allowed: "allowed";
       blocked: "blocked";
       limited: "limited";
-      pending: "pending";
       purged: "purged";
-    }>;
+    }>>;
     manualReviews: zod.ZodArray<zod.ZodObject<{
       id: zod.ZodString;
       decision: zod.ZodEnum<{
@@ -10154,14 +10152,13 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strip>>;
     testInput: zod.ZodBoolean;
     moderation: zod.ZodObject<{
-      status: zod.ZodEnum<{
+      decision: zod.ZodNullable<zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
         limited: "limited";
-        pending: "pending";
         purged: "purged";
-      }>;
+      }>>;
       manualReviews: zod.ZodArray<zod.ZodObject<{
         id: zod.ZodString;
         decision: zod.ZodEnum<{

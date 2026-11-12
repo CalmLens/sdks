@@ -1,4 +1,4 @@
-import "./Asset-C5CJR7RH.js";
+import "./Asset-B7lrHe68.js";
 import { i as EventFacts, o as EventType } from "./EventCatalog-CUiUuEsU.js";
 import "./Page-Bwn9Pb4k.js";
 import * as zod from "zod";
@@ -31,14 +31,13 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
     }>;
     testInput: zod.ZodBoolean;
     moderation: zod.ZodObject<{
-      status: zod.ZodEnum<{
+      decision: zod.ZodNullable<zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
         limited: "limited";
-        pending: "pending";
         purged: "purged";
-      }>;
+      }>>;
     }, zod.core.$strip>;
   }, zod.core.$strip>;
   content: zod.ZodObject<{
@@ -126,14 +125,13 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
-        status: zod.ZodEnum<{
+        decision: zod.ZodNullable<zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
           limited: "limited";
-          pending: "pending";
           purged: "purged";
-        }>;
+        }>>;
       }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{
@@ -230,14 +228,13 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
-        status: zod.ZodEnum<{
+        decision: zod.ZodNullable<zod.ZodEnum<{
           "age-restricted": "age-restricted";
           allowed: "allowed";
           blocked: "blocked";
           limited: "limited";
-          pending: "pending";
           purged: "purged";
-        }>;
+        }>>;
       }, zod.core.$strip>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{

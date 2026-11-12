@@ -248,7 +248,7 @@ const main = async () => {
         content: { plainText: text, type: "text/plain" },
       });
       process.stdout.write(
-        `Created asset ${asset.id}: ${asset.classification.moderation.status}.\n`,
+        `Created asset ${asset.id}: ${asset.classification.moderation.decision}.\n`,
       );
     } catch (error) {
       fail(`Trigger failed: ${describeError(error)}`);

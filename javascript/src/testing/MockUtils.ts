@@ -402,7 +402,7 @@ const searchFieldValues = (asset: Asset): Array<[SearchField, string]> => [
   ["type", asset.type],
   ["content.format", asset.content?.format ?? ""],
   ["content.extension", asset.content?.extension ?? ""],
-  ["classification.moderation.status", asset.classification.moderation.status],
+  ["classification.moderation.decision", asset.classification.moderation.decision ?? "pending"],
 ];
 
 /** The API's keyword score for the whole lowercased query. */
