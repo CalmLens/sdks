@@ -7,7 +7,7 @@
     "headers": {
       "x-api-key": "key",
       "user-agent": {
-        "$regex": "^calmlens-[a-z]+/[0-9]+\\.[0-9]+\\.[0-9]+[^ ]* \\([a-z][a-z0-9-]*(/[^ ()]+)?\\)$"
+        "$regex": "^calmlens-[a-z]+/[0-9]+\\.[0-9]+\\.[0-9]+[^ ]* \\([a-z][a-z0-9-]*(/[^ ()]+)?\\)( [^ /()]+(/[^ ()]+)?( \\([^()]*\\))?)?$"
       },
       "authorization": {
         "$absent": true
@@ -15,6 +15,1719 @@
     }
   },
   "cases": [
+    {
+      "name": "the client reads its API key, project and base URL from CALMLENS_* variables",
+      "area": "client-setup",
+      "env": {
+        "CALMLENS_API_KEY": "key",
+        "CALMLENS_PROJECT_ID": "project-1",
+        "CALMLENS_BASE_URL": "https://api.env.example.test/v1"
+      },
+      "clientFromEnv": true,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [],
+            "nextCursor": null,
+            "hasMore": false
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "result": {
+              "items": [],
+              "nextCursor": null,
+              "hasMore": false
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.env.example.test",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "a client with no API key in its options or the environment fails with sdk/invalid-config",
+      "area": "client-setup",
+      "env": {},
+      "clientFromEnv": true,
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
+      "name": "appInfo follows the SDK's user agent as name/version (url)",
+      "area": "client-setup",
+      "client": {
+        "appInfo": {
+          "name": "shop-plugin",
+          "version": "2.1.0",
+          "url": "https://example.test/plugin"
+        }
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "user-agent": {
+              "$regex": "^calmlens-[a-z]+/\\S+ \\([^)]*\\) shop-plugin/2\\.1\\.0 \\(https:\\/\\/example\\.test\\/plugin\\)$"
+            },
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "per-call request options add headers and query and body fields to that call only",
+      "area": "request-options",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": "asset-1",
+            "description": "Updated"
+          },
+          "requestOptions": {
+            "headers": {
+              "X-Trace-Id": "trace-1"
+            },
+            "extraBody": {
+              "futureField": "on"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "requestOptions": {
+            "extraQuery": {
+              "expand": "future"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "PATCH",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-trace-id": "trace-1",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "description": "Updated",
+            "futureField": "on"
+          }
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "expand=future",
+          "query": [
+            [
+              "expand",
+              "future"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-trace-id": {
+              "$absent": true
+            },
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "a call's maxRetries replaces the client's",
+      "area": "request-options",
+      "client": {
+        "maxRetries": 2
+      },
+      "responses": [
+        {
+          "status": 503,
+          "bodyText": "<html><body>503</body></html>",
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "text/html"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "requestOptions": {
+            "maxRetries": 0
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/http-error",
+              "status": 503,
+              "requestId": "req-1",
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "a raw request sends the path, query and body with the client's key and returns the JSON",
+      "area": "raw-request",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "id": "asset-1",
+                "name": "asset-1.txt",
+                "createdAt": 1760000000000,
+                "content": {
+                  "status": "stored",
+                  "removalReason": null,
+                  "updatedAt": null,
+                  "safetyHold": null,
+                  "format": null,
+                  "extension": null,
+                  "sizeInBytes": null,
+                  "checksums": null,
+                  "width": null,
+                  "height": null,
+                  "durationSeconds": null,
+                  "pageCount": null,
+                  "perceptualHash": null,
+                  "perceptualHashQuality": null,
+                  "metadata": null,
+                  "extractedText": null,
+                  "rendered": null,
+                  "hls": null,
+                  "preview": null
+                },
+                "upload": {
+                  "status": "completed",
+                  "updatedAt": null,
+                  "partsReceived": null
+                },
+                "classification": {
+                  "status": "completed",
+                  "moderation": {
+                    "decision": "allowed",
+                    "flaggedCategories": [],
+                    "regions": [],
+                    "manualReviews": [],
+                    "automatedStatus": null,
+                    "source": null,
+                    "policy": null,
+                    "pendingReview": null,
+                    "rule": null,
+                    "explanationComplete": null,
+                    "categories": null,
+                    "raw": null,
+                    "timeline": null
+                  },
+                  "failureReason": null,
+                  "updatedAt": null,
+                  "completedAt": null,
+                  "progress": null,
+                  "testInput": false,
+                  "ocr": null,
+                  "personDetection": null,
+                  "faceDetection": null,
+                  "linkDetection": null
+                },
+                "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+                "type": "image",
+                "parentPages": [],
+                "metadata": [],
+                "tags": [],
+                "visibility": "public"
+              }
+            ],
+            "nextCursor": null,
+            "hasMore": false
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "request",
+          "args": {
+            "method": "GET",
+            "path": "/projects/project-1/assets",
+            "query": {
+              "pageSize": "5"
+            }
+          },
+          "expect": {
+            "result": {
+              "items": [
+                {
+                  "id": "asset-1",
+                  "name": "asset-1.txt",
+                  "createdAt": 1760000000000,
+                  "content": {
+                    "status": "stored",
+                    "removalReason": null,
+                    "updatedAt": null,
+                    "safetyHold": null,
+                    "format": null,
+                    "extension": null,
+                    "sizeInBytes": null,
+                    "checksums": null,
+                    "width": null,
+                    "height": null,
+                    "durationSeconds": null,
+                    "pageCount": null,
+                    "perceptualHash": null,
+                    "perceptualHashQuality": null,
+                    "metadata": null,
+                    "extractedText": null,
+                    "rendered": null,
+                    "hls": null,
+                    "preview": null
+                  },
+                  "upload": {
+                    "status": "completed",
+                    "updatedAt": null,
+                    "partsReceived": null
+                  },
+                  "classification": {
+                    "status": "completed",
+                    "moderation": {
+                      "decision": "allowed",
+                      "flaggedCategories": [],
+                      "regions": [],
+                      "manualReviews": [],
+                      "automatedStatus": null,
+                      "source": null,
+                      "policy": null,
+                      "pendingReview": null,
+                      "rule": null,
+                      "explanationComplete": null,
+                      "categories": null,
+                      "raw": null,
+                      "timeline": null
+                    },
+                    "failureReason": null,
+                    "updatedAt": null,
+                    "completedAt": null,
+                    "progress": null,
+                    "testInput": false,
+                    "ocr": null,
+                    "personDetection": null,
+                    "faceDetection": null,
+                    "linkDetection": null
+                  },
+                  "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+                  "type": "image",
+                  "parentPages": [],
+                  "metadata": [],
+                  "tags": [],
+                  "visibility": "public"
+                }
+              ],
+              "nextCursor": null,
+              "hasMore": false
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "pageSize=5",
+          "query": [
+            [
+              "pageSize",
+              "5"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "a raw POST is retried only with an idempotency key",
+      "area": "raw-request",
+      "client": {
+        "maxRetries": 1
+      },
+      "responses": [
+        {
+          "status": 503,
+          "bodyText": "<html><body>503</body></html>",
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "text/html"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "request",
+          "args": {
+            "method": "POST",
+            "path": "/projects/project-1/folders",
+            "body": {
+              "name": "Inbox"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/http-error",
+              "status": 503,
+              "requestId": "req-1",
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/folders",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "name": "Inbox"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a result's lastResponse holds the status, request ID and idempotency key",
+      "area": "last-response",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-2",
+            "name": "asset-2.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "decision": null,
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expectLastResponse": true,
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            },
+            "lastResponse": {
+              "status": 200,
+              "requestId": "req-1",
+              "idempotencyKey": null
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          },
+          "requestOptions": {
+            "idempotencyKey": "upload-1"
+          },
+          "expectLastResponse": true,
+          "expect": {
+            "result": {
+              "id": "asset-2",
+              "name": "asset-2.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "processing",
+                "moderation": {
+                  "decision": null,
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            },
+            "lastResponse": {
+              "status": 200,
+              "requestId": "req-2",
+              "idempotencyKey": "upload-1"
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "wait=false",
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": {
+              "$uuid": "generated-1"
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the attempt hook sees every attempt with its status, request ID and wait",
+      "area": "observability",
+      "responses": [
+        {
+          "status": 503,
+          "bodyText": "<html><body>503</body></html>",
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "text/html",
+            "retry-after": "0"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ],
+      "sleepsMs": [
+        0
+      ],
+      "attempts": [
+        {
+          "operation": "assets.retrieve",
+          "method": "GET",
+          "path": "/v1/assets/asset-1",
+          "attempt": 1,
+          "delayMs": 0,
+          "status": 503,
+          "requestId": "req-1",
+          "errorCode": "sdk/http-error"
+        },
+        {
+          "operation": "assets.retrieve",
+          "method": "GET",
+          "path": "/v1/assets/asset-1",
+          "attempt": 2,
+          "delayMs": null,
+          "status": 200,
+          "requestId": "req-2",
+          "errorCode": null
+        }
+      ]
+    },
+    {
+      "name": "debug logs never hold the API key",
+      "area": "observability",
+      "client": {
+        "apiKey": "ck_contract_log_secret_7f3a"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
+            },
+            "upload": {
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "decision": "allowed",
+                "flaggedCategories": [],
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
+              },
+              "upload": {
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "decision": "allowed",
+                  "flaggedCategories": [],
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ],
+      "logs": {
+        "level": "debug",
+        "mustNotContain": [
+          "ck_contract_log_secret_7f3a"
+        ]
+      }
+    },
     {
       "name": "API requests send the API key, user agent and JSON accept header to the default base URL",
       "area": "headers",
