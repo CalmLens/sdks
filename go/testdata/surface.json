@@ -3298,7 +3298,7 @@
   "asyncClient": {
     "names": {
       "python": "AsyncCalmLensServerClient",
-      "java": "ServerClient.async"
+      "java": "CalmLensServerClient.async"
     },
     "notApplicable": {
       "javascript": "Every method returns a Promise.",
