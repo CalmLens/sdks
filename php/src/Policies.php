@@ -10,6 +10,12 @@ namespace CalmLens;
  * `policy/revision-conflict`. Through a project's key you can change only policies no other
  * project uses. A preset policy's `preset.mode` is `live` (it follows the preset's latest release),
  * `pinned` (the organisation's own preset policy, held at one release) or `copy`.
+ *
+ * @phpstan-import-type Policy from Types
+ * @phpstan-import-type PolicyPage from Types
+ * @phpstan-import-type PolicySettings from Types
+ * @phpstan-import-type PresetId from Types
+ * @phpstan-import-type RequestOptions from Types
  */
 final class Policies extends Resource
 {
@@ -19,6 +25,11 @@ final class Policies extends Resource
      * One page of the organisation's policies, oldest first unless `sort` (`createdAt` and `id`,
      * descending when prefixed with `-`) says otherwise. Pass the page's `nextCursor` as `cursor`
      * and a `pageSize` (1 to 100, 50 by default). `retrieveAssigned` says which one the project uses.
+     *
+     * @param array{
+     *     cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
+     * } $options
+     * @return PolicyPage
      */
     public function list(array $options = []): array
     {
@@ -36,6 +47,10 @@ final class Policies extends Resource
         yield from $this->items($this->list(...), $options);
     }
 
+    /**
+     * @param array{policyId: string, requestOptions?: RequestOptions} $options
+     * @return Policy
+     */
     public function retrieve(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -47,6 +62,12 @@ final class Policies extends Resource
      * with an optional `description`. `settings.categorySettings` names every category, each with
      * its `action`, `allowances` and `restrictions`. The policy moderates nothing until it is
      * assigned to a project or named on an upload preset.
+     *
+     * @param array{
+     *     name?: string, description?: string, settings?: PolicySettings, presetId?: PresetId,
+     *     requestOptions?: RequestOptions,
+     * } $options
+     * @return Policy
      */
     public function create(array $options): array
     {
@@ -57,6 +78,12 @@ final class Policies extends Resource
     /**
      * Changes the `name`, `description` or `settings` of the policy at its current `revision`; later
      * moderation uses them. Saving a `live` policy pins it.
+     *
+     * @param array{
+     *     policyId: string, revision: int, name?: string, description?: string, settings?: PolicySettings,
+     *     requestOptions?: RequestOptions,
+     * } $options
+     * @return Policy
      */
     public function update(array $options): array
     {
@@ -68,6 +95,11 @@ final class Policies extends Resource
     /**
      * Restores the settings of the preset release a `pinned` or `copy` policy is pinned to,
      * discarding its edits. Send the policy's `revision` and its `preset.version` as `presetVersion`.
+     *
+     * @param array{
+     *     policyId: string, revision: int, presetVersion: int, requestOptions?: RequestOptions,
+     * } $options
+     * @return Policy
      */
     public function reset(array $options): array
     {
@@ -79,6 +111,11 @@ final class Policies extends Resource
     /**
      * Moves an unchanged `pinned` or `copy` policy to the latest release of its preset. Send the
      * policy's `revision` and its `preset.latestVersion` as `presetVersion`.
+     *
+     * @param array{
+     *     policyId: string, revision: int, presetVersion: int, requestOptions?: RequestOptions,
+     * } $options
+     * @return Policy
      */
     public function upgrade(array $options): array
     {
@@ -91,6 +128,11 @@ final class Policies extends Resource
      * Switches automatic updates on (`enabled` true: a `pinned` policy becomes `live`, replacing its
      * settings with the latest preset) or off (a `live` policy is pinned at its current release) for
      * the organisation's own preset policy.
+     *
+     * @param array{
+     *     policyId: string, enabled: bool, revision: int, presetVersion: int, requestOptions?: RequestOptions,
+     * } $options
+     * @return Policy
      */
     public function setAutomaticUpdates(array $options): array
     {
@@ -99,7 +141,11 @@ final class Policies extends Resource
         return $this->session->request('PUT', $path . '/automatic-updates', body: (object) $api, options: $request);
     }
 
-    /** Deletes a policy that no project or upload preset uses. */
+    /**
+     * Deletes a policy that no project or upload preset uses.
+     *
+     * @param array{policyId: string, requestOptions?: RequestOptions} $options
+     */
     public function delete(array $options): void
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -109,6 +155,9 @@ final class Policies extends Resource
     /**
      * The policy the project moderates with. Uploads through an upload preset that names its own
      * policy use that one instead.
+     *
+     * @param array{requestOptions?: RequestOptions} $options
+     * @return Policy
      */
     public function retrieveAssigned(array $options = []): array
     {
@@ -116,7 +165,12 @@ final class Policies extends Resource
         return $this->session->request('GET', $this->session->project('policy'), options: $request);
     }
 
-    /** Chooses the policy (`policyId`) the project moderates with. */
+    /**
+     * Chooses the policy (`policyId`) the project moderates with.
+     *
+     * @param array{policyId: string, requestOptions?: RequestOptions} $options
+     * @return Policy
+     */
     public function assign(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);

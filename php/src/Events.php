@@ -6,6 +6,11 @@ namespace CalmLens;
 
 use CalmLens\Internal\Values;
 
+/**
+ * @phpstan-import-type EventPage from Types
+ * @phpstan-import-type EventType from Types
+ * @phpstan-import-type RequestOptions from Types
+ */
 final class Events extends Resource
 {
     protected const OPERATIONS = 'events';
@@ -17,6 +22,12 @@ final class Events extends Resource
      * lacks the permission to see them. `types` (a list of event types, such as `asset.blocked`)
      * and `assetId` narrow the feed to those types or one asset's events; a cursor belongs to the
      * filters it was issued with, so pass the same ones with each `cursor`.
+     *
+     * @param array{
+     *     cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string,
+     *     requestOptions?: RequestOptions,
+     * } $options
+     * @return EventPage
      */
     public function list(array $options = []): array
     {

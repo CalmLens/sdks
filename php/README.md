@@ -36,6 +36,9 @@ if (in_array($asset['classification']['moderation']['status'], ['allowed', 'limi
 
 Keep API keys on the server, and reuse a client within a request or worker. Methods take one
 options array with camelCase keys; responses are associative arrays with the API's field names.
+Each method's docblock gives PHPStan the shape of its options and result, and `CalmLens\Types`
+names the shared ones, such as `Asset` and `Event`, for your own docblocks:
+`@phpstan-import-type Asset from \CalmLens\Types`.
 
 | Status           | What to do                                                                   |
 | ---------------- | ---------------------------------------------------------------------------- |

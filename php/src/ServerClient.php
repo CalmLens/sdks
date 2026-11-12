@@ -8,6 +8,11 @@ use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
 use GuzzleHttp\ClientInterface;
 
+/**
+ * @phpstan-import-type Lens from Types
+ * @phpstan-import-type LensType from Types
+ * @phpstan-import-type RequestOptions from Types
+ */
 final class ServerClient
 {
     public const DEFAULT_BASE_URL = 'https://api.calmlens.com/v1';
@@ -108,6 +113,15 @@ final class ServerClient
     /**
      * Creates or changes several named lenses, as `ensureLens` does. New definitions are sent in
      * one request, or in consecutive requests of at most `ENSURE_LENSES_BATCH_SIZE`, in order.
+     *
+     * @param array{
+     *     lenses: list<array{
+     *         identifier: string, name: string, description?: ?string, type: LensType, active?: bool,
+     *         transform?: array<string, mixed>|null,
+     *     }>,
+     *     requestOptions?: RequestOptions,
+     * } $options
+     * @return list<Lens>
      */
     public function ensureLenses(array $options): array
     {

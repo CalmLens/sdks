@@ -11,6 +11,8 @@
     "psr/http-message": "^2.0"
   },
   "require-dev": {
+    "phpstan/phpdoc-parser": "^2.3",
+    "phpstan/phpstan": "^2.1",
     "phpunit/phpunit": "^11.5"
   },
   "autoload": {
@@ -20,7 +22,10 @@
   },
   "scripts": {
     "test": "phpunit",
-    "check": "@php scripts-check.php"
+    "check": [
+      "@php scripts-check.php",
+      "phpstan analyse --configuration=tests/phpstan.neon --no-progress --memory-limit=1G"
+    ]
   },
   "config": {
     "sort-packages": true

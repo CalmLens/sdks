@@ -2603,7 +2603,7 @@ final class MockServerClient
         return ['uploadPresets' => $saved];
     }
 
-    private function deleteUploadPreset(string $id): ?array
+    private function deleteUploadPreset(string $id): null
     {
         foreach ($this->uploadPresets as $key => $preset) {
             if ($preset['id'] === $id) {

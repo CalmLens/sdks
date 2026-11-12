@@ -16,6 +16,10 @@ use Psr\Http\Message\ResponseInterface;
  * beneath it. The asset segment is the asset ID, or `ext:` and the URL-encoded external ID, for a
  * public asset, or a signed grant for a private one: use `signAssetUrl` if the asset is private,
  * `getAssetUrl` otherwise, and add viewer claims to either.
+ *
+ * @phpstan-import-type RequestOptions from Types
+ * @phpstan-import-type SignedAssetUrl from Types
+ * @phpstan-import-type ViewerClaims from Types
  */
 final class Cdn extends Resource
 {
@@ -104,10 +108,12 @@ final class Cdn extends Resource
      * appends them, and can be changed later without signing again. The options are checked
      * before anything is sent.
      *
-     * @param array{projectId?: string, assetId?: string, externalId?: string, expiresIn?: int, original?: bool,
-     *   resource?: string, lens?: string, transform?: string|array<string, mixed>,
-     *   viewerClaims?: array{region?: string, ageConfirmed?: bool}, requestOptions?: array<string, mixed>} $options
-     * @return array{url: string, expiresAt: int} the signed URL and its expiry in unix milliseconds
+     * @param array{
+     *     assetId?: string, externalId?: string, expiresIn?: int, original?: bool, projectId?: string,
+     *     resource?: string, lens?: string, transform?: string|array<string, mixed>,
+     *     viewerClaims?: ViewerClaims, requestOptions?: RequestOptions,
+     * } $options
+     * @return SignedAssetUrl the signed URL and its expiry in unix milliseconds
      */
     public function signAssetUrl(array $options): array
     {

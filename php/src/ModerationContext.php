@@ -36,8 +36,7 @@ final class ModerationContext
         $characters = 0;
         for ($index = count($items) - 1; $index >= 0 && count($selected) < self::USED_ITEMS; $index--) {
             $item = $items[$index];
-            $text = is_array($item) ? ($item['text'] ?? null) : null;
-            $authorId = is_array($item) ? ($item['authorId'] ?? null) : null;
+            [$text, $authorId] = is_array($item) ? [$item['text'] ?? null, $item['authorId'] ?? null] : [null, null];
             if (!is_string($text) || ($authorId !== null && !is_string($authorId))) {
                 Values::invalid('Every earlier post needs a text string and an optional authorId string');
             }

@@ -35,6 +35,8 @@ use Psr\Http\Message\ResponseInterface;
  * options, mock behaviour scenarios, the capability surface with its defaults and retryable
  * rules, and rejected requests. Each fixture case is its own named test.
  */
+require_once __DIR__ . '/TypeContract.php';
+
 final class ContractTest extends TestCase
 {
     private static array $cache = [];
@@ -1224,6 +1226,76 @@ final class ContractTest extends TestCase
             self::assertNull($error->status);
             self::assertNull($error->requestId);
         }
+    }
+
+    // types.json: each operation's declared options and result shapes against the API's schemas.
+
+    /**
+     * Option keys PHP takes besides the API's fields, which types.json leaves out: request options
+     * on every method, and the upload payload, which PHP takes as `content` or `part` arrays.
+     */
+    private const NATIVE_OPTIONS = [
+        '*' => ['requestOptions'],
+        'assets.create' => ['content', 'part', 'url', 'sizeInBytes', 'totalSizeInBytes'],
+        'assets.uploadPart' => ['part', 'wait'],
+        'cdn.signAssetUrl' => ['projectId'],
+    ];
+
+    /** @return array{ReflectionMethod, array<string, PHPStan\PhpDocParser\Ast\Type\TypeNode>} the operation's method and the aliases its docblocks see */
+    private static function declaredMethod(string $php): array
+    {
+        [$property, $name] = str_contains($php, '->') ? explode('->', $php) : [null, $php];
+        $class = $property === null ? ServerClient::class : (new ReflectionProperty(ServerClient::class, $property))->getType()->getName();
+        return [new ReflectionMethod($class, $name), TypeContract::aliases(\CalmLens\Types::class, $class)];
+    }
+
+    public static function declaredTypes(): iterable
+    {
+        foreach (self::fixtures('types')['operations'] as $operation) {
+            yield $operation['id'] => [$operation];
+        }
+    }
+
+    #[DataProvider('declaredTypes')]
+    public function testDeclaredTypesMatchTheApi(array $operation): void
+    {
+        $differences = self::typeDifferences($operation);
+        self::assertSame([], $differences, implode("\n", $differences));
+    }
+
+    /** @return list<string> every difference as `<operation> <options|result> $.<path>: <problem>` */
+    private static function typeDifferences(array $operation): array
+    {
+        $types = self::fixtures('types');
+        $id = $operation['id'];
+        [$method, $aliases] = self::declaredMethod($operation['names']['php']);
+        $doc = TypeContract::docblock($method->getDocComment());
+        $problems = [];
+        $params = array_values(array_filter($doc->getParamTagValues(), fn ($tag) => $tag->parameterName === '$options'));
+        if ($params === []) {
+            $problems[] = 'options $: no @param shape for $options';
+        } else {
+            $native = [...self::NATIVE_OPTIONS['*'], ...(self::NATIVE_OPTIONS[$id] ?? []), ...$operation['options']['clientOptions']];
+            foreach (TypeContract::options($params[0]->type, $operation['options'], $native, $operation['method'] === 'PATCH', $types['definitions'], $aliases) as $problem) {
+                $problems[] = "options $problem";
+            }
+        }
+        $returns = $doc->getReturnTagValues();
+        if ($operation['result'] === null) {
+            // No model: the method returns nothing, or something other than a response body.
+        } elseif ($returns === []) {
+            $problems[] = 'result $: no @return shape';
+        } else {
+            foreach (TypeContract::result($returns[0]->type, $operation['result'], $types['definitions'], $aliases) as $problem) {
+                $problems[] = "result $problem";
+            }
+        }
+        foreach ($doc->children as $child) {
+            if (($child->value ?? null) instanceof PHPStan\PhpDocParser\Ast\PhpDoc\InvalidTagValueNode) {
+                $problems[] = "options $: unreadable {$child->name}: {$child->value->exception->getMessage()}";
+            }
+        }
+        return array_map(fn (string $problem) => "$id $problem", $problems);
     }
 }
 

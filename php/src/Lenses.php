@@ -8,6 +8,11 @@ namespace CalmLens;
  * The project's lenses: named image transforms the CDN applies at `/@<identifier>`. The CDN serves
  * files made with each lens's current definition. `ServerClient::ensureLenses` creates or changes
  * lenses by identifier, for applications that declare theirs in code.
+ *
+ * @phpstan-import-type Lens from Types
+ * @phpstan-import-type LensPage from Types
+ * @phpstan-import-type LensType from Types
+ * @phpstan-import-type RequestOptions from Types
  */
 final class Lenses extends Resource
 {
@@ -18,6 +23,11 @@ final class Lenses extends Resource
      * descending when prefixed with `-`) says otherwise. Pass the page's `nextCursor` as `cursor`
      * and a `pageSize` (1 to 100, 50 by default). The built-in lenses are always available and
      * aren't listed.
+     *
+     * @param array{
+     *     cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
+     * } $options
+     * @return LensPage
      */
     public function list(array $options = []): array
     {
@@ -38,6 +48,12 @@ final class Lenses extends Resource
     /**
      * Creates a lens from `identifier`, `name`, `type` and an optional `description`, `transform`
      * and `active` (whether the CDN serves it, true by default). The identifier must be new to the project (`lens/identifier-taken` otherwise).
+     *
+     * @param array{
+     *     identifier: string, name: string, description?: ?string, type: LensType, active?: bool,
+     *     transform?: array<string, mixed>|null, requestOptions?: RequestOptions,
+     * } $options
+     * @return Lens
      */
     public function create(array $options): array
     {
@@ -47,6 +63,10 @@ final class Lenses extends Resource
         return $lens;
     }
 
+    /**
+     * @param array{lensId: string, requestOptions?: RequestOptions} $options
+     * @return Lens
+     */
     public function retrieve(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -56,6 +76,12 @@ final class Lenses extends Resource
     /**
      * Changes a lens's `name`, `description`, `type`, `transform` or whether the CDN serves it
      * (`active`); fields left out stay as they are. The CDN serves the new transform from then on.
+     *
+     * @param array{
+     *     lensId: string, name?: string, description?: ?string, type?: LensType, active?: bool,
+     *     transform?: array<string, mixed>|null, requestOptions?: RequestOptions,
+     * } $options
+     * @return Lens
      */
     public function update(array $options): array
     {
@@ -69,6 +95,8 @@ final class Lenses extends Resource
     /**
      * Deletes a lens. URLs that select it stop being served; files the CDN already delivered may
      * stay in caches until they expire.
+     *
+     * @param array{lensId: string, requestOptions?: RequestOptions} $options
      */
     public function delete(array $options): void
     {

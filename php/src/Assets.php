@@ -10,6 +10,35 @@ use CalmLens\Internal\Values;
 use GuzzleHttp\Psr7\LimitStream;
 use Psr\Http\Message\StreamInterface;
 
+/**
+ * @phpstan-import-type Asset from Types
+ * @phpstan-import-type AssetBatch from Types
+ * @phpstan-import-type AssetContext from Types
+ * @phpstan-import-type AssetPage from Types
+ * @phpstan-import-type AssetSearchResults from Types
+ * @phpstan-import-type MetadataValue from Types
+ * @phpstan-import-type RequestOptions from Types
+ * @phpstan-import-type TimelinePage from Types
+ * @phpstan-import-type UploadContent from Types
+ * @phpstan-import-type UploadPart from Types
+ * @phpstan-type CreateAssetOptions array{
+ *     externalUrl?: ?string, name: string, description?: ?string, visibility?: 'public'|'private'|null,
+ *     metadata?: list<array{id: string, value: MetadataValue}>|null, tags?: list<string>|null,
+ *     externalId?: ?string, folderId?: ?string, authorId?: ?string, context?: ?AssetContext,
+ *     uploadPresetId?: ?string,
+ *     processingOptions?: array{
+ *         retainContent?: bool|string|null, storeSensitiveMetadata?: bool|string|null,
+ *         features?: array{
+ *             ocr?: array{enabled: bool|string}|null, personDetection?: array{enabled: bool|string}|null,
+ *             faceDetection?: array{enabled: bool|string, ageEstimation?: bool|string}|null,
+ *             linkDetection?: array{enabled: bool|string}|null,
+ *             streaming?: array{enabled: bool|string}|null,
+ *         }|null,
+ *     }|null,
+ *     content?: UploadContent, part?: UploadPart, url?: string, sizeInBytes?: int, totalSizeInBytes?: int,
+ *     requestOptions?: RequestOptions,
+ * }
+ */
 final class Assets extends Resource
 {
     protected const OPERATIONS = 'assets';
@@ -45,6 +74,11 @@ final class Assets extends Resource
     /**
      * The best `pageSize` matches (1 to 20, 10 by default) for a keyword or natural-language `query`,
      * ranked by relevance. Search has no cursor: refine the query, or list with a filter, for more.
+     *
+     * @param array{
+     *     query: string, pageSize?: int, mode?: 'keyword'|'semantic'|'hybrid', requestOptions?: RequestOptions,
+     * } $options
+     * @return AssetSearchResults
      */
     public function search(array $options): array
     {
@@ -57,6 +91,11 @@ final class Assets extends Resource
      * `folderId==null` for the root); `sort` is `createdAt` and `id`, comma-separated, each
      * descending when prefixed with `-` (`-createdAt` by default). Pass the page's `nextCursor` as
      * `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
+     *
+     * @param array{
+     *     cursor?: string, pageSize?: int, sort?: string, filter?: ?string, requestOptions?: RequestOptions,
+     * } $options
+     * @return AssetPage
      */
     public function list(array $options = []): array
     {
@@ -64,7 +103,14 @@ final class Assets extends Resource
         return $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request);
     }
 
-    /** One page of an asset's child assets, with the same `cursor`, `pageSize` and `sort` as `list`. */
+    /**
+     * One page of an asset's child assets, with the same `cursor`, `pageSize` and `sort` as `list`.
+     *
+     * @param array{
+     *     assetId: string, cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
+     * } $options
+     * @return AssetPage
+     */
     public function listChildren(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -77,6 +123,11 @@ final class Assets extends Resource
      * `source`, `startSeconds`, `endSeconds` and `categories`. Pass the page's opaque `nextCursor`
      * as `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
      * `classification.moderation.timeline.segmentCount` says how many segments there are.
+     *
+     * @param array{
+     *     assetId: string, cursor?: string, pageSize?: int, requestOptions?: RequestOptions,
+     * } $options
+     * @return TimelinePage
      */
     public function listTimeline(array $options): array
     {
@@ -103,12 +154,24 @@ final class Assets extends Resource
         yield from $this->items($this->listTimeline(...), $options);
     }
 
+    /**
+     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @return Asset
+     */
     public function retrieve(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request);
     }
 
+    /**
+     * @param array{
+     *     assetId: string, name?: string, description?: ?string, externalId?: ?string, externalUrl?: ?string,
+     *     metadata?: list<array{id: string, value: MetadataValue}>|null, tags?: list<string>|null,
+     *     visibility?: 'public'|'private'|null, requestOptions?: RequestOptions,
+     * } $options
+     * @return Asset
+     */
     public function update(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -116,6 +179,10 @@ final class Assets extends Resource
         return $this->session->request('PATCH', $path, body: (object) $api, options: $request);
     }
 
+    /**
+     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @return Asset
+     */
     public function retry(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -127,6 +194,12 @@ final class Assets extends Resource
      * or `purged`) becomes the moderation status and a manual review with the required `note` is
      * added. An asset still pending moderation can only be blocked or purged; purging deletes the
      * stored content and needs `'confirmPurge' => true` and the `assets:delete` permission.
+     *
+     * @param array{
+     *     assetId: string, decision: 'allowed'|'limited'|'age-restricted'|'blocked'|'purged', note: string,
+     *     confirmPurge?: true, requestOptions?: RequestOptions,
+     * } $options
+     * @return Asset
      */
     public function decide(array $options): array
     {
@@ -144,6 +217,9 @@ final class Assets extends Resource
      * re-run's is stored, reported by `asset.classified` and `asset.<status>` events, and a failed
      * re-run keeps it. A reviewed asset fails with `asset/reviewed`, and one whose content is gone
      * with `asset/content-unavailable`.
+     *
+     * @param array{assetId: string, rerun?: bool, requestOptions?: RequestOptions} $options
+     * @return Asset
      */
     public function explain(array $options): array
     {
@@ -158,6 +234,9 @@ final class Assets extends Resource
      * and placeholder, and keeps the asset record, metadata and classification results. The
      * returned asset has `content.status` `removed` and `content.removalReason` `requested`; the
      * CDN no longer serves it.
+     *
+     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @return Asset
      */
     public function removeContent(array $options): array
     {
@@ -168,6 +247,8 @@ final class Assets extends Resource
     /**
      * Deletes an asset record together with its stored content. An asset extracted from another
      * (one with a `parentId`) fails with `asset/child-not-deletable`: delete its parent instead.
+     *
+     * @param array{assetId: string, requestOptions?: RequestOptions} $options
      */
     public function delete(array $options): void
     {
@@ -185,8 +266,10 @@ final class Assets extends Resource
      * `batch-id` fact naming `batchId`. Assets under a safety hold are skipped. Not retried: it
      * carries no `Idempotency-Key`.
      *
-     * @param array{assetIds: list<string>, operation: string} $options
-     * @return array{batchId: string, status: string, assetCount: int}
+     * @param array{
+     *     assetIds: list<string>, operation: 'delete'|'remove-content', requestOptions?: RequestOptions,
+     * } $options
+     * @return AssetBatch
      */
     public function batch(array $options): array
     {
@@ -213,6 +296,10 @@ final class Assets extends Resource
         }
     }
 
+    /**
+     * @param array{assetId: string, folderId: ?string, requestOptions?: RequestOptions} $options
+     * @return Asset
+     */
     public function move(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -226,10 +313,18 @@ final class Assets extends Resource
     /**
      * Uploads an asset and returns without waiting for its decision (`wait=false`), with
      * `classification.status` `queued`.
+     *
+     * @param CreateAssetOptions $options
+     * @return Asset
      */
     public function create(array $options): array { return $this->submit($options, false); }
 
-    /** Uploads an asset and waits for its moderation decision (`wait=true`). */
+    /**
+     * Uploads an asset and waits for its moderation decision (`wait=true`).
+     *
+     * @param CreateAssetOptions $options
+     * @return Asset
+     */
     public function classify(array $options): array
     {
         if (isset($options['content']['plainText']) && (!is_string($options['content']['plainText']) || trim($options['content']['plainText']) === '')) {
@@ -399,6 +494,11 @@ final class Assets extends Resource
     /**
      * Uploads the next part of a multipart upload. Whether the final part waits for the decision was
      * chosen when the upload started; pass `wait` (a boolean) to override it.
+     *
+     * @param array{
+     *     assetId: string, part: UploadPart, wait?: bool, requestOptions?: RequestOptions,
+     * } $options
+     * @return Asset
      */
     public function uploadPart(array $options): array
     {

@@ -1,0 +1,21 @@
+# composer check: static analysis of the package sources. The SDK checks the arrays callers pass at
+# run time, so docblock shapes describe what callers should pass, not what the checks may assume.
+parameters:
+    level: 5
+    paths:
+        - ../src
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # The read can reach the end of the stream, so eof() is checked again after it.
+        - identifier: booleanNot.alwaysTrue
+          path: ../src/Internal/Session.php
+        # The pattern before it only matches numeric strings, which `0 +` turns into an int or float.
+        - identifier: binaryOp.invalid
+          path: ../src/Internal/Transforms.php
+        # StreamDecoratorTrait reads the decorated stream from this property.
+        - identifier: property.onlyWritten
+          path: ../src/Internal/UploadForm.php
+        # Guzzle 7's ConnectException takes the handler context that Guzzle 8's lacks.
+        - identifier: arguments.count
+          path: ../src/Testing/MockServerClient.php
+          reportUnmatched: false
