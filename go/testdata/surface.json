@@ -831,7 +831,7 @@
         "go": "Assets.ListAll",
         "rust": "assets().iterate",
         "java": "assets().iterate",
-        "ruby": "assets.each",
+        "ruby": "assets.list",
         "php": "assets->each"
       }
     },
@@ -845,7 +845,7 @@
         "go": "Assets.ListChildrenAll",
         "rust": "assets().iterate_children",
         "java": "assets().iterateChildren",
-        "ruby": "assets.each_child",
+        "ruby": "assets.list_children",
         "php": "assets->eachChild"
       }
     },
@@ -859,7 +859,7 @@
         "go": "Assets.ListTimelineAll",
         "rust": "assets().iterate_timeline",
         "java": "assets().iterateTimeline",
-        "ruby": "assets.each_timeline_segment",
+        "ruby": "assets.list_timeline",
         "php": "assets->eachTimelineSegment"
       }
     },
@@ -873,7 +873,7 @@
         "go": "Folders.ListAll",
         "rust": "folders().iterate",
         "java": "folders().iterate",
-        "ruby": "folders.each",
+        "ruby": "folders.list",
         "php": "folders->each"
       }
     },
@@ -887,7 +887,7 @@
         "go": "HashLists.ListAll",
         "rust": "hash_lists().iterate",
         "java": "hashLists().iterate",
-        "ruby": "hash_lists.each",
+        "ruby": "hash_lists.list",
         "php": "hashLists->each"
       }
     },
@@ -901,7 +901,7 @@
         "go": "HashLists.ListEntriesAll",
         "rust": "hash_lists().iterate_entries",
         "java": "hashLists().iterateEntries",
-        "ruby": "hash_lists.each_entry",
+        "ruby": "hash_lists.list_entries",
         "php": "hashLists->eachEntry"
       }
     },
@@ -915,7 +915,7 @@
         "go": "Policies.ListAll",
         "rust": "policies().iterate",
         "java": "policies().iterate",
-        "ruby": "policies.each",
+        "ruby": "policies.list",
         "php": "policies->each"
       }
     },
@@ -929,7 +929,7 @@
         "go": "Lenses.ListAll",
         "rust": "lenses().iterate",
         "java": "lenses().iterate",
-        "ruby": "lenses.each",
+        "ruby": "lenses.list",
         "php": "lenses->each"
       }
     },
@@ -943,7 +943,7 @@
         "go": "UploadPresets.ListAll",
         "rust": "upload_presets().iterate",
         "java": "uploadPresets().iterate",
-        "ruby": "upload_presets.each",
+        "ruby": "upload_presets.list",
         "php": "uploadPresets->each"
       }
     },
@@ -957,7 +957,7 @@
         "go": "Events.ListAll",
         "rust": "events().pages",
         "java": "events().pages",
-        "ruby": "events.each_page",
+        "ruby": "events.list",
         "php": "events->eachPage"
       }
     },
