@@ -38,6 +38,15 @@ class TypeContractTest < Minitest::Test
       end
     end
 
+    def required_keys(type)
+      case type
+      when RBS::Types::Alias then required_keys(@builder.expand_alias2(type.name, type.args))
+      when RBS::Types::Record then type.fields.keys
+      when RBS::Types::Union then type.types.map { |member| required_keys(member) }.reduce(:&)
+      else []
+      end
+    end
+
     private
 
     # A union accepts a value one member accepts; otherwise the closest member's mismatches show.
@@ -147,13 +156,20 @@ class TypeContractTest < Minitest::Test
       assert_conforms result(fixture), method_type(fixture['operation']).type.return_type,
                       "#{fixture['operation']} response (requests.json case #{index + 1})", complete: complete
     end
-    next unless fixture['options'].is_a?(Hash) && fixture['options'].key?('processingOptions')
+    next unless fixture['inputContract'] || (fixture['options'].is_a?(Hash) && fixture['options'].key?('processingOptions'))
 
     define_method("test_options_#{index + 1}_#{label}_match_the_signature") do
       options = snake_options(fixture['options'])
       type = method_type(fixture['operation']).type
-      assert_conforms options, (type.required_positionals + type.optional_positionals).first.type,
-                      "#{fixture['operation']} options (requests.json case #{index + 1})"
+      parameter = (type.required_positionals + type.optional_positionals).first
+      if parameter
+        assert_conforms options, parameter.type, "#{fixture['operation']} options (requests.json case #{index + 1})"
+        required = snake_options(fixture.fetch('inputContract', {}).fetch('requiredKeys', []).to_h { |key| [key, true] }).keys
+        assert_empty required - checker.required_keys(parameter.type),
+                     "#{fixture['operation']}: required inputs must be required by its options type"
+      else
+        assert_empty options, "#{fixture['operation']} has no options parameter"
+      end
     end
   end
 end

@@ -812,8 +812,7 @@ export interface VerifyWebhookSignatureOptions {
   now?: Date | number;
 }
 
-export interface ClassifyTextOptions
-  extends Omit<SubmitAssetCommonOptions, "name" | "visibility" | "isFinal"> {
+export interface ClassifyTextOptions extends Omit<SubmitAssetCommonOptions, "name" | "isFinal"> {
   text: string;
   name?: string;
 }

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["tests/signatures.generated.ts"],
+  "compilerOptions": { "noEmit": true }
+}

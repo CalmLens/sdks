@@ -18,8 +18,8 @@
 //! - `rustls` (default): TLS through rustls with the bundled Mozilla root certificates.
 //!   `rustls-native-roots` uses the operating system's roots, and `native-tls` the platform TLS
 //!   library, instead.
-//! - `blocking`: [`blocking::ServerClient`], the same API without `async`.
-//! - `testing`: [`testing::MockServerClient`], an offline client for tests. Enable it in
+//! - `blocking`: `blocking::ServerClient`, the same API without `async`.
+//! - `testing`: `testing::MockServerClient`, an offline client for tests. Enable it in
 //!   `[dev-dependencies]` only.
 //!
 //! With `default-features = false` the crate offers the models and the webhook helpers

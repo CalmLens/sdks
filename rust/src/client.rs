@@ -2221,6 +2221,7 @@ impl TextClient<'_> {
                 name: options.name.unwrap_or_else(|| "text".into()),
                 content: Some(Content::text(options.text)),
                 description: options.description,
+                visibility: options.visibility,
                 processing_options: options.processing_options,
                 metadata: options.metadata,
                 tags: options.tags,

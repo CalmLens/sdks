@@ -4174,6 +4174,9 @@ pub struct ClassifyText {
     /// A description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// CDN visibility, as for an asset upload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<Visibility>,
     /// Processing options.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub processing_options: Option<ProcessingOptions>,
@@ -5392,7 +5395,7 @@ pub struct UpdateProjectSettings {
     /// the project's existing media. A smaller value than the estimate is refused with
     /// `search/estimate-changed`, whose details give the estimate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub search_indexing_budget_units: Option<u64>,
+    pub search_indexing_budget_units: Option<f64>,
 }
 impl UpdateProjectSettings {
     /// Replaces the project's settings with `settings`, whatever their revision.

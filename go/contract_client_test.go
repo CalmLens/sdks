@@ -587,7 +587,8 @@ func TestRequestFixtures(t *testing.T) {
 		// Result is what the method returns when it isn't the response body.
 		Result json.RawMessage
 		// FullModel marks a response holding every field of the model its endpoint returns.
-		FullModel bool
+		FullModel     bool
+		InputContract json.RawMessage
 	}](t, "requests.json")
 	for index, fixture := range fixtures {
 		t.Run(fmt.Sprintf("%d %s", index+1, fixture.Operation), func(t *testing.T) {
@@ -595,6 +596,29 @@ func TestRequestFixtures(t *testing.T) {
 			c, err := NewServerClient(Options{APIKey: "key", ProjectID: "project-1", MaxRetries: Ptr(0), HTTPClient: &http.Client{Transport: transport}})
 			if err != nil {
 				t.Fatal(err)
+			}
+			if len(fixture.InputContract) > 0 {
+				parts := strings.Split(fixture.Operation, ".")
+				target := reflect.ValueOf(c)
+				name := strings.ToUpper(parts[len(parts)-1][:1]) + parts[len(parts)-1][1:]
+				if len(parts) > 1 {
+					resource := strings.ToUpper(parts[0][:1]) + parts[0][1:]
+					if parts[0] == "cdn" {
+						resource, name = "CDN", "SignAssetURL"
+					}
+					target = target.Elem().FieldByName(resource)
+				}
+				method := target.MethodByName(name)
+				if !method.IsValid() {
+					t.Fatalf("missing method %s", fixture.Operation)
+				}
+				declaration := method.Type()
+				for i := 0; i < declaration.NumOut(); i++ {
+					result := declaration.Out(i)
+					if result.Kind() == reflect.Interface && result != reflect.TypeFor[error]() {
+						t.Fatalf("%s must declare its result model, got %s", fixture.Operation, result)
+					}
+				}
 			}
 			called, err := invoke(t, context.Background(), c, fixture.Operation, decodeArgs(t, fixture.Options))
 			if err != nil {

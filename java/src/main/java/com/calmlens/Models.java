@@ -1206,6 +1206,7 @@ public final class Models {
     private String text;
     private String name;
     private String description;
+    private Visibility visibility;
     private ProcessingOptions processingOptions;
     private List<MetadataItem> metadata;
     private List<String> tags;
@@ -1225,6 +1226,8 @@ public final class Models {
     public ClassifyText text(String value) { text = value; return this; }
     public ClassifyText name(String value) { name = value; return this; }
     public ClassifyText description(String value) { description = value; return this; }
+    /** @param value CDN visibility, as for an asset upload @return these options */
+    public ClassifyText visibility(Visibility value) { visibility = value; return this; }
     public ClassifyText processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
     public ClassifyText metadata(List<MetadataItem> value) { metadata = value; return this; }
     /** @param value tags for the asset, such as {@code List.of("catalogue", "backpacks")} @return these options */
@@ -1252,6 +1255,7 @@ public final class Models {
     SubmitAsset toSubmitAsset() {
       SubmitAsset asset = new SubmitAsset(name == null ? "text" : name, Content.text(text));
       asset.description = description;
+      asset.visibility = visibility;
       asset.processingOptions = processingOptions;
       asset.metadata = metadata;
       asset.tags = tags;

@@ -1209,6 +1209,7 @@ module CalmLens
     ?retain_content: bool,
     ?block_unmoderated_assets: bool,
     ?store_sensitive_metadata: bool,
+    ?link_checking_enabled: bool,
     ?streaming_enabled: bool,
     ?ai_media_search_enabled: bool,
     ?remote_url_rule: { mode: "allow" | "deny", domains: Array[String] }?,

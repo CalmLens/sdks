@@ -350,6 +350,18 @@ class TypeContractTests(unittest.TestCase):
                            for key, value in (fixture.get("options") or {}).items()
                            if key != "idempotencyKey" and (value is not None or key in nullable)}
                 self.assertEqual(_type_errors(options, options_type, "options"), [])
+                contract = fixture.get("inputContract", {})
+                if "field" in contract:
+                    method = _resolve_name(_client(), _snake(operation))
+                    keyword = _snake(contract["field"])
+                    parameter = inspect.signature(method).parameters[keyword]
+                    self.assertEqual(parameter.kind, inspect.Parameter.KEYWORD_ONLY)
+                    hint = typing.get_type_hints(method, vars(client_module))[keyword]
+                    self.assertEqual(_type_errors(options[contract["field"]], hint, keyword), [])
+                if contract.get("requiredKeys"):
+                    self.assertTrue(typing.is_typeddict(options_type), operation)
+                    self.assertEqual(set(contract["requiredKeys"]) - options_type.__required_keys__, set(),
+                                     f"{operation}: required inputs must be required by its options type")
 
 
 class TransformTests(unittest.TestCase):

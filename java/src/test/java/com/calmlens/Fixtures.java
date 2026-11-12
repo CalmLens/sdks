@@ -50,6 +50,36 @@ final class Fixtures {
     }
   }
 
+  /** JSON decoding can set private fields that a caller cannot. Input contracts also require a
+   * public typed builder for each option, and a declared result model rather than Object. */
+  static void assertSignature(CalmLensServerClient client, String operation, JsonObject options) throws Exception {
+    String[] parts = operation.split("\\.");
+    Object target = parts.length == 1 ? client : CalmLensServerClient.class.getField(parts[0]).get(client);
+    Method method = Arrays.stream(target.getClass().getMethods())
+        .filter(m -> m.getName().equals(parts[parts.length - 1]) && m.getParameterCount() == 1
+            && m.getParameterTypes()[0] != String.class).findFirst().orElse(null);
+    if (method == null) {
+      assertEquals(0, options.size(), operation + " has no options parameter");
+      method = target.getClass().getMethod(parts[parts.length - 1]);
+    } else {
+      Class<?> type = method.getParameterTypes()[0];
+      for (String key : options.keySet()) {
+        String builderName = Arrays.stream(type.getDeclaredFields())
+            .filter(field -> field.isAnnotationPresent(com.google.gson.annotations.SerializedName.class)
+                && field.getAnnotation(com.google.gson.annotations.SerializedName.class).value().equals(key))
+            .map(java.lang.reflect.Field::getName).findFirst().orElse(key);
+        List<Method> setters = Arrays.stream(type.getMethods())
+            .filter(m -> m.getName().equals(builderName) && m.getParameterCount() == 1
+                && type.isAssignableFrom(m.getReturnType())).toList();
+        assertFalse(setters.isEmpty(), operation + "." + key + " needs a public typed builder");
+        assertTrue(setters.stream().anyMatch(m -> m.getParameterTypes()[0] != Object.class),
+            operation + "." + key + " must have a typed input");
+      }
+    }
+    assertNotEquals(Object.class, method.getReturnType(), operation + " must declare its result type");
+    assertNotEquals(Map.class, method.getReturnType(), operation + " must declare its result model");
+  }
+
   /** Whether an operation is a list's iterator, which yields every item rather than returning a value. */
   static boolean isIterator(String operation) { return operation.substring(operation.lastIndexOf('.') + 1).startsWith("iterate"); }
 

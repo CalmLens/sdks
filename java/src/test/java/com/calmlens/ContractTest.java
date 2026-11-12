@@ -75,6 +75,7 @@ class ContractTest {
         return Fixtures.json(200, fixture.get("response").toString());
       });
       String operation = fixture.get("operation").getAsString();
+      if (fixture.has("inputContract")) Fixtures.assertSignature(client, operation, fixture.getAsJsonObject("options"));
       Object result = Fixtures.invoke(client, operation, fixture.getAsJsonObject("options"));
       assertEquals(fixture.get("request"), captured[0]);
       // A fixture's result is what the method returns when it isn't the response body.

@@ -154,7 +154,10 @@ async fn request_contracts() {
             )
             .await
             .unwrap();
-            assert_eq!(fixture["request"], server.join().unwrap());
+            assert_eq!(
+                whole_numbers(fixture["request"].clone()),
+                whole_numbers(server.join().unwrap())
+            );
             compare_typed(&result, &expected_result(fixture))
                 .unwrap_or_else(|path| panic!("{}: {path}", fixture["operation"]));
         },
@@ -279,7 +282,10 @@ async fn request_contracts_through_the_mock() {
                 .unwrap_or_else(|path| panic!("{}: {path}", f["operation"]));
             let requests = mock.requests();
             assert_eq!(requests.len(), 1);
-            assert_eq!(f["request"], common::describe(&requests[0]));
+            assert_eq!(
+                whole_numbers(f["request"].clone()),
+                whole_numbers(common::describe(&requests[0]))
+            );
             assert_eq!(mock.remaining_responses(), 0);
         },
     )

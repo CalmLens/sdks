@@ -30,7 +30,7 @@
     "prepublishOnly": "npm run check && npm run test && npm run build",
     "test": "bun test --parallel=4 ./tests/",
     "check:fix": "tsc --noEmit --project tsconfig.json && npx @biomejs/biome check --write",
-    "check": "tsc --noEmit --project tsconfig.json && npx @biomejs/biome check",
+    "check": "tsc --noEmit --project tsconfig.json && tsc --project tsconfig.contract.json && npx @biomejs/biome check",
     "cleanup": "rimraf esm && rimraf cjs && rimraf bin",
     "build": "npm run cleanup && rolldown -c rolldown.config.mjs && node scripts/post-build.js && npm run build:cli && npm run verify:package",
     "build:cli": "bun scripts/build-cli.ts",

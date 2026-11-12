@@ -2524,7 +2524,7 @@ class Text:
         self._c = client
 
     def classify(self, options: ClassifyTextOptions | None = None, /, *, text: str = _UNSET, name: str = _UNSET,
-                 description: str = _UNSET, processing_options: ProcessingOptions = _UNSET,
+                 description: str = _UNSET, processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
                  metadata: List[MetadataItem] = _UNSET, tags: List[str] = _UNSET, author_id: str = _UNSET,
                  context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
@@ -2532,7 +2532,7 @@ class Text:
         """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``).
         ``author_id``, ``context`` and ``upload_preset_id`` work as in :meth:`Assets.create`."""
         merged = _merge("text.classify", options, text=text, name=name, description=description, processing_options=processing_options,
-                        metadata=metadata, tags=tags, author_id=author_id, context=context, external_id=external_id,
+                        visibility=visibility, metadata=metadata, tags=tags, author_id=author_id, context=context, external_id=external_id,
                         external_url=external_url, folder_id=folder_id, upload_preset_id=upload_preset_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():

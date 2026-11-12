@@ -1585,9 +1585,11 @@ func Ptr[T any](value T) *T { return &value }
 
 // ClassifyTextOptions moderates plain text. Name defaults to "text".
 type ClassifyTextOptions struct {
-	Text              string
-	Name              string
-	Description       *string
+	Text        string
+	Name        string
+	Description *string
+	// Visibility works as in SubmitAssetOptions.
+	Visibility        string
 	ProcessingOptions *ProcessingOptions
 	Metadata          []MetadataItem
 	// Tags work as in SubmitAssetOptions.

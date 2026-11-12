@@ -10,7 +10,8 @@
       "!!src/client/CalmLensErrorCodes.ts",
       "!!src/client/CalmLensOptionKeys.ts",
       "!!src/testing/MockClassification.ts",
-      "!!src/contract"
+      "!!src/contract",
+      "!!tests/signatures.generated.ts"
     ]
   }
 }

@@ -1428,6 +1428,7 @@ class SubmitAssetOptions(_SubmitRequired, total=False):
     processingOptions: ProcessingOptions
     visibility: Visibility
     metadata: list[MetadataItem]
+    tags: list[str]
     authorId: str
     context: ModerationContext
     externalId: str
@@ -1452,7 +1453,7 @@ class SignedUploadToken(TypedDict):
     expiresAt: int
 
 
-class AssetIdOptions(TypedDict, total=False):
+class AssetIdOptions(TypedDict):
     assetId: str
 
 
@@ -1655,6 +1656,8 @@ class ClassifyTextOptions(_ClassifyTextRequired, total=False):
     description: str
     processingOptions: ProcessingOptions
     metadata: list[MetadataItem]
+    tags: list[str]
+    visibility: Visibility
     authorId: str
     context: ModerationContext
     externalId: str

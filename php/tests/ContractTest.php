@@ -130,6 +130,13 @@ final class ContractTest extends TestCase
             return Create::promiseFor(new Response(200, [], json_encode($fixture['response'])));
         };
         $client = new ServerClient('key', 'project-1', maxRetries: 0, httpClient: new Client(['handler' => $handler]));
+        if (isset($fixture['inputContract'])) {
+            $parts = explode('.', $fixture['operation']);
+            $target = count($parts) === 1 ? $client : $client->{$parts[0]};
+            $method = new ReflectionMethod($target, end($parts));
+            self::assertSame('array', (string) $method->getParameters()[0]->getType());
+            self::assertSame(self::expectedResult($fixture) === null ? 'void' : 'array', (string) $method->getReturnType());
+        }
         self::assertSame(self::expectedResult($fixture), self::invoke($client, $fixture['operation'], $fixture['options'] ?? []));
         self::assertSame(1, $calls);
     }
