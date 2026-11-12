@@ -595,7 +595,7 @@ final class Assets extends Resource
             $delay = min($delay * self::DECISION_INTERVAL_FACTOR, self::DECISION_MAX_INTERVAL);
         } while (true);
         throw CalmLensException::create('sdk/timeout', "Asset {$options['assetId']} had no moderation decision after {$timeout}s",
-            details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
+            details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationDecision' => $status]);
     }
 
     /**

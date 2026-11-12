@@ -369,7 +369,7 @@ final class ContractTest extends TestCase
     private static function runClientStep(ServerClient $client, string $operation, array $args): mixed
     {
         $args = self::phpArgs($operation, $args);
-        return $operation === 'events.iterate' ? self::collect($client->events->eachPage($args))
+        return $operation === 'events.iterate' ? self::collect($client->events->each($args))
             : (self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, $args));
     }
 
