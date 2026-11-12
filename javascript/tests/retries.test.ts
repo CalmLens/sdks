@@ -139,6 +139,21 @@ describe("retries", () => {
     expect(requests).toHaveLength(1);
   });
 
+  test("a request's own signal cancels the wait before a retry", async () => {
+    const { fetchImpl, requests } = scriptedFetch([
+      () => new Response("unavailable", { status: 503, headers: { "Retry-After": "30" } }),
+      () => new Response("served"),
+    ]);
+    const client = new CalmLensServerClient({ apiKey: "key", projectId, fetch: fetchImpl });
+    const controller = new AbortController();
+    const pending = client.cdn.serve({ assetId: "asset-1", init: { signal: controller.signal } });
+    setTimeout(() => controller.abort(), 20);
+    const started = Date.now();
+    await expect(pending).rejects.toMatchObject({ code: "sdk/cancelled" });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(requests).toHaveLength(1);
+  });
+
   test("retries uploads with the same Idempotency-Key, including while the first is in progress", async () => {
     const { fetchImpl, requests } = scriptedFetch([
       apiError(409, "idempotency/request-in-progress", { "Retry-After": "0" }),

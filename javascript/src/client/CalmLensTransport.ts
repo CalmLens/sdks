@@ -252,6 +252,19 @@ export class CalmLensTransport {
     return Object.fromEntries(headers.entries());
   }
 
+  /** Waits before a retry. Either the client's or the request's signal cancels the wait. */
+  private async backoff(ms: number, request: TransportRequest) {
+    const callers = createAttemptSignal(
+      [this.settings.signal, request.init?.signal ?? undefined],
+      undefined,
+    );
+    try {
+      await this.sleep(ms, callers.signal);
+    } finally {
+      callers.release();
+    }
+  }
+
   private canRetry(request: TransportRequest) {
     return (
       this.settings.maxRetries > 0 &&
@@ -307,7 +320,7 @@ export class CalmLensTransport {
         const failure = toFailure(cause, attempt);
         // Transport failures and timeouts; a cancellation is never retried.
         if (canRetryAgain && failure.isRetryable()) {
-          await this.sleep(getRetryDelayMs(attemptNumber), this.settings.signal);
+          await this.backoff(getRetryDelayMs(attemptNumber), request);
           continue;
         }
         throw failure;
@@ -327,7 +340,7 @@ export class CalmLensTransport {
         }
         attempt.release();
         await response.body?.cancel().catch(() => {});
-        await this.sleep(delayMs, this.settings.signal);
+        await this.backoff(delayMs, request);
         continue;
       }
 
@@ -344,7 +357,7 @@ export class CalmLensTransport {
       const shouldRetry =
         canRetryAgain && retryDelayMs <= RETRY_AFTER_MAX_MS && error.isRetryable();
       if (shouldRetry) {
-        await this.sleep(retryDelayMs, this.settings.signal);
+        await this.backoff(retryDelayMs, request);
         continue;
       }
       throw error;
