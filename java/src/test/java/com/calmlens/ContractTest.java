@@ -2,9 +2,15 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.calmlens.MockCalmLensServerClient.Grant;
-import com.calmlens.MockCalmLensServerClient.Options;
-import com.calmlens.MockCalmLensServerClient.Outcome;
+import com.calmlens.exception.*;
+import com.calmlens.internal.Json;
+import com.calmlens.models.*;
+import com.calmlens.params.*;
+import com.calmlens.testing.*;
+
+import com.calmlens.testing.MockCalmLensServerClient.Grant;
+import com.calmlens.testing.MockCalmLensServerClient.Options;
+import com.calmlens.testing.MockCalmLensServerClient.Outcome;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -41,7 +47,7 @@ import org.junit.jupiter.api.function.ThrowingConsumer;
  */
 class ContractTest {
   private static CalmLensServerClient client(Transport transport) {
-    return CalmLensServerClient.builder("key", "project-1").transport(transport).build();
+    return CalmLensServerClient.builder().apiKey("key").projectId("project-1").transport(transport).build();
   }
 
   /** One dynamic test per element of {@code cases}, named by its index and {@code name}. */
@@ -69,20 +75,27 @@ class ContractTest {
   @TestFactory Stream<DynamicTest> requestContracts() throws Exception {
     return cases(array("requests.json"), f -> f.get("operation").getAsString(), fixture -> {
       JsonObject[] captured = {null};
-      CalmLensServerClient client = client(request -> {
+      Transport transport = request -> {
         assertEquals("key", request.headers().get("X-Api-Key"));
         captured[0] = Fixtures.describe(request.method(), request.uri(), request.headers(), Fixtures.body(request));
         return Fixtures.json(200, fixture.get("response").toString());
-      });
+      };
+      CalmLensServerClient client = client(transport);
       String operation = fixture.get("operation").getAsString();
       if (fixture.has("inputContract")) Fixtures.assertSignature(client, operation, fixture.getAsJsonObject("options"));
-      Object result = Fixtures.invoke(client, operation, fixture.getAsJsonObject("options"));
-      assertEquals(fixture.get("request"), captured[0]);
       // A fixture's result is what the method returns when it isn't the response body.
       JsonElement response = fixture.has("result") ? fixture.get("result") : fixture.get("response");
       JsonElement expected = operation.endsWith(".delete") || operation.equals("hashLists.removeEntry") ? JsonNull.INSTANCE
           : operation.equals("ensureLenses") ? response.getAsJsonObject().get("lenses") : response;
-      Fixtures.assertMatches(expected, tree(result), "result");
+      // The same request and result through the synchronous client and its asynchronous form.
+      for (boolean async : new boolean[] {false, true}) {
+        captured[0] = null;
+        String label = async ? "async result" : "result";
+        // A fresh client each time, so ensureLenses' cache doesn't answer the second call.
+        Object result = Fixtures.invoke(client(transport), operation, fixture.getAsJsonObject("options"), async && !Fixtures.isIterator(operation));
+        assertEquals(fixture.get("request"), captured[0], label + " request");
+        Fixtures.assertMatches(expected, Fixtures.isIterator(operation) ? collect((Iterable<?>) result) : Fixtures.typed(result), label);
+      }
     });
   }
 
@@ -90,7 +103,7 @@ class ContractTest {
   @TestFactory Stream<DynamicTest> requestContractsThroughTheMock() throws Exception {
     return cases(array("requests.json"), f -> f.get("operation").getAsString(), fixture -> {
       MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueue(200, fixture.get("response"));
-      Fixtures.invoke(mock.client, fixture.get("operation").getAsString(), fixture.getAsJsonObject("options"));
+      Fixtures.invoke(mock.client(), fixture.get("operation").getAsString(), fixture.getAsJsonObject("options"));
       assertEquals(1, mock.requests().size());
       var recorded = mock.requests().get(0);
       assertEquals(fixture.get("request"), Fixtures.describe(recorded.method(), java.net.URI.create(recorded.url()), recorded.headers(), recorded.body()));
@@ -106,6 +119,7 @@ class ContractTest {
       String operation = rejection.get("operation").getAsString();
       CalmLensException error = assertThrows(CalmLensException.class, () -> Fixtures.invoke(client, operation, rejection.getAsJsonObject("options")), rejection.toString());
       assertEquals(rejection.get("error").getAsString(), error.getCode(), rejection.toString());
+      if (rejection.has("kind")) Fixtures.assertKind(error, rejection.get("kind").getAsString(), rejection.toString());
     });
   }
 
@@ -115,14 +129,14 @@ class ContractTest {
       JsonObject options = cdn.getAsJsonObject("options");
       // Every fixture option must reach the request model, so a new option can't be silently ignored.
       if (cdn.has("url")) {
-        java.util.Set<String> mapped = new java.util.HashSet<>(Models.encode(Fixtures.decode(options, Models.CdnRequest.class)).keySet());
+        java.util.Set<String> mapped = new java.util.HashSet<>(Fixtures.encode(Fixtures.decode(options, CdnRequestParams.class)).keySet());
         mapped.add("transform");
         assertTrue(mapped.containsAll(options.keySet()), cdn.toString());
-        assertEquals(cdn.get("url").getAsString(), client.cdn.getAssetUrl(Fixtures.decode(options, Models.CdnRequest.class)));
+        assertEquals(cdn.get("url").getAsString(), client.cdn().getAssetUrl(Fixtures.decode(options, CdnRequestParams.class)));
       } else {
         // Options the typed transform model cannot hold are rejected while decoding them.
         assertEquals(cdn.get("error").getAsString(), assertThrows(CalmLensException.class,
-            () -> client.cdn.getAssetUrl(Fixtures.decode(options, Models.CdnRequest.class))).getCode(), cdn.toString());
+            () -> client.cdn().getAssetUrl(Fixtures.decode(options, CdnRequestParams.class))).getCode(), cdn.toString());
       }
     });
   }
@@ -131,29 +145,41 @@ class ContractTest {
 
   @Test void errorCodeConstantsMatchThePublicApi() throws Exception {
     Map<String, Integer> expected = new HashMap<>();
-    for (JsonElement item : array("errors.json"))
-      expected.put(item.getAsJsonObject().get("code").getAsString(), item.getAsJsonObject().get("status").getAsInt());
+    for (JsonElement item : array("errors.json")) {
+      String code = item.getAsJsonObject().get("code").getAsString();
+      // The proxy cases are sdk/http-error at each status: the SDK's own code, not an API one.
+      if (!code.startsWith("sdk/")) expected.put(code, item.getAsJsonObject().get("status").getAsInt());
+    }
     assertEquals(expected, ErrorCodes.apiStatuses());
     assertTrue(ErrorCodes.httpStatus(ErrorCodes.SDK_TIMEOUT).isEmpty());
   }
 
   @TestFactory Stream<DynamicTest> eachErrorCodeHasItsHttpStatus() throws Exception {
-    return cases(array("errors.json"), e -> e.get("code").getAsString(), entry ->
-        assertEquals(entry.get("status").getAsInt(), ErrorCodes.httpStatus(entry.get("code").getAsString()).orElseThrow()));
+    return cases(array("errors.json"), e -> e.get("code").getAsString(), entry -> {
+      String code = entry.get("code").getAsString();
+      if (code.startsWith("sdk/")) assertTrue(ErrorCodes.httpStatus(code).isEmpty(), code + " has no status of its own");
+      else assertEquals(entry.get("status").getAsInt(), ErrorCodes.httpStatus(code).orElseThrow());
+    });
   }
 
   /** Each API error code, answered to a real call (retries off), becomes a typed error with every field. */
   @TestFactory Stream<DynamicTest> eachErrorCodeBecomesATypedError() throws Exception {
     return cases(array("errors.json"), e -> e.get("code").getAsString(), entry -> {
       JsonObject response = entry.getAsJsonObject("response");
-      CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").maxRetries(0).transport(request -> {
+      CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1").maxRetries(0).transport(request -> {
         Map<String, List<String>> headers = new HashMap<>();
         response.getAsJsonObject("headers").entrySet().forEach(h -> headers.put(h.getKey(), List.of(h.getValue().getAsString())));
-        return new Transport.Response(response.get("status").getAsInt(), headers, response.get("body").toString().getBytes(StandardCharsets.UTF_8));
+        String body = response.has("bodyText") ? response.get("bodyText").getAsString() : response.get("body").toString();
+        return new Transport.Response(response.get("status").getAsInt(), headers, body.getBytes(StandardCharsets.UTF_8));
       }).build();
-      CalmLensException error = assertThrows(CalmLensException.class,
-          () -> Fixtures.invoke(client, entry.get("operation").getAsString(), entry.getAsJsonObject("args")));
-      assertEquals(entry.get("expected"), Fixtures.errorFields(error));
+      for (boolean async : new boolean[] {false, true}) {
+        CalmLensException error = assertThrows(CalmLensException.class,
+            () -> Fixtures.invoke(client, entry.get("operation").getAsString(), entry.getAsJsonObject("args"), async));
+        assertEquals(entry.get("expected"), Fixtures.errorFields(error));
+        Fixtures.assertKind(error, entry.get("kind").getAsString(), entry.get("code").getAsString());
+        // A proxy's page is kept as the raw body.
+        if (response.has("bodyText")) assertEquals(response.get("bodyText").getAsString(), error.getBody().orElseThrow());
+      }
     });
   }
 
@@ -195,37 +221,37 @@ class ContractTest {
 
   @TestFactory Stream<DynamicTest> futureWebhookFieldsAndTypesAreAccepted() throws Exception {
     return cases(array("webhooks.json", "parsing"), f -> f.get("expectedType").getAsString(), f -> {
-      Models.WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(
+      WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(
           f.get("body").getAsString().getBytes(StandardCharsets.UTF_8), f.get("signature").getAsString(),
           f.get("timestamp").getAsString(), f.get("secret").getAsString(), f.get("now").getAsLong(), 300);
-      assertEquals(f.get("expectedType").getAsString(), event.type());
-      assertEquals(f.get("expectedFactKey").getAsString(), event.facts().get(0).key());
+      assertEquals(f.get("expectedType").getAsString(), event.getRawJsonObject().get("type").getAsString());
+      assertEquals(f.get("expectedFactKey").getAsString(), event.getFacts().get(0).getKey());
     });
   }
 
   /** CalmLens converts each stored event to the delivered payload the same way. */
   @TestFactory Stream<DynamicTest> webhookPayloadConversionContracts() throws Exception {
     return cases(array("webhooks.json", "payloads"), p -> p.getAsJsonObject("event").get("type").getAsString(), entry -> {
-      Models.Event event = Json.GSON.fromJson(entry.get("event"), Models.Event.class);
-      assertEquals(Json.GSON.fromJson(entry.get("payload"), Models.WebhookEventPayload.class), CalmLensServerClient.toWebhookEventPayload(event));
+      Event event = Json.GSON.fromJson(entry.get("event"), Event.class);
+      assertEquals(Json.GSON.fromJson(entry.get("payload"), WebhookEventPayload.class), CalmLensServerClient.toWebhookEventPayload(event));
     });
   }
 
   @TestFactory Stream<DynamicTest> webhookPayloadParsingContracts() throws Exception {
     return cases(array("webhooks.json", "payloads"), p -> p.getAsJsonObject("event").get("type").getAsString(), item -> {
       JsonObject expected = item.getAsJsonObject("payload");
-      Models.WebhookEventPayload parsed = CalmLensServerClient.readWebhookEvent(expected.toString());
-      assertEquals(expected.get("id").getAsString(), parsed.id());
-      assertEquals(expected.get("projectId").getAsString(), parsed.projectId());
-      assertEquals(expected.get("type").getAsString(), parsed.type());
-      assertEquals(expected.get("severity").getAsString(), parsed.severity());
-      assertEquals(expected.get("title").getAsString(), parsed.title());
-      assertEquals(string(expected, "description"), parsed.description());
-      assertEquals(string(expected, "assetId"), parsed.assetId());
-      if (expected.get("asset").isJsonNull()) assertNull(parsed.asset());
-      else assertEventAsset(expected.getAsJsonObject("asset"), parsed.asset());
-      assertEquals(expected.get("facts"), Json.GSON.toJsonTree(parsed.facts()));
-      assertEquals(Instant.ofEpochMilli(expected.get("createdAt").getAsLong()), parsed.createdAt());
+      WebhookEventPayload parsed = CalmLensServerClient.readWebhookEvent(expected.toString());
+      assertEquals(expected.get("id").getAsString(), parsed.getId());
+      assertEquals(expected.get("projectId").getAsString(), parsed.getProjectId());
+      assertEquals(EventType.fromValue(expected.get("type").getAsString()), parsed.getType());
+      assertEquals(EventSeverity.fromValue(expected.get("severity").getAsString()), parsed.getSeverity());
+      assertEquals(expected.get("title").getAsString(), parsed.getTitle());
+      assertEquals(string(expected, "description"), parsed.getDescription().orElse(null));
+      assertEquals(string(expected, "assetId"), parsed.getAssetId().orElse(null));
+      if (expected.get("asset").isJsonNull()) assertTrue(parsed.getAsset().isEmpty());
+      else assertEventAsset(expected.getAsJsonObject("asset"), parsed.getAsset().orElseThrow());
+      assertEquals(expected.get("facts"), Json.GSON.toJsonTree(parsed.getFacts()));
+      assertEquals(Instant.ofEpochMilli(expected.get("createdAt").getAsLong()), parsed.getCreatedAt());
     });
   }
 
@@ -234,12 +260,13 @@ class ContractTest {
     return value == null || value.isJsonNull() ? null : value.getAsString();
   }
 
-  private static void assertEventAsset(JsonObject expected, Models.EventAsset asset) {
-    assertEquals(string(expected, "id"), asset.id());
-    assertEquals(string(expected, "externalId"), asset.externalId());
-    assertEquals(string(expected.getAsJsonObject("classification"), "status"), asset.classification().status().value());
-    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "status"), asset.classification().moderation().status().value());
-    assertEquals(string(expected.getAsJsonObject("content"), "status"), asset.content().status().value());
+  private static void assertEventAsset(JsonObject expected, EventAsset asset) {
+    assertEquals(string(expected, "id"), asset.getId());
+    assertEquals(string(expected, "externalId"), asset.getExternalId().orElse(null));
+    assertEquals(string(expected.getAsJsonObject("classification"), "status"), asset.getClassification().getStatus().getValue());
+    assertEquals(string(expected.getAsJsonObject("classification").getAsJsonObject("moderation"), "decision"),
+        asset.getClassification().getModeration().getDecision().map(AssetModerationDecision::getValue).orElse(null));
+    assertEquals(string(expected.getAsJsonObject("content"), "status"), asset.getContent().getStatus().getValue());
   }
 
   /** The header containers a Java receiver gets: values as given (strings or lists), and every value as a list. */
@@ -279,7 +306,7 @@ class ContractTest {
   /** A parsed delivery equals the body as a whole, unknown fields included, and knows whether it is a test send. */
   @TestFactory Stream<DynamicTest> webhookParsedEvents() throws Exception {
     return cases(array("webhooks.json", "parsed"), c -> c.get("name").getAsString(), c -> {
-      Models.WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(
+      WebhookEventPayload event = CalmLensServerClient.parseWebhookEvent(
           c.get("body").getAsString().getBytes(StandardCharsets.UTF_8), c.get("signature").getAsString(), c.get("timestamp").getAsString(),
           c.get("secret").getAsString(), c.get("now").getAsLong(), CalmLensServerClient.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
       assertEquals(c.get("expected"), tree(event));
@@ -289,23 +316,23 @@ class ContractTest {
 
   @TestFactory Stream<DynamicTest> webhookTestFacts() throws Exception {
     return cases(array("webhooks.json", "testFacts"), c -> c.get("name").getAsString(), c ->
-        assertEquals(c.get("isTest").getAsBoolean(), CalmLensServerClient.isTestWebhookEvent(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class))));
+        assertEquals(c.get("isTest").getAsBoolean(), CalmLensServerClient.isTestWebhookEvent(Json.GSON.fromJson(c.get("event"), WebhookEventPayload.class))));
   }
 
   /** getEventFact reads one fact's value by key, null when the event lacks it, from a delivery and from a feed event. */
   @TestFactory Stream<DynamicTest> webhookFactLookups() throws Exception {
     return cases(array("webhooks.json", "factLookups"), c -> c.get("name").getAsString(), c -> {
       String key = c.get("key").getAsString();
-      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class), key)));
-      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), Models.Event.class), key)));
+      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), WebhookEventPayload.class), key)));
+      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), Event.class), key)));
     });
   }
 
   /** getEventFacts gives every fact's value by key, from a delivery and from a feed event. */
   @TestFactory Stream<DynamicTest> webhookFactObjects() throws Exception {
     return cases(array("webhooks.json", "factObjects"), c -> c.get("name").getAsString(), c -> {
-      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class))));
-      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), Models.Event.class))));
+      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), WebhookEventPayload.class))));
+      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), Event.class))));
     });
   }
 
@@ -313,22 +340,22 @@ class ContractTest {
     return cases(array("webhooks.json", "assetSequences"), c -> c.get("name").getAsString(), c -> {
       Long lastSequence = c.get("lastSequence").isJsonNull() ? null : c.get("lastSequence").getAsLong();
       boolean newer = c.get("newer").getAsBoolean();
-      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class), lastSequence));
-      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), Models.Event.class), lastSequence));
+      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), WebhookEventPayload.class), lastSequence));
+      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), Event.class), lastSequence));
     });
   }
 
   /** An event becomes its delivery body, is signed into delivery headers, and parses back from them. */
   @TestFactory Stream<DynamicTest> webhookRoundTrips() throws Exception {
     return cases(array("webhooks.json", "roundTrips"), c -> c.get("name").getAsString(), c -> {
-      Models.WebhookEventPayload payload = CalmLensServerClient.toWebhookEventPayload(Json.GSON.fromJson(c.get("event"), Models.Event.class));
+      WebhookEventPayload payload = CalmLensServerClient.toWebhookEventPayload(Json.GSON.fromJson(c.get("event"), Event.class));
       assertEquals(c.get("payload"), tree(payload));
       String body = c.get("body").getAsString();
       assertEquals(body, Json.GSON.toJson(payload));
       Map<String, String> headers = CalmLensServerClient.createWebhookHeaders(c.get("secret").getAsString(), body,
           c.get("deliveryId").getAsString(), c.get("timestampSeconds").getAsLong());
       assertEquals(Json.GSON.fromJson(c.get("headers"), new com.google.gson.reflect.TypeToken<Map<String, String>>() {}.getType()), headers);
-      Models.WebhookEventPayload received = CalmLensServerClient.parseWebhookRequest(headers, body.getBytes(StandardCharsets.UTF_8),
+      WebhookEventPayload received = CalmLensServerClient.parseWebhookRequest(headers, body.getBytes(StandardCharsets.UTF_8),
           c.get("secret").getAsString(), c.get("timestampSeconds").getAsLong(), CalmLensServerClient.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
       assertEquals(c.get("payload"), tree(received));
       assertEquals(payload, received);
@@ -342,9 +369,9 @@ class ContractTest {
     byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
     String now = Long.toString(System.currentTimeMillis() / 1000);
     String header = CalmLensServerClient.createWebhookSignatureHeader("whsec", now, body);
-    assertEquals(payload.get("id").getAsString(), CalmLensServerClient.parseWebhookEvent(body, header, now, "whsec").id());
+    assertEquals(payload.get("id").getAsString(), CalmLensServerClient.parseWebhookEvent(body, header, now, "whsec").getId());
     assertEquals(payload.get("id").getAsString(), CalmLensServerClient.parseWebhookRequest(
-        Map.of(CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER, header, CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER, now), body, "whsec").id());
+        Map.of(CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER, header, CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER, now), body, "whsec").getId());
     String stale = Long.toString(System.currentTimeMillis() / 1000 - CalmLensServerClient.WEBHOOK_SIGNATURE_TOLERANCE_SECONDS - 5);
     assertFalse(CalmLensServerClient.verifyWebhookRequest(Map.of(CalmLensServerClient.WEBHOOK_SIGNATURE_HEADER,
         CalmLensServerClient.createWebhookSignatureHeader("whsec", stale, body), CalmLensServerClient.WEBHOOK_TIMESTAMP_HEADER, stale), body, "whsec"));
@@ -354,13 +381,13 @@ class ContractTest {
 
   /** Options a Java type cannot hold, so the type already refuses them. */
   private static final Map<String, String> TOKEN_OPTIONS_REJECTED_BY_TYPE = Map.of(
-      "fractional lifetime", "SignUploadToken.expiresIn is an Integer");
+      "fractional lifetime", "UploadTokenSignParams.expiresIn is an Integer");
 
-  private static Models.SignUploadToken tokenOptions(JsonObject options) {
-    Models.SignUploadToken typed = new Models.SignUploadToken(options.get("uploadPresetId").getAsString());
-    if (options.has("externalId")) typed.externalId(options.get("externalId").getAsString());
-    if (options.has("expiresIn")) typed.expiresIn(options.get("expiresIn").getAsInt());
-    return typed;
+  private static UploadTokenSignParams tokenOptions(JsonObject options) {
+    UploadTokenSignParams.Builder typed = UploadTokenSignParams.builder().setUploadPresetId(options.get("uploadPresetId").getAsString());
+    if (options.has("externalId")) typed.setExternalId(options.get("externalId").getAsString());
+    if (options.has("expiresIn")) typed.setExpiresIn(options.get("expiresIn").getAsInt());
+    return typed.build();
   }
 
   private static JsonObject tokenClaims(String token) {
@@ -377,9 +404,10 @@ class ContractTest {
   @TestFactory Stream<DynamicTest> uploadTokensSignExactly() throws Exception {
     return cases(array("upload-tokens.json", "signing"), c -> c.get("name").getAsString(), c -> {
       JsonObject expected = c.getAsJsonObject("expected");
-      Models.SignedUploadToken signed = MockCalmLensServerClient.signUploadToken(c.get("apiKey").getAsString(),
+      SignedUploadToken signed = MockCalmLensServerClient.signUploadToken(c.get("apiKey").getAsString(),
           tokenOptions(c.getAsJsonObject("options")), c.get("now").getAsLong(), c.get("nonce").getAsString());
-      assertEquals(new Models.SignedUploadToken(expected.get("token").getAsString(), expected.get("expiresAt").getAsLong()), signed);
+      assertEquals(expected.get("token").getAsString(), signed.getToken());
+      assertEquals(expected.get("expiresAt").getAsLong(), signed.getExpiresAt());
     });
   }
 
@@ -388,20 +416,20 @@ class ContractTest {
     String context = fixture.get("signingContext").getAsString();
     return cases(fixture.getAsJsonArray("signing"), c -> c.get("name").getAsString(), c -> {
       JsonObject expected = c.getAsJsonObject("expected");
-      CalmLensServerClient client = CalmLensServerClient.builder(c.get("apiKey").getAsString(), "project-1").build();
+      CalmLensServerClient client = CalmLensServerClient.builder().apiKey(c.get("apiKey").getAsString()).projectId("project-1").build();
       long before = System.currentTimeMillis();
-      Models.SignedUploadToken signed = client.uploadTokens.sign(tokenOptions(c.getAsJsonObject("options")));
+      SignedUploadToken signed = client.uploadTokens().sign(tokenOptions(c.getAsJsonObject("options")));
       long after = System.currentTimeMillis();
-      JsonObject claims = tokenClaims(signed.token());
+      JsonObject claims = tokenClaims(signed.getToken());
       JsonObject want = expected.getAsJsonObject("claims").deepCopy();
-      want.addProperty("e", signed.expiresAt());
+      want.addProperty("e", signed.getExpiresAt());
       want.add("n", claims.get("n"));
       assertEquals(want, claims);
       assertNotEquals(c.get("nonce").getAsString(), claims.get("n").getAsString());
       long lifetime = expected.get("expiresAt").getAsLong() - c.get("now").getAsLong();
-      assertTrue(signed.expiresAt() - before >= lifetime && signed.expiresAt() - after <= lifetime, "expiry within the lifetime");
-      String body = signed.token().substring("clut_".length(), signed.token().indexOf('.'));
-      assertEquals(hmacHex(expected.get("signingSecret").getAsString(), context + body), signed.token().substring(signed.token().indexOf('.') + 1));
+      assertTrue(signed.getExpiresAt() - before >= lifetime && signed.getExpiresAt() - after <= lifetime, "expiry within the lifetime");
+      String body = signed.getToken().substring("clut_".length(), signed.getToken().indexOf('.'));
+      assertEquals(hmacHex(expected.get("signingSecret").getAsString(), context + body), signed.getToken().substring(signed.getToken().indexOf('.') + 1));
     });
   }
 
@@ -415,8 +443,8 @@ class ContractTest {
         return;
       }
       String apiKey = c.get("apiKey").getAsString();
-      CalmLensServerClient client = CalmLensServerClient.builder(apiKey, "project-1").transport(request -> fail("Sent " + request.uri())).build();
-      assertEquals(c.get("error").getAsString(), assertThrows(CalmLensException.class, () -> client.uploadTokens.sign(tokenOptions(options))).getCode());
+      CalmLensServerClient client = CalmLensServerClient.builder().apiKey(apiKey).projectId("project-1").transport(request -> fail("Sent " + request.uri())).build();
+      assertEquals(c.get("error").getAsString(), assertThrows(CalmLensException.class, () -> client.uploadTokens().sign(tokenOptions(options))).getCode());
       assertEquals(c.get("error").getAsString(), assertThrows(CalmLensException.class,
           () -> MockCalmLensServerClient.signUploadToken(apiKey, tokenOptions(options), 0, "n")).getCode());
     });
@@ -454,13 +482,13 @@ class ContractTest {
   /** Every transform option, decoded into ImageTransformOptions and serialized, gives the selector the CDN writes. */
   @TestFactory Stream<DynamicTest> transformOptionContracts() throws Exception {
     return cases(array("transform-options.json", "cases"), c -> c.get("selector").getAsString(), testCase -> {
-      Models.ImageTransformOptions options = Json.GSON.fromJson(testCase.get("options"), Models.ImageTransformOptions.class);
+      ImageTransformOptions options = Json.GSON.fromJson(testCase.get("options"), ImageTransformOptions.class);
       assertEquals(testCase.get("selector").getAsString(), CalmLensServerClient.serializeTransform(options));
     });
   }
 
   /**
-   * Invalid cases {@link Models.ImageTransformOptions} cannot hold: unknown options and values of
+   * Invalid cases {@link ImageTransformOptions} cannot hold: unknown options and values of
    * another type do not survive decoding, so no Java caller can pass them.
    */
   private static final Map<String, String> TRANSFORM_OPTIONS_REJECTED_BY_TYPE = Map.of(
@@ -477,7 +505,7 @@ class ContractTest {
   /** Structured options as decoded and encoded again, or null when they do not decode. */
   private static JsonElement transformRoundTrip(JsonElement options) {
     try {
-      return Json.GSON.toJsonTree(Json.GSON.fromJson(options, Models.ImageTransformOptions.class));
+      return Json.GSON.toJsonTree(Json.GSON.fromJson(options, ImageTransformOptions.class));
     } catch (RuntimeException undecodable) {
       return null;
     }
@@ -493,9 +521,9 @@ class ContractTest {
         return;
       }
       assertEquals(options, transformRoundTrip(options), "decodes into ImageTransformOptions");
-      Models.ImageTransformOptions typed = Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
+      ImageTransformOptions typed = Json.GSON.fromJson(options, ImageTransformOptions.class);
       CalmLensException error = assertThrows(CalmLensException.class,
-          () -> refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").resource("rendered").transform(typed)));
+          () -> refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1").setResource("rendered").setTransform(typed).build()));
       assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
       List<String> unknownKeys = Json.GSON.fromJson(testCase.get("unknownKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
       List<String> invalidKeys = Json.GSON.fromJson(testCase.get("invalidKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
@@ -515,8 +543,8 @@ class ContractTest {
     for (JsonElement element : refused) {
       String type = element.getAsString();
       tests.add(DynamicTest.dynamicTest(type, () -> {
-        CalmLensException error = assertThrows(CalmLensException.class, () -> refusing().assets.create(
-            new Models.SubmitAsset("x", new Models.Content().mimeType(type).base64("aGVsbG8="))));
+        CalmLensException error = assertThrows(CalmLensException.class, () -> refusing().assets().create(
+            AssetCreateParams.builder().setName("x").setContent(Content.base64("aGVsbG8=", type)).build()));
         assertEquals(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, error.getCode());
         assertEquals(Map.of("mimeType", type, "source", "calmlens"), error.getDetails());
       }));
@@ -638,13 +666,13 @@ class ContractTest {
       JsonObject call = new JsonObject();
       call.addProperty("trigger", input.trigger().value());
       call.addProperty("queued", input.queued());
-      call.addProperty("assetId", input.asset().id());
-      call.addProperty("name", input.asset().name());
+      call.addProperty("assetId", input.asset().getId());
+      call.addProperty("name", input.asset().getName());
       call.addProperty("text", input.content().text());
       byte[] bytes = input.content().bytes();
       call.addProperty("bytesBase64", bytes == null ? null : java.util.Base64.getEncoder().encodeToString(bytes));
       calls.add(call);
-      String name = input.asset().name();
+      String name = input.asset().getName();
       JsonElement spec = moderate.has("byName") && name != null ? moderate.getAsJsonObject("byName").get(name) : null;
       if (spec == null && input.trigger() == MockCalmLensServerClient.Trigger.UPLOAD) spec = moderate.get(input.queued() ? "queued" : "analyzed");
       if (spec != null) return buildDecision(spec);
@@ -721,12 +749,12 @@ class ContractTest {
         mock.clearRequests();
         return JsonNull.INSTANCE;
       case "mock.enqueueEvent": {
-        List<Models.EventFact> facts = new ArrayList<>();
-        for (JsonElement fact : args.getAsJsonArray("facts")) facts.add(Json.GSON.fromJson(fact, Models.EventFact.class));
+        List<EventFact> facts = new ArrayList<>();
+        for (JsonElement fact : args.getAsJsonArray("facts")) facts.add(Json.GSON.fromJson(fact, EventFact.class));
         String assetId = args.has("assetId") && !args.get("assetId").isJsonNull() ? args.get("assetId").getAsString() : null;
-        Models.EventFact[] list = facts.toArray(Models.EventFact[]::new);
+        EventFact[] list = facts.toArray(EventFact[]::new);
         return tree(args.has("actor")
-            ? mock.enqueueEvent(args.get("type").getAsString(), assetId, Json.GSON.fromJson(args.get("actor"), Models.EventActor.class), list)
+            ? mock.enqueueEvent(args.get("type").getAsString(), assetId, Json.GSON.fromJson(args.get("actor"), EventActor.class), list)
             : mock.enqueueEvent(args.get("type").getAsString(), assetId, list));
       }
       case "mock.grant":
@@ -741,24 +769,23 @@ class ContractTest {
         return JsonNull.INSTANCE;
       }
       case "cdn.serve":
-        return served(mock.client.cdn.serve(Fixtures.decode(args, Models.CdnRequest.class)));
+        return served(mock.client().cdn().serve(Fixtures.decode(args, CdnRequestParams.class)));
       case "mock.fetchCdn":
         return served(mock.fetchCdn(args.get("url").getAsString()));
       case "cdn.getAssetInfo":
-        return tree(mock.client.cdn.getAssetInfo(args.get("url").getAsString(),
-            args.has("viewerClaims") ? Json.GSON.fromJson(args.get("viewerClaims"), Models.ViewerClaims.class) : null));
+        return tree(mock.client().cdn().getAssetInfo(args.get("url").getAsString(),
+            args.has("viewerClaims") ? Json.GSON.fromJson(args.get("viewerClaims"), ViewerClaims.class) : null));
       case "assets.waitForDecision":
-        return tree(mock.client.assets.waitForDecision(new Models.WaitForDecision(args.get("assetId").getAsString())
-            .timeout(Duration.ofMillis(args.get("timeoutMs").getAsLong()))));
+        return tree(mock.client().assets().waitForDecision(args.get("assetId").getAsString(), Duration.ofMillis(args.get("timeoutMs").getAsLong())));
       case "events.pages":
-        return collect(mock.client.events.pages(Fixtures.decode(args, Models.ListEvents.class)));
+        return collect(mock.client().events().pages(Fixtures.decode(args, EventListParams.class)));
       default:
         if (args.has("idempotencyKey")) {
-          RequestOptions request = new RequestOptions().idempotencyKey(args.remove("idempotencyKey").getAsString());
-          Models.SubmitAsset submit = Fixtures.decode(args, Models.SubmitAsset.class);
-          return tree(operation.equals("assets.create") ? mock.client.assets.create(submit, request) : mock.client.assets.classify(submit, request));
+          RequestOptions request = RequestOptions.builder().setIdempotencyKey(args.remove("idempotencyKey").getAsString()).build();
+          AssetCreateParams submit = Fixtures.decode(args, AssetCreateParams.class);
+          return tree(operation.equals("assets.create") ? mock.client().assets().create(submit, request) : mock.client().assets().classify(submit, request));
         }
-        Object result = Fixtures.invoke(mock.client, operation, args);
+        Object result = Fixtures.invoke(mock.client(), operation, args);
         // Every list's iterator yields its items in order.
         return Fixtures.isIterator(operation) ? collect((Iterable<?>) result) : tree(result);
     }
@@ -880,7 +907,7 @@ class ContractTest {
         mock = new MockCalmLensServerClient(mockOptions);
         mock.setApiKeyGrants(grants);
       } else {
-        CalmLensServerClient.Builder builder = CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
+        CalmLensServerClient.Builder builder = CalmLensServerClient.builder().apiKey(MockCalmLensServerClient.createMockApiKey(grants)).projectId("project-1")
             .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1");
         if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
         mock = new MockCalmLensServerClient(builder, mockOptions);
@@ -899,8 +926,27 @@ class ContractTest {
   /** The categories and qualifiers {@link MockDecision} accepts are surface.json's. */
   @Test void mockDecisionClassificationMatchesTheSurface() throws Exception {
     JsonObject classification = Fixtures.read("surface.json").getAsJsonObject().getAsJsonObject("classification");
-    assertEquals(classification.get("categories"), Json.GSON.toJsonTree(MockClassification.CATEGORIES));
-    assertEquals(classification.get("qualifiers"), Json.GSON.toJsonTree(MockClassification.QUALIFIERS));
+    assertEquals(classification.get("categories"), Json.GSON.toJsonTree(MockClassificationValues.categories()));
+    assertEquals(classification.get("qualifiers"), Json.GSON.toJsonTree(MockClassificationValues.qualifiers()));
+  }
+
+  /** surface.json asyncClient: the client's asynchronous form, whose operations return futures. */
+  @Test void offersTheAsyncClient() throws Exception {
+    String name = Fixtures.read("surface.json").getAsJsonObject().getAsJsonObject("asyncClient").getAsJsonObject("names").get("java").getAsString();
+    int dot = name.lastIndexOf('.');
+    Method async = sdkClass(name.substring(0, dot)).getMethod(name.substring(dot + 1));
+    Method retrieve = async.getReturnType().getMethod("assets").getReturnType().getMethod("retrieve", String.class);
+    assertEquals(java.util.concurrent.CompletableFuture.class, retrieve.getReturnType());
+  }
+
+  /** surface.json errorKinds: every kind's Java class exists, and extends its parent kind's class. */
+  @TestFactory Stream<DynamicTest> errorKindsResolve() throws Exception {
+    return cases(array("surface.json", "errorKinds"), k -> k.get("id").getAsString(), kind -> {
+      Class<?> type = Fixtures.errorKindClass(kind.get("id").getAsString());
+      assertTrue(CalmLensException.class.isAssignableFrom(type), type.getName());
+      JsonElement parent = kind.get("parent");
+      if (parent != null && !parent.isJsonNull()) assertEquals(Fixtures.errorKindClass(parent.getAsString()), type.getSuperclass());
+    });
   }
 
   // surface.json retryable: whether an error is retryable follows from its code and status alone.
@@ -909,32 +955,27 @@ class ContractTest {
     return cases(array("surface.json", "retryable"), r -> r.get("code").getAsString() + " " + r.get("status"), entry -> {
       String code = entry.get("code").getAsString();
       boolean expected = entry.get("retryable").getAsBoolean();
-      List<CalmLensException> errors = new ArrayList<>();
-      if (entry.get("status").isJsonNull()) {
-        errors.add(new CalmLensException(code, null));
-        // The classes the client raises for failures without a response.
-        if (code.equals(ErrorCodes.SDK_TRANSPORT_ERROR)) errors.add(new TransportException(code, null, null));
-        if (code.equals(ErrorCodes.SDK_TIMEOUT)) errors.add(new RequestTimeoutException(null, null));
-      } else {
-        errors.add(new ApiException(code, null, null, entry.get("status").getAsInt(), Map.of(), null));
-      }
-      boolean local = entry.get("local").getAsBoolean();
-      for (CalmLensException error : errors) {
-        assertEquals(expected, error.isRetryable(), error.getClass().getSimpleName());
-        assertEquals(local, error.isLocal(), error.getClass().getSimpleName());
-      }
+      // The exception the client raises for the code and status.
+      CalmLensException error = CalmLensException.of(code, null, null, entry.get("status").isJsonNull() ? 0 : entry.get("status").getAsInt(),
+          Map.of(), null, null, null);
+      assertEquals(expected, error.isRetryable(), error.getClass().getSimpleName());
+      assertEquals(entry.get("local").getAsBoolean(), error.isLocal(), error.getClass().getSimpleName());
+      Fixtures.assertKind(error, entry.get("kind").getAsString(), code);
     });
   }
 
   // surface.json: every capability a server SDK must offer exists under its Java name.
 
   private static CalmLensServerClient refusing() {
-    return CalmLensServerClient.builder("key", "project-1").maxRetries(0).transport(request -> fail("Sent " + request.uri())).build();
+    return CalmLensServerClient.builder().apiKey("key").projectId("project-1").maxRetries(0).transport(request -> fail("Sent " + request.uri())).build();
   }
 
   /** A class of the SDK by its simple name, including nested model and mock classes. */
   private static Class<?> sdkClass(String name) {
-    for (String candidate : List.of("com.calmlens." + name, "com.calmlens.Models$" + name, "com.calmlens.MockCalmLensServerClient$" + name)) {
+    // A nested class is named with dots, as in CdnRequestParams.Builder.
+    String binary = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) + "$" + name.substring(name.lastIndexOf('.') + 1) : name;
+    for (String candidate : List.of("com.calmlens." + name, "com.calmlens.testing." + name, "com.calmlens.models." + name,
+        "com.calmlens.params." + name, "com.calmlens.params." + binary, "com.calmlens.testing.MockCalmLensServerClient$" + name)) {
       try {
         return Class.forName(candidate);
       } catch (ClassNotFoundException next) {
@@ -961,7 +1002,7 @@ class ContractTest {
   }
 
   private static CalmLensException raisedError(JsonObject spec) {
-    CalmLensServerClient failing = CalmLensServerClient.builder("key", "project-1").maxRetries(0).transport(request -> {
+    CalmLensServerClient failing = CalmLensServerClient.builder().apiKey("key").projectId("project-1").maxRetries(0).transport(request -> {
       Map<String, List<String>> headers = new HashMap<>();
       spec.getAsJsonObject("headers").entrySet().forEach(e -> headers.put(e.getKey(), List.of(e.getValue().getAsString())));
       return new Transport.Response(spec.get("status").getAsInt(), headers, spec.get("body").toString().getBytes(StandardCharsets.UTF_8));
@@ -975,12 +1016,12 @@ class ContractTest {
     String value = capability.has("value") ? capability.get("value").getAsString() : null;
     switch (capability.get("kind").getAsString()) {
       case "method": {
-        String[] parts = name.split("\\.");
+        String[] parts = name.replace("()", "").split("\\.");
         Class<?> target = CalmLensServerClient.class;
         if (parts.length == 2) {
           try {
-            target = CalmLensServerClient.class.getField(parts[0]).getType();
-          } catch (NoSuchFieldException missing) {
+            target = CalmLensServerClient.class.getMethod(parts[0]).getReturnType();
+          } catch (NoSuchMethodException missing) {
             return false;
           }
         }
@@ -999,7 +1040,7 @@ class ContractTest {
         Object want = switch (capability.get("id").getAsString()) {
           case "errors.code" -> expected.get("code").getAsString();
           case "errors.status" -> expected.get("status").getAsInt();
-          case "errors.requestId" -> expected.get("requestId").getAsString();
+          case "errors.requestId" -> Optional.of(expected.get("requestId").getAsString());
           case "errors.retryAfter" -> Optional.of(Duration.ofSeconds(expected.get("retryAfterSeconds").getAsLong()));
           default -> throw new AssertionError(capability);
         };
@@ -1013,7 +1054,7 @@ class ContractTest {
         return want.equals(accessor.invoke(error));
       }
       case "cdn-resource":
-        return refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").resource(name)).endsWith("/asset-1/" + capability.get("path").getAsString());
+        return refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1").setResource(name).build()).endsWith("/asset-1/" + capability.get("path").getAsString());
       case "cdn-option":
       case "mock-option": {
         int dot = name.lastIndexOf('.');
@@ -1051,12 +1092,10 @@ class ContractTest {
 
   /** Fixture options a Java type cannot hold, so the type already refuses the request. */
   private static final Map<String, String> REJECTED_BY_TYPE = Map.of(
-      "signed URL lifetime of a fraction of a second", "SignAssetUrlOptions.expiresIn is a Long",
-      "batch with an unknown operation", "BatchAssets.operation is an AssetBatchOperation enum",
+      "signed URL lifetime of a fraction of a second", "CdnSignAssetUrlParams.expiresIn is a Long",
       "signed URL with an unknown transform option", "ImageTransformOptions has no bogus option");
   private static final Map<String, Class<?>> REJECTED_TYPES = Map.of(
-      "signed URL lifetime of a fraction of a second", Models.SignAssetUrlOptions.class,
-      "batch with an unknown operation", Models.BatchAssets.class);
+      "signed URL lifetime of a fraction of a second", CdnSignAssetUrlParams.class);
 
   @TestFactory Stream<DynamicTest> refusesRejectedRequestsBeforeSending() throws Exception {
     CalmLensServerClient client = refusing();
@@ -1070,7 +1109,7 @@ class ContractTest {
           assertNotEquals(transform, transformRoundTrip(transform), REJECTED_BY_TYPE.get(name));
           return;
         }
-        JsonObject typed = Models.encode(Fixtures.decode(options, REJECTED_TYPES.get(name)));
+        JsonObject typed = Fixtures.encode(Fixtures.decode(options, REJECTED_TYPES.get(name)));
         assertNotEquals(options, typed, REJECTED_BY_TYPE.get(name));
         return;
       }
@@ -1080,7 +1119,7 @@ class ContractTest {
       assertEquals(rejection.get("error").getAsString(), error.getCode());
       assertTrue(error.isLocal(), name);
       assertEquals(0, error.getStatus(), name);
-      assertNull(error.getRequestId(), name);
+      assertTrue(error.getRequestId().isEmpty(), name);
     });
   }
 
@@ -1092,6 +1131,8 @@ class ContractTest {
    * its {@code $.<path>: <problem>} contains the key's text.
    */
   private static final Map<String, String> TYPE_DIFFERENCES = Map.of(
+      "* result facts[].value: optional, but",
+      "A fact's value is untyped JSON, which an Object field can't tell from a missing one, so getValue() returns it or null rather than failing; getRawJsonObject() keeps both",
       "* * features.aiGeneratedDetection: declared, but",
       "Behind ENABLE_AI_GENERATED_DETECTION (packages/shared/src/SharedConstants.ts), which is off, so the API hides the option",
       "* result classification.aiGeneratedDetection: declared, but",
@@ -1101,40 +1142,22 @@ class ContractTest {
       "* result moderation.linkSafety: declared, but",
       "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the link-safety decision",
       "* * settings.linkSafety: declared, but",
-      "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the policy's link-safety settings",
-      "* result moderation.automatedStatus: AssetModerationStatus has [pending], which",
-      "Declared as the asset's AssetModerationStatus so it compares with status(); an open value class can't be narrowed to the values the policy itself decides",
-      "* result moderation.regions[].status: AssetModerationStatus has [allowed, pending], which",
-      "Declared as the asset's AssetModerationStatus so it compares with status(); an open value class can't be narrowed to the restricted values a region can have");
+      "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the policy's link-safety settings");
 
-  private static final String INFORMATIONAL = "Java has open value classes only for the values that decide delivery and"
-      + " review (classification and moderation status, review decisions, content status, rendered kind, visibility and"
-      + " hash list action); other listed result values are Strings, so a value a newer API adds decodes unchanged";
-  private static final String CATEGORIES = "Moderation categories and qualifiers are Strings, so categories and qualifiers"
-      + " the API adds decode and can be configured without an SDK update";
-  private static final String OPTION_VALUES = "Option values are plain Strings, like the matching result fields, so a value"
-      + " the API adds can be sent without an SDK update; the API refuses an unknown one";
+  private static final String CATEGORY_KEYS = "Maps keyed by moderation category keep String keys: an EnumMap can't hold"
+      + " two categories this SDK version doesn't know, which would both be UNKNOWN; ModerationCategory.fromValue reads a key";
+  private static final String QUALIFIERS = "Qualifier names are Strings: they ship with moderation policy updates, more often"
+      + " than SDK releases, and a policy round-trips them unchanged";
+  private static final String FACT_KEYS = "Fact keys are Strings, read with getEventFact by their registered key; the set grows"
+      + " with each event type, and getEventFacts keeps facts this SDK version doesn't know";
 
   /** Fields the SDK keeps as open Strings where the API lists values, by {@code Class.field}, with the reason. */
   private static final Map<String, String> OPEN_STRINGS = openStrings(
-      INFORMATIONAL, List.of("Asset.type", "AssetClassification.failureReason", "AssetContent.removalReason", "AssetHls.reason",
-          "AssetHls.status", "AssetHlsRendition.kind", "AssetModeration.source", "AssetPendingReview.reason",
-          "AssetSearchMatch.matchedFields[]", "AssetSearchResponse.semanticStatus", "AssetUpload.status", "BatchAssetsResponse.status",
-          "CategoryPolicyScore.action", "CategoryPolicySettingsSnapshot.action", "CategoryPolicySource.kind", "CategoryResult.likelihood",
-          "CategoryResult.reason", "CategoryResult.status", "DecisionPolicyPreset.id", "DetectedLink.source", "Event.severity",
-          "Event.type", "EventActor.type", "EventAssetUpload.status", "EventFact.key", "EventsPage.excludedTypes[]",
-          "ExtractedText.type", "FaceDetectionResult.reason", "FaceDetectionResult.status", "HashMatch.source", "Lens.type",
-          "LinkDetectionResult.reason", "LinkDetectionResult.status", "MediaClassificationSegment.source", "MetadataField.icon",
-          "MetadataField.type", "OcrResult.reason", "OcrResult.status", "PersonDetectionResult.reason", "PersonDetectionResult.status",
-          "PolicyCategorySettings.action", "PolicyPreset.id", "PolicyPreset.mode", "PolicyRuleSnapshot.action",
-          "ProjectSettings.optOutJurisdictions[]", "QualifierResult.likelihood", "QualifierResult.reason", "QualifierResult.status",
-          "RegionalDecision.region", "RemoteUrlRule.mode", "ReviewDecider.type", "SafetyHold.reason", "UploadPreset.access"),
-      CATEGORIES, List.of("AssetModeration.categories{key}", "AssetModeration.flaggedCategories[]",
-          "AssetPendingReview.uncertainCategories[]", "CategoryResult.qualifiers{key}", "MediaClassificationSegment.categories{key}",
-          "ModerationRaw.categories{key}", "PolicyRuleSnapshot.unless[]", "PolicyRuleSnapshot.when[]",
-          "PolicySettings.categorySettings{key}", "RegionalDecision.category"),
-      OPTION_VALUES, List.of("CreatePolicy.presetId", "LensDefinition.lensType", "ListEvents.types[]",
-          "ProjectSettingsInput.optOutJurisdictions[]", "SearchAssets.mode", "UpdateLens.lensType", "UploadPresetDefinition.access"));
+      CATEGORY_KEYS, List.of("AssetModeration.categories{key}", "MediaClassificationSegment.categories{key}", "ModerationRaw.categories{key}",
+          "PolicySettings.categorySettings{key}", "PolicySettingsParams.categorySettings{key}"),
+      QUALIFIERS, List.of("CategoryResult.qualifiers{key}", "PolicyRuleSnapshot.unless[]", "PolicyRuleSnapshot.when[]",
+          "PolicyRuleParams.unless[]", "PolicyRuleParams.when[]"),
+      FACT_KEYS, List.of("EventFact.key"));
 
   private static Map<String, String> openStrings(Object... reasonsAndFields) {
     Map<String, String> fields = new HashMap<>();
@@ -1143,15 +1166,16 @@ class ContractTest {
     return fields;
   }
 
-  /** The client method an operation's {@code names.java} names, as {@link Fixtures#invoke} finds it. */
+  /** The client method an operation's {@code names.java} names, such as {@code assets().update}: the overload without request options. */
   private static Method typedMethod(String name) throws Exception {
-    String[] parts = name.split("\\.");
-    Class<?> target = parts.length == 1 ? CalmLensServerClient.class : CalmLensServerClient.class.getField(parts[0]).getType();
+    String[] parts = name.replace("()", "").split("\\.");
+    Class<?> target = parts.length == 1 ? CalmLensServerClient.class : CalmLensServerClient.class.getMethod(parts[0]).getReturnType();
     String method = parts[parts.length - 1];
+    // The overload with params, else the one with the most parameters.
     return Arrays.stream(target.getMethods())
-        .filter(m -> m.getName().equals(method) && m.getParameterCount() == 1 && m.getParameterTypes()[0] != String.class)
-        .findFirst()
-        .or(() -> Arrays.stream(target.getMethods()).filter(m -> m.getName().equals(method) && m.getParameterCount() == 0).findFirst())
+        .filter(m -> m.getName().equals(method) && Arrays.stream(m.getParameterTypes()).noneMatch(t -> t == RequestOptions.class))
+        .max(java.util.Comparator.<Method>comparingInt(m -> Arrays.stream(m.getParameterTypes()).anyMatch(com.calmlens.params.ApiParams.class::isAssignableFrom) ? 1 : 0)
+            .thenComparingInt(Method::getParameterCount))
         .orElseThrow(() -> new AssertionError("no method " + name));
   }
 

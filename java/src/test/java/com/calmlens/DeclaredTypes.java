@@ -40,7 +40,7 @@ import java.util.TreeSet;
  *   <li><b>Required options</b> are the parameters of a public constructor (compiled with {@code
  *       -parameters}) whose parameter names are exactly the operation's required options. Optional
  *       options are reference types, so an unset one is not sent.
- *   <li><b>Null in options</b> is {@link Models.Patch}: it sends an explicit null. A plain field
+ *   <li><b>Null in options</b> is {@code Patch}, set with a builder's {@code clearX()}: it sends an explicit null. A plain field
  *       omits null.
  *   <li><b>Results</b> are records. Every Java reference type can be null, and records shared with
  *       options keep their scalars boxed, so a required field can't be marked as always present:
@@ -68,6 +68,8 @@ final class DeclaredTypes {
   private final Set<String> usedOpenStrings;
   /** The declaring {@code Class.field} of the value being compared, for {@link #openStrings}. */
   private String field;
+  /** The model field whose presence is being checked. */
+  private Field currentField;
 
   /**
    * @param openStrings {@code Class.field} (or {@code Class.field[]} / {@code Class.field{key}} for
@@ -112,43 +114,42 @@ final class DeclaredTypes {
     JsonObject properties = options.getAsJsonObject("properties");
     Set<String> required = strings(options.getAsJsonArray("required"));
     Set<String> clientOptions = options.has("clientOptions") ? strings(options.getAsJsonArray("clientOptions")) : Set.of();
-    if (method.getParameterCount() == 0) {
-      if (properties.size() > 0) problem("$", "the method takes no options, the API has " + properties.keySet());
-      return;
+    // A parameter named after an option is that option (path IDs, ensure lists); params hold the rest.
+    Map<String, Parameter> positional = new LinkedHashMap<>();
+    Class<?> params = null;
+    for (Parameter parameter : method.getParameters()) {
+      if (!parameter.isNamePresent()) throw new IllegalStateException("compile with -parameters");
+      if (com.calmlens.params.ApiParams.class.isAssignableFrom(parameter.getType())) params = parameter.getType();
+      else if (parameter.getType() != com.calmlens.RequestOptions.class) positional.put(parameter.getName(), parameter);
     }
-    Class<?> type = method.getParameterTypes()[0];
-    Map<String, Field> fields = wireFields(type);
+    Map<String, Field> fields = params == null ? new LinkedHashMap<>() : wireFields(params);
     for (String name : NOT_OPTIONS) fields.remove(name);
     for (String name : clientOptions) fields.remove(name);
     for (var entry : properties.entrySet()) {
       String name = entry.getKey();
       String path = "$." + name;
+      JsonObject schema = entry.getValue().getAsJsonObject().getAsJsonObject("schema");
+      Parameter parameter = positional.remove(name);
+      if (parameter != null) {
+        // A positional argument is always passed: the option must be required.
+        if (!required.contains(name)) problem(path, "a required argument, but the option is optional");
+        this.field = method.getDeclaringClass().getSimpleName() + "." + method.getName() + "(" + name + ")";
+        Nullable split = nullable(schema, new LinkedHashSet<>());
+        if (split.schema() != null) compare(split.schema(), parameter.getParameterizedType(), path, new LinkedHashSet<>(), false, true);
+        continue;
+      }
       Field field = fields.remove(name);
       if (field == null) { problem(path, "not declared"); continue; }
-      JsonObject schema = entry.getValue().getAsJsonObject().getAsJsonObject("schema");
       this.field = field.getDeclaringClass().getSimpleName() + "." + field.getName();
       property(schema, field.getGenericType(), path, required.contains(name), new LinkedHashSet<>(), false);
+      boolean marked = field.isAnnotationPresent(com.calmlens.internal.Required.class);
+      if (required.contains(name) && !marked) problem(path, "optional in the params builder, but the API requires it");
+      if (!required.contains(name) && marked) problem(path, "required by the params builder, but the API makes it optional");
     }
     for (String extra : fields.keySet()) problem("$." + extra, "declared, but the API has no such option");
-    Set<String> wanted = new TreeSet<>(required);
-    wanted.removeAll(NOT_OPTIONS);
-    if (!wanted.isEmpty() && !hasConstructor(type, wanted))
-      problem("$", "no public constructor takes exactly the required options " + wanted);
-  }
-
-  private static boolean hasConstructor(Class<?> type, Set<String> required) {
-    for (Constructor<?> constructor : type.getConstructors()) {
-      Set<String> names = new TreeSet<>();
-      for (Parameter parameter : constructor.getParameters()) {
-        if (!parameter.isNamePresent()) throw new IllegalStateException("compile with -parameters");
-        // A parameter named after a field takes that field's wire name (lensType is type).
-        String name = parameter.getName();
-        for (var field : wireFields(type).entrySet()) if (field.getValue().getName().equals(name)) name = field.getKey();
-        if (!NOT_OPTIONS.contains(name)) names.add(name);
-      }
-      if (names.equals(required)) return true;
-    }
-    return false;
+    for (String extra : positional.keySet())
+      if (!NOT_OPTIONS.contains(extra) && !(extra.equals("timeout") && method.getName().equals("waitForDecision")))
+        problem("$." + extra, "a parameter, but the API has no such option");
   }
 
   // ------------------------------------------------------------------ Walk
@@ -157,13 +158,16 @@ final class DeclaredTypes {
   private void property(JsonObject schema, Type declared, String path, boolean required, Set<String> inside, boolean result) {
     Nullable split = nullable(schema, inside);
     Class<?> raw = raw(declared);
-    boolean isPatch = raw == Models.Patch.class;
+    boolean isPatch = raw == com.calmlens.internal.Patch.class;
     boolean isOptional = raw == Optional.class;
     if (result) {
-      // Every reference type can be null, so a required field can't be marked as always present;
-      // the check is the other way: a field the API may omit or null is never a primitive.
-      if (raw.isPrimitive() && (!required || split.allowsNull))
-        problem(path, "a primitive, but the API " + (split.allowsNull ? "allows null" : "may omit it"));
+      // A required, non-null field is @Required (decoding fails without it) and its getter returns
+      // the value; any other field's getter returns Optional.
+      boolean marked = currentField != null && currentField.isAnnotationPresent(com.calmlens.internal.Required.class);
+      boolean always = required && !split.allowsNull;
+      if (currentField != null && always && !marked && !isOpen(schema)) problem(path, "optional, but the API always sends it");
+      if (currentField != null && !always && marked) problem(path, "required, but the API " + (split.allowsNull ? "allows null" : "may omit it"));
+      if (raw.isPrimitive()) problem(path, "a primitive field, which can't tell a missing value from 0 or false");
     } else {
       if (raw.isPrimitive() && !required) problem(path, "a primitive, so always sent; the option is optional");
       if (isPatch && !split.allowsNull) problem(path, "a Patch (sends null), but the API refuses null");
@@ -190,7 +194,7 @@ final class DeclaredTypes {
       schema = split.schema;
     }
     Class<?> raw = raw(declared);
-    if (raw == Models.Patch.class || raw == Optional.class) { compare(schema, argument(declared, 0), path, inside, result, true); return; }
+    if (raw == com.calmlens.internal.Patch.class || raw == Optional.class) { compare(schema, argument(declared, 0), path, inside, result, true); return; }
     if (isOpen(schema)) {
       if (raw != Object.class && raw != JsonElement.class) problem(path, "declared " + name(declared) + ", the API allows any JSON value");
       return;
@@ -261,6 +265,7 @@ final class DeclaredTypes {
     if (Map.class.isAssignableFrom(raw) && properties.size() > 0) {
       // A Map stands for an object whose fields all share one type, keyed by name (categories).
       mapKeys(new TreeSet<>(properties.keySet()), declared, path);
+      currentField = null;
       for (var entry : properties.entrySet())
         property(entry.getValue().getAsJsonObject(), argument(declared, 1), path + "." + entry.getKey(), true, inside, result);
       return;
@@ -276,7 +281,9 @@ final class DeclaredTypes {
       Field field = fields.remove(entry.getKey());
       if (field == null) { problem(child, "not declared"); continue; }
       this.field = field.getDeclaringClass().getSimpleName() + "." + field.getName();
+      this.currentField = field;
       property(entry.getValue().getAsJsonObject(), field.getGenericType(), child, required.contains(entry.getKey()), inside, result);
+      this.currentField = null;
     }
     for (String extra : fields.keySet()) problem(path + "." + extra, "declared, but the API has no such field");
   }
@@ -373,6 +380,14 @@ final class DeclaredTypes {
   /** The wire values of a Java enum or one of the SDK's open value classes, or null. */
   static Set<String> declaredValues(Class<?> type) {
     Set<String> values = new TreeSet<>();
+    if (type.isEnum() && com.calmlens.models.ApiEnum.class.isAssignableFrom(type)) {
+      // UNKNOWN has no value: it stands for every value this SDK version doesn't know.
+      for (Object constant : type.getEnumConstants()) {
+        String value = ((com.calmlens.models.ApiEnum) constant).getValue();
+        if (value != null) values.add(value);
+      }
+      return values;
+    }
     if (type.isEnum()) {
       for (Field field : type.getFields()) {
         if (!field.isEnumConstant()) continue;
@@ -481,7 +496,6 @@ final class DeclaredTypes {
         int modifiers = field.getModifiers();
         if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) || field.isSynthetic()) continue;
         // Json.KEEPS_JSON: Event and WebhookEventPayload keep the object they were read from.
-        if (field.getName().equals("json") && (current == Models.Event.class || current == Models.WebhookEventPayload.class)) continue;
         SerializedName name = field.getAnnotation(SerializedName.class);
         fields.put(name != null ? name.value() : field.getName(), field);
       }

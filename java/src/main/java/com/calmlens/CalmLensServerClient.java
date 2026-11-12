@@ -1,5 +1,16 @@
 package com.calmlens;
 
+import com.calmlens.exception.*;
+import com.calmlens.internal.ClientAccess.TransformProblems;
+import com.calmlens.internal.ClientAccess.TransformSelector;
+import com.calmlens.internal.Json;
+import com.calmlens.internal.Sleeper;
+import com.calmlens.internal.Timeouts;
+import com.calmlens.internal.TransformSchema;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.internal.UploadMimeTypes;
+import com.calmlens.models.*;
+import com.calmlens.params.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -46,19 +57,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Synchronous, thread-safe CalmLens client. Create one per API key and reuse it; close it when your
  * application shuts down.
  *
  * <pre>{@code
- * try (var client = CalmLensServerClient.builder(apiKey, projectId).build()) {
- *   Asset asset = client.text.classify("Hello world");
- *   if (asset.classification().moderation().status() == AssetModerationStatus.ALLOWED) publish();
+ * try (var client = CalmLensServerClient.fromEnv()) {
+ *   Asset asset = client.text().classify("Hello world");
+ *   if (asset.getClassification().getModeration().getDecision().orElse(null) == AssetModerationDecision.ALLOWED) publish();
  * }
  * }</pre>
  *
- * <p>Failures are {@link CalmLensException}s. Reads ({@code GET}) and uploads, which carry an
+ * <p>Every method takes a {@link RequestOptions} as its last argument for one call's deadlines,
+ * retries, idempotency key and headers. Failures are {@link CalmLensException}s, one subclass per
+ * kind of failure. Reads ({@code GET}) and uploads, which carry an
  * {@code Idempotency-Key}, are retried with jittered backoff on network failures, HTTP 429, 500, 502,
  * 503 and 504 and {@link ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS}, honouring {@code Retry-After}.
  * Requests never follow redirects.
@@ -77,7 +91,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * asset, the blurred {@code placeholder}, the {@code hls} stream of audio or video (its adaptive
    * HLS master playlist; its media playlists and segments are relative paths beneath {@code hls/}),
    * the {@code embed} page, which shows the asset in an iframe, and the {@code info} display JSON
-   * ({@link Cdn#getAssetInfo(String)}).
+   * ({@link CdnService#getAssetInfo(String)}).
    */
   public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "placeholder", "hls", "embed", "info");
   /** Where each resource is served beneath an asset URL. */
@@ -110,6 +124,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   private static final long MULTIPART_MIN_PART_BYTES = 5L * 1024 * 1024;
   private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
   private static final Set<String> RESTRICTED_HEADERS = Set.of("connection", "content-length", "expect", "host", "upgrade", "x-api-key");
+  /** Headers the SDK sets on API requests, which {@link RequestOptions} can't set either. */
+  private static final Set<String> SDK_HEADERS = Set.of("accept", "content-type", "idempotency-key", "user-agent", "x-calmlens-upload");
   /** The API deadline of each request attempt when {@link Builder#timeout(Duration)} is not set: 120 seconds. */
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
   /** Automatic retries when {@link Builder#maxRetries(int)} is not set. */
@@ -143,30 +159,52 @@ public final class CalmLensServerClient implements AutoCloseable {
   /** The longest wait between {@code waitForDecision} checks. */
   public static final Duration DECISION_POLL_MAX_DELAY = Duration.ofSeconds(2);
 
-  /** Asset uploads, moderation, listing and management. */
-  public final Assets assets = new Assets();
-  /** Text moderation. */
-  public final Text text = new Text();
-  /** Folders. */
-  public final Folders folders = new Folders();
-  /** Hash lists that image uploads are compared with. */
-  public final HashLists hashLists = new HashLists();
-  /** Moderation policies, shared by the project's organisation. */
-  public final Policies policies = new Policies();
-  /** {@code client.lenses}: the project's lenses. */
-  public final Lenses lenses = new Lenses();
-  /** The project's upload presets. */
-  public final UploadPresets uploadPresets = new UploadPresets();
-  /** The project's settings. */
-  public final ProjectSettings projectSettings = new ProjectSettings();
-  /** The project's metadata fields. */
-  public final MetadataFields metadataFields = new MetadataFields();
-  /** Signs upload tokens for upload presets, locally. */
-  public final UploadTokens uploadTokens = new UploadTokens();
-  /** The events feed. */
-  public final Events events = new Events();
-  /** CDN URLs and downloads. */
-  public final Cdn cdn = new Cdn();
+  private final AssetService assets = new AssetService();
+  private final TextService text = new TextService();
+  private final FolderService folders = new FolderService();
+  private final HashListService hashLists = new HashListService();
+  private final PolicyService policies = new PolicyService();
+  private final LensService lenses = new LensService();
+  private final UploadPresetService uploadPresets = new UploadPresetService();
+  private final ProjectSettingsService projectSettings = new ProjectSettingsService();
+  private final MetadataFieldService metadataFields = new MetadataFieldService();
+  private final UploadTokenService uploadTokens = new UploadTokenService();
+  private final EventService events = new EventService();
+  private final CdnService cdn = new CdnService();
+
+  /** @return asset uploads, moderation, listing and management */
+  public AssetService assets() { return assets; }
+  /** @return text moderation */
+  public TextService text() { return text; }
+  /** @return folders */
+  public FolderService folders() { return folders; }
+  /** @return hash lists that image uploads are compared with */
+  public HashListService hashLists() { return hashLists; }
+  /** @return moderation policies, shared by the project's organisation */
+  public PolicyService policies() { return policies; }
+  /** @return the project's lenses */
+  public LensService lenses() { return lenses; }
+  /** @return the project's upload presets */
+  public UploadPresetService uploadPresets() { return uploadPresets; }
+  /** @return the project's settings */
+  public ProjectSettingsService projectSettings() { return projectSettings; }
+  /** @return the project's metadata fields */
+  public MetadataFieldService metadataFields() { return metadataFields; }
+  /** @return upload token signing, done locally */
+  public UploadTokenService uploadTokens() { return uploadTokens; }
+  /** @return the events feed */
+  public EventService events() { return events; }
+  /** @return CDN URLs and downloads */
+  public CdnService cdn() { return cdn; }
+
+  /**
+   * This client's asynchronous form: the same operations, each returning a {@link
+   * java.util.concurrent.CompletableFuture}. It shares this client's connection, settings and lens
+   * cache, and closing this client stops it.
+   *
+   * @return the asynchronous client
+   */
+  public CalmLensServerClientAsync async() { return new CalmLensServerClientAsync(this, asyncExecutor.get()); }
 
   private final String apiKey, projectId, baseUrl, cdnBaseUrl, userAgent;
   private final Duration timeout, uploadTimeout;
@@ -179,31 +217,95 @@ public final class CalmLensServerClient implements AutoCloseable {
   private final LongSupplier nanoTime;
   private final AtomicBoolean closed;
   private final LensCache lensCache;
+  /** The executor of {@link #async()} calls: the builder's, or a pool made on first use and shut down on close. */
+  private final AsyncExecutor asyncExecutor;
+
+  /** The async executor, made lazily so clients that never call {@link #async()} start no threads. */
+  private static final class AsyncExecutor {
+    private final java.util.concurrent.@Nullable ExecutorService given;
+    private java.util.concurrent.@Nullable ExecutorService owned;
+    private boolean closed;
+
+    AsyncExecutor(java.util.concurrent.@Nullable ExecutorService given) { this.given = given; }
+
+    synchronized java.util.concurrent.Executor get() {
+      if (given != null) return given;
+      if (closed) throw CalmLensException.of(ErrorCodes.SDK_CLIENT_CLOSED, "The client is closed");
+      if (owned == null) {
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger();
+        owned = java.util.concurrent.Executors.newCachedThreadPool(task -> {
+          Thread thread = new Thread(task, "calmlens-async-" + count.incrementAndGet());
+          thread.setDaemon(true);
+          return thread;
+        });
+      }
+      return owned;
+    }
+
+    synchronized void close() {
+      closed = true;
+      if (owned != null) owned.shutdown();
+    }
+  }
+  /** Headers added to every request: a derived client's {@link RequestOptions#getHeaders()}. */
+  private final Map<String, String> extraHeaders;
+  /** Query parameters and body fields added to every request: a derived client's extras. */
+  private final Map<String, Object> extraQuery, extraBody;
+  /** The operation a derived client makes, for the request listener and logs. */
+  private final @Nullable String operation;
+  private final @Nullable RequestListener listener;
+  private final boolean responseValidation;
+  private final System.Logger logger;
+  private final System.Logger.Level logLevel;
   /** Leaves multipart size checks to the API; set by the mock so its API answers them in the API's order. */
-  boolean deferUploadChecks;
+  private boolean deferUploadChecks;
+
+  static {
+    com.calmlens.internal.ClientAccess.Holder.install(new com.calmlens.internal.ClientAccess() {
+      @Override public CalmLensServerClient build(Builder builder, Transport transport, Sleeper sleeper, LongSupplier nanoTime,
+          int defaultMaxRetries, boolean deferUploadChecks) {
+        CalmLensServerClient client = new CalmLensServerClient(builder, transport, sleeper, nanoTime, defaultMaxRetries);
+        client.deferUploadChecks = deferUploadChecks;
+        return client;
+      }
+
+      @Override public SignedUploadToken signUploadToken(String apiKey, UploadTokenSignParams params, long now, String nonce) {
+        return CalmLensServerClient.signUploadToken(apiKey, params, now, nonce);
+      }
+
+      @Override public CdnResponse cdnResponse(Transport.Response response, InputStream body) { return new CdnResponse(response, body); }
+
+      @Override public boolean isAcceptedUploadMimeType(String mimeType) { return CalmLensServerClient.isAcceptedUploadMimeType(mimeType); }
+
+      @Override public String rejectedUploadMimeTypeMessage(String mimeType) { return CalmLensServerClient.rejectedUploadMimeTypeMessage(mimeType); }
+
+      @Override public String encodeComponent(String value) { return CalmLensServerClient.encodeComponent(value); }
+
+      @Override public TransformSelector parseTransformSelector(String selector) { return CalmLensServerClient.parseTransformSelector(selector); }
+
+      @Override public TransformProblems checkTransformOptions(JsonElement options) { return CalmLensServerClient.checkTransformOptions(options); }
+    });
+  }
 
   /** Lenses ensured by a client and the clients derived from it, and the requests in flight. */
   private static final class LensCache {
-    final Map<String, Models.Lens> ensured = new ConcurrentHashMap<>();
+    final Map<String, Lens> ensured = new ConcurrentHashMap<>();
     final Map<String, java.util.concurrent.CompletableFuture<Void>> pending = new ConcurrentHashMap<>();
   }
 
-  /** Waits between retries; replaced in mocks so tests do not sleep. */
-  @FunctionalInterface
-  interface Sleeper { void sleep(Duration delay) throws InterruptedException; }
-
   /**
-   * A client for the production API with default options. Prefer {@link #builder(String, String)}.
+   * A client for the production API with default options. Prefer {@link #builder()} or {@link #fromEnv()}.
    *
    * @param apiKey a project API key
    * @param projectId the project ID
    * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_CONFIG} for a missing key or project, or
    *     a key that can't be sent as a header
    */
-  public CalmLensServerClient(String apiKey, String projectId) { this(builder(apiKey, projectId), null, null, null, DEFAULT_MAX_RETRIES); }
+  public CalmLensServerClient(String apiKey, String projectId) { this(builder().apiKey(apiKey).projectId(projectId), null, null, null, DEFAULT_MAX_RETRIES); }
 
-  /** A client like {@code base} with other deadlines or retries, sharing its transport, state and lens cache. */
-  private CalmLensServerClient(CalmLensServerClient base, Duration timeout, Duration uploadTimeout, int maxRetries) {
+  /** A client like {@code base} with other deadlines, retries or headers, sharing its transport, state and lens cache. */
+  private CalmLensServerClient(CalmLensServerClient base, Duration timeout, @Nullable Duration uploadTimeout, int maxRetries, Map<String, String> extraHeaders,
+      Map<String, Object> extraQuery, Map<String, Object> extraBody, @Nullable String operation) {
     this.apiKey = base.apiKey;
     this.projectId = base.projectId;
     this.baseUrl = base.baseUrl;
@@ -220,10 +322,19 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.nanoTime = base.nanoTime;
     this.closed = base.closed;
     this.lensCache = base.lensCache;
+    this.asyncExecutor = base.asyncExecutor;
     this.deferUploadChecks = base.deferUploadChecks;
+    this.extraHeaders = extraHeaders;
+    this.extraQuery = extraQuery;
+    this.extraBody = extraBody;
+    this.operation = operation;
+    this.listener = base.listener;
+    this.responseValidation = base.responseValidation;
+    this.logger = base.logger;
+    this.logLevel = base.logLevel;
   }
 
-  private CalmLensServerClient(Builder options, Transport override, Sleeper sleeper, LongSupplier nanoTime, int defaultMaxRetries) {
+  private CalmLensServerClient(Builder options, @Nullable Transport override, @Nullable Sleeper sleeper, @Nullable LongSupplier nanoTime, int defaultMaxRetries) {
     int retries = options.maxRetries != null ? options.maxRetries : defaultMaxRetries;
     // Validate every option before building anything.
     if (options.apiKey == null || options.apiKey.isBlank() || options.projectId == null || options.projectId.isBlank())
@@ -240,6 +351,15 @@ public final class CalmLensServerClient implements AutoCloseable {
       throw config("partSizeBytes must be from 5 MiB (5242880) to 64 MiB (67108864)");
     this.closed = new AtomicBoolean();
     this.lensCache = new LensCache();
+    this.asyncExecutor = new AsyncExecutor(options.asyncExecutor);
+    this.extraHeaders = Map.of();
+    this.extraQuery = Map.of();
+    this.extraBody = Map.of();
+    this.operation = null;
+    this.listener = options.listener;
+    this.responseValidation = options.responseValidation;
+    this.logger = options.logger != null ? options.logger : System.getLogger("com.calmlens");
+    this.logLevel = logLevel(options.logLevel != null ? options.logLevel : System.getenv(LOG_ENV));
     this.baseUrl = baseUrl("baseUrl", options.baseUrl);
     this.cdnBaseUrl = baseUrl("cdnBaseUrl", options.cdnBaseUrl);
     this.apiKey = options.apiKey;
@@ -249,7 +369,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.maxRetries = retries;
     this.maxResponseBytes = options.maxResponseBytes;
     this.partSizeBytes = options.partSizeBytes;
-    this.userAgent = "calmlens-java/" + VERSION + " (java/" + Runtime.version() + ")";
+    this.userAgent = "calmlens-java/" + VERSION + " (java/" + Runtime.version() + ")"
+        + (options.appName == null ? "" : " " + options.appName + (options.appVersion == null ? "" : "/" + options.appVersion)
+            + (options.appUrl == null ? "" : " (" + options.appUrl + ")"));
     this.sleeper = sleeper != null ? sleeper : delay -> Thread.sleep(delay.toMillis());
     this.nanoTime = nanoTime != null ? nanoTime : System::nanoTime;
     Transport custom = override != null ? override : options.transport;
@@ -269,29 +391,30 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (value == null ? !optional : value.isZero() || value.isNegative()) throw config(name + " must be a positive duration");
   }
 
-  private static CalmLensException config(String message) { return new CalmLensException(ErrorCodes.SDK_INVALID_CONFIG, message); }
+  private static CalmLensException config(String message) { return CalmLensException.of(ErrorCodes.SDK_INVALID_CONFIG, message); }
 
   /** The most assets one {@code assets.batch} request takes. */
   public static final int ASSET_BATCH_MAX_ASSETS = 500;
 
   /** Refuses a batch the API would reject for its size, an ID or the operation. */
-  static void validateBatch(Models.BatchAssets options) {
-    if (options == null) throw argument("Batch options are required");
-    java.util.List<String> ids = options.assetIdsValue();
+  static void validateBatch(@Nullable AssetBatchParams options) {
+    if (options == null) throw argument("Batch params are required");
+    java.util.List<String> ids = options.getAssetIds().orElse(null);
     if (ids == null || ids.isEmpty() || ids.size() > ASSET_BATCH_MAX_ASSETS)
       throw argument("assetIds must list 1 to " + ASSET_BATCH_MAX_ASSETS + " asset IDs");
     for (String id : ids) if (id == null || id.isEmpty()) throw argument("Every asset ID must be a non-empty string");
-    if (options.operationValue() == null) throw argument("operation must be one of delete, remove-content");
+    if (options.getOperation().isEmpty() || options.getOperation().get() == AssetBatchOperation.UNKNOWN)
+      throw argument("operation must be one of delete, remove-content");
   }
 
-  private static CalmLensException argument(String message) { return new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, message); }
+  private static CalmLensException argument(String message) { return CalmLensException.of(ErrorCodes.SDK_INVALID_ARGUMENT, message); }
 
-  private static CalmLensException payloadError(String message) { return new CalmLensException(ErrorCodes.INVALID_UPLOAD_PAYLOAD, message); }
+  private static CalmLensException payloadError(String message) { return CalmLensException.of(ErrorCodes.INVALID_UPLOAD_PAYLOAD, message); }
 
   private static String baseUrl(String option, String value) {
     URI uri;
     try { uri = value == null ? null : new URI(value); }
-    catch (URISyntaxException cause) { throw new CalmLensException(ErrorCodes.SDK_INVALID_CONFIG, option + " must be an absolute http(s) URL", cause); }
+    catch (URISyntaxException cause) { throw CalmLensException.of(ErrorCodes.SDK_INVALID_CONFIG, option + " must be an absolute http(s) URL", cause); }
     if (uri == null || uri.getHost() == null || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())))
       throw config(option + " must be an absolute http(s) URL");
     return value.replaceAll("/+$", "");
@@ -308,16 +431,36 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
   }
 
+  /** The environment variable that sets the log level: {@code off}, {@code info} or {@code debug}. */
+  public static final String LOG_ENV = "CALMLENS_LOG";
+
+  /** The environment variable {@link #fromEnv()} reads the API key from. */
+  public static final String API_KEY_ENV = "CALMLENS_API_KEY";
+  /** The environment variable {@link #fromEnv()} reads the project ID from. */
+  public static final String PROJECT_ID_ENV = "CALMLENS_PROJECT_ID";
+  /** The environment variable {@link #fromEnv()} reads the API base URL from. */
+  public static final String BASE_URL_ENV = "CALMLENS_BASE_URL";
+
   /**
-   * @param apiKey a project API key
-   * @param projectId the project ID
-   * @return a builder with production defaults
+   * A builder with production defaults and no credentials: set {@link Builder#apiKey(String)} and
+   * {@link Builder#projectId(String)}, or call {@link Builder#fromEnv()}, before {@link
+   * Builder#build()}.
+   *
+   * @return the builder
    */
-  public static Builder builder(String apiKey, String projectId) { return new Builder(apiKey, projectId); }
+  public static Builder builder() { return new Builder(); }
+
+  /**
+   * A client configured from the environment: see {@link Builder#fromEnv()}.
+   *
+   * @return the client
+   * @throws ConfigurationException when the API key or project ID is missing
+   */
+  public static CalmLensServerClient fromEnv() { return builder().fromEnv().build(); }
 
   /** Client options. Every option is validated by {@link #build()}. */
   public static final class Builder {
-    private final String apiKey, projectId;
+    private @Nullable String apiKey, projectId;
     private String baseUrl = DEFAULT_BASE_URL, cdnBaseUrl = DEFAULT_CDN_BASE_URL;
     private Duration timeout = DEFAULT_TIMEOUT;
     private Duration connectTimeout = Duration.ofSeconds(10);
@@ -328,8 +471,104 @@ public final class CalmLensServerClient implements AutoCloseable {
     private long partSizeBytes = DEFAULT_PART_SIZE_BYTES;
     private Transport transport;
     private HttpClient httpClient;
+    private @Nullable String appName, appVersion, appUrl, logLevel;
+    private @Nullable RequestListener listener;
+    private System.Logger logger;
+    private java.util.concurrent.@Nullable ExecutorService asyncExecutor;
+    private boolean responseValidation;
 
-    private Builder(String apiKey, String projectId) { this.apiKey = apiKey; this.projectId = projectId; }
+    private Builder() {}
+
+    /**
+     * Names your integration in the {@code User-Agent}, as {@code name/version (url)}, so CalmLens
+     * can tell plugins and platforms apart.
+     *
+     * @param name your app or plugin's name
+     * @param version its version, or null
+     * @param url its website, or null
+     * @return this builder
+     */
+    public Builder appInfo(String name, @Nullable String version, @Nullable String url) {
+      appName = name;
+      appVersion = version;
+      appUrl = url;
+      return this;
+    }
+
+    /**
+     * Where the client logs retries and failures ({@code info}) and every request ({@code debug}),
+     * through {@code System.Logger}, which routes to SLF4J, Log4j or {@code java.util.logging}. It
+     * never logs the API key, bodies, query strings or signed URLs. {@code com.calmlens} by default.
+     *
+     * @param value the logger
+     * @return this builder
+     */
+    public Builder logger(System.Logger value) { logger = value; return this; }
+
+    /**
+     * How much the client logs: {@code off}, {@code info} or {@code debug}; the {@value #LOG_ENV}
+     * environment variable, else {@code off}, by default.
+     *
+     * @param value the level
+     * @return this builder
+     */
+    public Builder logLevel(String value) { logLevel = value; return this; }
+
+    /**
+     * @param value receives every request attempt: its operation, method, path, attempt, status,
+     *     request ID, duration and the delay before a retry
+     * @return this builder
+     */
+    public Builder requestListener(RequestListener value) { listener = value; return this; }
+
+    /**
+     * The threads that run {@link CalmLensServerClient#async()} calls; an unbounded pool of daemon
+     * threads, shut down by {@link CalmLensServerClient#close()}, by default. One you supply is not
+     * shut down.
+     *
+     * @param value the executor
+     * @return this builder
+     */
+    public Builder asyncExecutor(java.util.concurrent.ExecutorService value) { asyncExecutor = value; return this; }
+
+    /**
+     * Checks every response model for the fields the API always sends as soon as it is read, so a
+     * malformed response fails at once with {@code sdk/invalid-response} rather than when a getter
+     * reads the missing field. Off by default.
+     *
+     * @param value whether to check responses
+     * @return this builder
+     */
+    public Builder responseValidation(boolean value) { responseValidation = value; return this; }
+
+    /** @param value a project API key @return this builder */
+    public Builder apiKey(String value) { apiKey = value; return this; }
+
+    /** @param value the project ID @return this builder */
+    public Builder projectId(String value) { projectId = value; return this; }
+
+    /**
+     * Reads the API key, project ID and API base URL from the {@code calmlens.apiKey}, {@code
+     * calmlens.projectId} and {@code calmlens.baseUrl} system properties, or else the {@value
+     * #API_KEY_ENV}, {@value #PROJECT_ID_ENV} and {@value #BASE_URL_ENV} environment variables. A
+     * setting neither has keeps its current value.
+     *
+     * @return this builder
+     */
+    public Builder fromEnv() {
+      String key = setting("calmlens.apiKey", API_KEY_ENV), project = setting("calmlens.projectId", PROJECT_ID_ENV),
+          base = setting("calmlens.baseUrl", BASE_URL_ENV);
+      if (key != null) apiKey = key;
+      if (project != null) projectId = project;
+      if (base != null) baseUrl = base;
+      return this;
+    }
+
+    private static @Nullable String setting(String property, String variable) {
+      String value = System.getProperty(property);
+      if (value == null || value.isEmpty()) value = System.getenv(variable);
+      return value == null || value.isEmpty() ? null : value;
+    }
 
     /** @param value the API base URL, such as {@code http://localhost:6110/v1} @return this builder */
     public Builder baseUrl(String value) { baseUrl = value; return this; }
@@ -355,7 +594,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * Deadline of each binary upload attempt (file, byte and stream content and multipart parts).
      * There is none by default, so large files are never cut off; text content and URL submissions
      * use {@link #timeout(Duration)}. Override it per call with {@link
-     * RequestOptions#uploadTimeout(Duration)}.
+     * RequestOptions.Builder#setUploadTimeout(Duration)}.
      *
      * @param value a positive duration, or null for no limit
      * @return this builder
@@ -414,17 +653,6 @@ public final class CalmLensServerClient implements AutoCloseable {
      */
     public CalmLensServerClient build() { return new CalmLensServerClient(this, null, null, null, DEFAULT_MAX_RETRIES); }
 
-    /** Builds with this configuration but another transport, leaving this builder unchanged. */
-    CalmLensServerClient build(Transport override, Sleeper sleeper) { return new CalmLensServerClient(this, override, sleeper, null, DEFAULT_MAX_RETRIES); }
-
-    /** Like {@link #build(Transport, Sleeper)}, measuring decision waits with {@code nanoTime}. */
-    CalmLensServerClient build(Transport override, Sleeper sleeper, LongSupplier nanoTime) { return new CalmLensServerClient(this, override, sleeper, nanoTime, DEFAULT_MAX_RETRIES); }
-
-    /** Like {@link #build(Transport, Sleeper, LongSupplier)}, with {@code defaultMaxRetries} unless {@link #maxRetries(int)} was set. */
-    CalmLensServerClient build(Transport override, Sleeper sleeper, LongSupplier nanoTime, int defaultMaxRetries) {
-      return new CalmLensServerClient(this, override, sleeper, nanoTime, defaultMaxRetries);
-    }
-
     @Override public String toString() {
       return "CalmLensServerClient.Builder[projectId=" + projectId + ", baseUrl=" + baseUrl + ", cdnBaseUrl=" + cdnBaseUrl + "]";
     }
@@ -437,6 +665,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   @Override public void close() {
     if (!closed.compareAndSet(false, true)) return;
+    asyncExecutor.close();
     // HttpClient implements AutoCloseable from Java 21; on Java 17 it is released by garbage collection.
     if (ownedHttpClient instanceof AutoCloseable closeable) {
       try { closeable.close(); } catch (Exception ignored) { /* already closing */ }
@@ -448,47 +677,134 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * A client whose calls use other deadlines or retries, sharing this client's credentials,
-   * connection and lens cache. This client is unchanged, and closing either closes both.
+   * A client whose calls use other deadlines, retries or headers, sharing this client's
+   * credentials, connection and lens cache. This client is unchanged, and closing either closes
+   * both.
    *
    * <pre>{@code
-   * var patient = client.withRequestOptions(new RequestOptions().timeout(Duration.ofMinutes(5)).maxRetries(5));
+   * var patient = client.withRequestOptions(RequestOptions.builder().setTimeout(Duration.ofMinutes(5)).setMaxRetries(5).build());
    * }</pre>
    *
-   * @param options {@code timeout}, {@code uploadTimeout} and {@code maxRetries}; an idempotency
-   *     key belongs to one call, so it is refused here
+   * @param options {@code timeout}, {@code uploadTimeout}, {@code maxRetries} and headers; an
+   *     idempotency key belongs to one call, so it is refused here
    * @return the derived client
-   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+   * @throws InvalidArgumentException for invalid options
    */
   public CalmLensServerClient withRequestOptions(RequestOptions options) {
     if (options == null) throw argument("Request options are required");
-    if (options.idempotencyKeyValue() != null) throw argument("An idempotency key applies to one call; pass it to that call");
+    if (options.getIdempotencyKey().isPresent()) throw argument("An idempotency key applies to one call; pass it to that call");
     return with(options);
   }
 
   /** This client, or a derived one with the overrides in {@code options}. */
-  private CalmLensServerClient with(RequestOptions options) {
-    if (options == null || options.timeoutValue() == null && options.uploadTimeoutValue() == null && options.maxRetriesValue() == null) return this;
-    Duration callTimeout = options.timeoutValue() != null ? options.timeoutValue() : timeout;
-    Duration callUploadTimeout = options.uploadTimeoutValue() != null ? options.uploadTimeoutValue() : uploadTimeout;
-    int retries = options.maxRetriesValue() != null ? options.maxRetriesValue() : maxRetries;
+  private CalmLensServerClient with(@Nullable RequestOptions options) { return with(options, operation); }
+
+  /** A client for one operation: this one's settings, the overrides in {@code options} and {@code name} for logs and listeners. */
+  private CalmLensServerClient with(@Nullable RequestOptions options, @Nullable String operationName) {
+    if ((options == null || options.getTimeout().isEmpty() && options.getUploadTimeout().isEmpty() && options.getMaxRetries().isEmpty()
+        && options.getHeaders().isEmpty() && options.getExtraQuery().isEmpty() && options.getExtraBody().isEmpty())
+        && Objects.equals(operationName, operation)) return this;
+    if (options == null) options = RequestOptions.none();
+    Duration callTimeout = options.getTimeout().orElse(timeout);
+    Duration callUploadTimeout = options.getUploadTimeout().orElse(uploadTimeout);
+    int retries = options.getMaxRetries().orElse(maxRetries);
     if (callTimeout.isZero() || callTimeout.isNegative()) throw argument("timeout must be a positive duration");
     if (callUploadTimeout != null && (callUploadTimeout.isZero() || callUploadTimeout.isNegative())) throw argument("uploadTimeout must be a positive duration");
     if (retries < 0 || retries > 10) throw argument("maxRetries must be between 0 and 10");
-    return new CalmLensServerClient(this, callTimeout, callUploadTimeout, retries);
+    Map<String, String> headers = new LinkedHashMap<>(extraHeaders);
+    options.getHeaders().forEach((name, value) -> {
+      if (name != null && SDK_HEADERS.contains(name.toLowerCase(Locale.ROOT))) throw argument("Header " + name + " cannot be set");
+      header(headers, name, value);
+    });
+    Map<String, Object> query = new LinkedHashMap<>(extraQuery), fields = new LinkedHashMap<>(extraBody);
+    query.putAll(options.getExtraQuery());
+    fields.putAll(options.getExtraBody());
+    return new CalmLensServerClient(this, callTimeout, callUploadTimeout, retries, Collections.unmodifiableMap(headers),
+        Collections.unmodifiableMap(query), Collections.unmodifiableMap(fields), operationName);
   }
 
-  private static String key(RequestOptions options) { return options == null ? null : options.idempotencyKeyValue(); }
+  private static @Nullable String key(@Nullable RequestOptions options) { return options == null ? null : options.getIdempotencyKey().orElse(null); }
 
-  // For MockCalmLensServerClient, which answers requests at these addresses.
-  String projectId() { return projectId; }
-  String baseUrl() { return baseUrl; }
-  String cdnBaseUrl() { return cdnBaseUrl; }
-  Duration timeout() { return timeout; }
-  Duration uploadTimeout() { return uploadTimeout; }
-  int maxRetries() { return maxRetries; }
-  long maxResponseBytes() { return maxResponseBytes; }
-  long partSizeBytes() { return partSizeBytes; }
+  /** @return the project this client works in */
+  public String getProjectId() { return projectId; }
+
+  /** @return the API base URL */
+  public String getBaseUrl() { return baseUrl; }
+
+  /** @return the CDN base URL */
+  public String getCdnBaseUrl() { return cdnBaseUrl; }
+
+  /** @return the deadline of each API request attempt */
+  public Duration getTimeout() { return timeout; }
+
+  /** @return the deadline of each binary upload attempt; empty for none */
+  public java.util.Optional<Duration> getUploadTimeout() { return java.util.Optional.ofNullable(uploadTimeout); }
+
+  /** @return how many times a failed read or idempotent upload is retried */
+  public int getMaxRetries() { return maxRetries; }
+
+  /** @return the largest API response body the client reads */
+  public long getMaxResponseBytes() { return maxResponseBytes; }
+
+  /** @return the size of each part of a large upload */
+  public long getPartSizeBytes() { return partSizeBytes; }
+
+  /**
+   * Sends a request to an API path the SDK has no method for yet, with this client's API key,
+   * retries and error handling: a {@code GET} or {@code HEAD}, or a request with an idempotency key,
+   * is retried like the SDK's own calls. Non-2xx responses throw the same exceptions.
+   *
+   * @param method the HTTP method, such as {@code GET}
+   * @param path the path beneath the API base URL, such as {@code /projects/project-1/assets}
+   * @return the response
+   */
+  public RawResponse request(String method, String path) { return request(method, path, null, null, null); }
+
+  /**
+   * @param method the HTTP method, such as {@code POST}
+   * @param path the path beneath the API base URL
+   * @param query query parameters, or null; strings are sent as they are, anything else as JSON
+   * @param body a JSON body: a {@code JsonElement}, params, a map or list, or null for none
+   * @param requestOptions deadlines, retries, headers and an idempotency key, or null
+   * @return the response
+   * @see #request(String, String)
+   */
+  public RawResponse request(String method, String path, @Nullable Map<String, ?> query, @Nullable Object body,
+      @Nullable RequestOptions requestOptions) {
+    CalmLensServerClient c = with(requestOptions, null);
+    if (method == null || !HEADER_NAME.matcher(method).matches()) throw argument("method must be an HTTP method");
+    if (path == null || !path.startsWith("/") || path.startsWith("//")) throw argument("path must start with a single /");
+    String verb = method.toUpperCase(Locale.ROOT);
+    JsonObject queryJson = query == null ? null : Json.WRITE.toJsonTree(query).getAsJsonObject();
+    queryJson = withExtras(queryJson, c.extraQuery);
+    JsonElement json = body == null ? null : body instanceof JsonElement element ? element : Json.WRITE.toJsonTree(body);
+    if (!c.extraBody.isEmpty() && (json == null || json.isJsonObject())) json = withExtras(json == null ? null : json.getAsJsonObject(), c.extraBody);
+    Map<String, String> headers = c.baseHeaders("application/json");
+    Transport.Body payload = null;
+    if (json != null) {
+      headers.put("Content-Type", "application/json");
+      payload = Transport.Body.ofBytes(Json.write(json).getBytes(StandardCharsets.UTF_8));
+    }
+    String idempotency = key(requestOptions);
+    if (idempotency != null) headers.put("Idempotency-Key", idempotencyKey(idempotency));
+    boolean retryable = verb.equals("GET") || verb.equals("HEAD") || idempotency != null;
+    Reply reply = c.execute(new Call(verb, baseUrl + path + query(queryJson), headers, payload, c.timeout, retryable));
+    return new RawResponse(new ApiResponse(reply.status(), reply.headers()), reply.json() == null ? JsonNull.INSTANCE : reply.json());
+  }
+
+  /** Params as a JSON object: empty for null params. */
+  private static JsonObject encode(@Nullable Object params) {
+    if (params == null) return new JsonObject();
+    JsonElement tree = Json.GSON.toJsonTree(params);
+    if (!tree.isJsonObject()) throw argument("Params must be an object");
+    return tree.getAsJsonObject();
+  }
+
+  /** Refuses null params where an operation needs them. */
+  private static <T> T required(@Nullable T params) {
+    if (params == null) throw argument("Params are required");
+    return params;
+  }
 
   // ------------------------------------------------------------------ Encoding helpers
 
@@ -548,7 +864,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   /** The selector the API accepts: a string checked and as given, or structured options serialized. */
   private static String transformSelector(Object transform) {
     if (transform == null) return null;
-    if (transform instanceof Models.ImageTransformOptions options) return serializeTransform(options);
+    if (transform instanceof ImageTransformOptions options) return serializeTransform(options);
     String text = (String) transform;
     // A transform is one path segment of options: it must not add a segment, lens, query or fragment.
     if (text.contains("/") || text.contains("?") || text.contains("#") || text.contains("..") || text.startsWith("@"))
@@ -561,7 +877,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * Option keys are sorted so equal transforms share a URL, nested keys are dotted
    * ({@code border.color}), hex colours are written without {@code #} and values are percent-encoded.
    */
-  static String serializeTransform(Models.ImageTransformOptions transform) {
+  static String serializeTransform(ImageTransformOptions transform) {
     Map<?, ?> options = transformOptions(transform);
     assertTransformOptions(Json.GSON.toJsonTree(options));
     List<String> pairs = new ArrayList<>();
@@ -574,9 +890,6 @@ public final class CalmLensServerClient implements AutoCloseable {
   private static final JsonObject TRANSFORM_OPTIONS_SCHEMA = JsonParser.parseString(TransformSchema.JSON).getAsJsonObject();
 
   /** The dotted keys of transform options the CDN doesn't know, and those whose values it refuses. */
-  record TransformProblems(List<String> unknownKeys, List<String> invalidKeys) {
-    boolean isEmpty() { return unknownKeys.isEmpty() && invalidKeys.isEmpty(); }
-  }
 
   /**
    * Checks transform options against the image transform schema, as the CDN does, and returns the
@@ -659,12 +972,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     Map<String, Object> details = new LinkedHashMap<>();
     details.put("unknownKeys", List.copyOf(unknown));
     details.put("invalidKeys", List.copyOf(invalid));
-    throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options are invalid: " + String.join("; ", parts)
-        + ". Pass the options themselves, such as new ImageTransformOptions().width(640).format(\"webp\").", details, null);
+    throw CalmLensException.of(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options are invalid: " + String.join("; ", parts)
+        + ". Pass the options themselves, such as new ImageTransformOptions().width(640).format(\"webp\").", details, 0, null, null, null, null);
   }
 
   /** A CDN selector as the CDN reads it: an optional lens and the transform options, each null when absent. */
-  record TransformSelector(String lens, JsonObject options) {}
 
   private static final Pattern SELECTOR_LENS = Pattern.compile("^[a-z0-9-]{1,50}$");
   private static final Pattern SELECTOR_NUMBER = Pattern.compile("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$");
@@ -748,7 +1060,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /** Returns the options as nested maps of their wire values, or an empty map for none. */
-  private static Map<?, ?> transformOptions(Models.ImageTransformOptions options) {
+  private static Map<?, ?> transformOptions(ImageTransformOptions options) {
     if (options == null) return Map.of();
     try {
       return Json.GSON.fromJson(Json.GSON.toJsonTree(options), new TypeToken<Map<String, Object>>() {}.getType());
@@ -871,12 +1183,12 @@ public final class CalmLensServerClient implements AutoCloseable {
   private record Reply(int status, Map<String, List<String>> headers, byte[] body, JsonElement json) {}
 
   private void ensureOpen() {
-    if (closed.get()) throw new CalmLensException(ErrorCodes.SDK_CLIENT_CLOSED, "The client is closed");
+    if (closed.get()) throw CalmLensException.of(ErrorCodes.SDK_CLIENT_CLOSED, "The client is closed");
   }
 
-  /** The API key and User-Agent, and {@code accept} unless it is null. */
-  private Map<String, String> baseHeaders(String accept) {
-    Map<String, String> headers = new LinkedHashMap<>();
+  /** The API key and User-Agent, and {@code accept} unless it is null, after the call's extra headers. */
+  private Map<String, String> baseHeaders(@Nullable String accept) {
+    Map<String, String> headers = new LinkedHashMap<>(extraHeaders);
     headers.put("X-Api-Key", apiKey);
     headers.put("User-Agent", userAgent);
     if (accept != null) headers.put("Accept", accept);
@@ -901,7 +1213,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       sleeper.sleep(delay);
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting to retry", interrupted);
+      throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting to retry", interrupted);
     }
   }
 
@@ -909,25 +1221,32 @@ public final class CalmLensServerClient implements AutoCloseable {
     ensureOpen();
     try {
       Transport.Response response = transport.send(new Transport.Request(call.method(), URI.create(call.url()), call.headers(), call.body(), call.timeout()));
-      if (response == null) throw new TransportException(ErrorCodes.SDK_TRANSPORT_ERROR, "Transport returned no response", null);
+      if (response == null) throw CalmLensException.of(ErrorCodes.SDK_TRANSPORT_ERROR, "Transport returned no response", null);
       return response;
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Request interrupted", interrupted);
+      throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Request interrupted", interrupted);
     } catch (CalmLensException failure) {
       throw failure;
     } catch (IOException | RuntimeException failure) {
       if (Thread.currentThread().isInterrupted())
-        throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Request interrupted", failure);
+        throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Request interrupted", failure);
       throw transportError(failure);
     }
   }
 
-  static TransportException transportError(Throwable failure) {
+  /**
+   * The exception for a failure of the transport: a {@link TimeoutException} when it timed out,
+   * else a {@link ConnectionException}.
+   *
+   * @param failure what the transport threw
+   * @return the exception, not thrown
+   */
+  public static CalmLensException transportError(Throwable failure) {
     Throwable classify = failure instanceof UncheckedIOException unchecked && unchecked.getCause() != null ? unchecked.getCause() : failure;
     String message = failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage();
     boolean timedOut = classify instanceof HttpTimeoutException || classify instanceof SocketTimeoutException;
-    return timedOut ? new RequestTimeoutException(message, failure) : new TransportException(ErrorCodes.SDK_TRANSPORT_ERROR, message, failure);
+    return timedOut ? CalmLensException.of(ErrorCodes.SDK_TIMEOUT, message, failure) : CalmLensException.of(ErrorCodes.SDK_TRANSPORT_ERROR, message, failure);
   }
 
   private static boolean retryableStatus(int status) { return status == 429 || status == 500 || status == 502 || status == 503 || status == 504; }
@@ -940,9 +1259,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     try { return value == null ? -1 : Long.parseLong(value.strip()); } catch (NumberFormatException invalid) { return -1; }
   }
 
-  private ApiException tooLarge(Transport.Response response) {
-    return new ApiException(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "Response body exceeds " + maxResponseBytes + " bytes",
-        null, response.status(), response.headers(), null);
+  private CalmLensException tooLarge(Transport.Response response) {
+    return CalmLensException.of(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "Response body exceeds " + maxResponseBytes + " bytes", null, response.status(), response.headers(), null, null, null);
   }
 
   /** The time left of an attempt that started at {@code started} (nanoTime), or null without a deadline. */
@@ -970,44 +1288,55 @@ public final class CalmLensServerClient implements AutoCloseable {
       Call current = new Call(call.method(), call.url(), call.headers(), call.body(), attemptTimeout, call.retryable());
       Transport.Response response;
       byte[] body;
+      long started = System.nanoTime();
       try {
-        long started = System.nanoTime();
         response = send(current);
         try (response) {
           // A redirect is an HTTP failure like any other: repeating the request redirects again.
           if (isRedirect(response.status()))
-            throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null);
+            throw CalmLensException.of(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null, null, null);
           if (declaredLength(response) > maxResponseBytes) throw tooLarge(response);
           body = Timeouts.readAll(response.body(), maxResponseBytes, remaining(current.timeout(), started));
         } catch (IOException failure) {
           throw transportError(failure);
         }
-      } catch (TransportException failure) {
+      } catch (ConnectionException | TimeoutException failure) {
         if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) {
-          pauseWithinBudget(retryDelay(attempt, ThreadLocalRandom.current().nextDouble()), remainingBudget);
+          Duration wait = retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
+          report(call, attempt, started, 0, null, failure, wait);
+          pauseWithinBudget(wait, remainingBudget);
           continue;
         }
+        report(call, attempt, started, 0, null, failure, null);
+        throw failure;
+      } catch (CalmLensException failure) {
+        report(call, attempt, started, failure.getStatus(), failure.getHeaders(), failure, null);
         throw failure;
       }
       if (remainingBudget != null) decisionTimeLeft(remainingBudget);
       if (body == null) throw tooLarge(response);
       Reply reply = parse(response, body);
-      if (reply.status() >= 200 && reply.status() < 300) return reply;
-      ApiException error = error(reply);
+      if (reply.status() >= 200 && reply.status() < 300) {
+        report(call, attempt, started, reply.status(), reply.headers(), null, null);
+        return reply;
+      }
+      CalmLensException error = error(reply);
       if (canRetry(call, attempt) && error.isRetryable()) {
         Duration wait = error.getRetryAfter().isPresent() ? error.getRetryAfter().get() : retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
         if (wait.compareTo(RETRY_AFTER_MAX) <= 0) {
+          report(call, attempt, started, reply.status(), reply.headers(), error, wait);
           pauseWithinBudget(wait, remainingBudget);
           continue;
         }
       }
+      report(call, attempt, started, reply.status(), reply.headers(), error, null);
       throw error;
     }
   }
 
   private static long decisionTimeLeft(java.util.function.LongSupplier remainingBudget) {
     long left = remainingBudget.getAsLong();
-    if (left <= 0) throw new RequestTimeoutException("Decision deadline expired", null);
+    if (left <= 0) throw CalmLensException.of(ErrorCodes.SDK_TIMEOUT, "Decision deadline expired", null);
     return left;
   }
 
@@ -1033,7 +1362,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       invalid = failure;
     }
     if (response.status() >= 200 && response.status() < 300 && invalid != null)
-      throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid JSON response (HTTP " + response.status() + ")", null, response.status(), response.headers(), invalid);
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid JSON response (HTTP " + response.status() + ")", null, response.status(), response.headers(), null, null, invalid);
     return new Reply(response.status(), response.headers(), body, json);
   }
 
@@ -1041,23 +1370,27 @@ public final class CalmLensServerClient implements AutoCloseable {
    * The error for a non-2xx reply: the API's code, message, details and request ID (the {@code
    * X-Request-Id} header, else the body's {@code requestId}), or {@link ErrorCodes#SDK_HTTP_ERROR} when the body carries no code.
    */
-  private static ApiException error(Reply reply) {
+  private static CalmLensException error(Reply reply) {
     String code = errorCode(reply.json());
-    if (code == null) return new ApiException(ErrorCodes.SDK_HTTP_ERROR, "HTTP " + reply.status(), null, reply.status(), reply.headers(), null);
+    // The body is kept, capped, so a proxy's HTML error page isn't lost.
+    String raw = reply.body() == null ? null : new String(reply.body(), 0, Math.min(reply.body().length, CalmLensException.MAX_BODY_CHARS * 4), StandardCharsets.UTF_8);
+    if (code == null) return CalmLensException.of(ErrorCodes.SDK_HTTP_ERROR, "HTTP " + reply.status(), null, reply.status(), reply.headers(), null, raw, null);
     JsonObject failure = reply.json().getAsJsonObject();
     Map<String, Object> details = new LinkedHashMap<>();
     if (failure.has("details") && failure.get("details").isJsonObject())
       details.putAll(Json.GSON.fromJson(failure.get("details"), new TypeToken<Map<String, Object>>() {}.getType()));
     String requestId = failure.get("requestId") instanceof JsonPrimitive id && id.isString() ? id.getAsString() : null;
     String message = failure.get("message") instanceof JsonPrimitive text && text.isString() ? text.getAsString() : code;
-    return new ApiException(code, message, details, reply.status(), reply.headers(), requestId, null);
+    return CalmLensException.of(code, message, details, reply.status(), reply.headers(), requestId, raw, null);
   }
 
   /** The JSON body of a successful reply. */
   private static JsonElement success(Reply reply) { return reply.json(); }
 
 
-  private Reply json(String method, String path, JsonObject query, JsonElement body) {
+  private Reply json(String method, String path, @Nullable JsonObject query, @Nullable JsonElement body) {
+    query = withExtras(query, extraQuery);
+    if (!extraBody.isEmpty() && (body == null || body.isJsonObject())) body = withExtras(body == null ? null : body.getAsJsonObject(), extraBody);
     Map<String, String> headers = baseHeaders("application/json");
     Transport.Body payload = null;
     if (body != null) {
@@ -1068,26 +1401,79 @@ public final class CalmLensServerClient implements AutoCloseable {
     return execute(new Call(method, baseUrl + path + query(query), headers, payload, timeout, retryable));
   }
 
+  /** {@code object} with {@code extras} added, replacing fields of the same name; null when both are empty. */
+  private static @Nullable JsonObject withExtras(@Nullable JsonObject object, Map<String, Object> extras) {
+    if (extras.isEmpty()) return object;
+    JsonObject merged = object == null ? new JsonObject() : object.deepCopy();
+    extras.forEach((key, value) -> merged.add(key, value == null ? JsonNull.INSTANCE : Json.WRITE.toJsonTree(value)));
+    return merged;
+  }
+
+  private static System.Logger.Level logLevel(@Nullable String value) {
+    if (value == null) return System.Logger.Level.OFF;
+    switch (value.strip().toLowerCase(Locale.ROOT)) {
+      case "debug": return System.Logger.Level.DEBUG;
+      case "info": return System.Logger.Level.INFO;
+      case "off": case "": return System.Logger.Level.OFF;
+      default: throw config(LOG_ENV + " must be off, info or debug");
+    }
+  }
+
+  /** The path of a request URL for logs and listeners: no query, and signed grants redacted. */
+  private static String loggedPath(String url) {
+    String path = URI.create(url).getRawPath();
+    return path == null ? "" : path.replaceAll("/sig_[^/]*", "/sig_[redacted]");
+  }
+
+  /** Reports one attempt to the listener and the log. */
+  private void report(Call call, int attempt, long started, int status, @Nullable Map<String, List<String>> headers,
+      @Nullable CalmLensException failure, @Nullable Duration delay) {
+    if (listener == null && logLevel == System.Logger.Level.OFF) return;
+    List<String> ids = headers == null ? null : headers.entrySet().stream().filter(e -> "x-request-id".equalsIgnoreCase(e.getKey()))
+        .map(Map.Entry::getValue).findFirst().orElse(null);
+    String requestId = ids == null || ids.isEmpty() ? null : ids.get(0);
+    RequestEvent event = new RequestEvent(operation, call.method(), loggedPath(call.url()), attempt + 1, delay, status, requestId,
+        failure == null ? null : failure.getCode(), Duration.ofNanos(System.nanoTime() - started));
+    if (listener != null) {
+      try { listener.onAttempt(event); } catch (RuntimeException ignored) { /* a listener can't fail the call */ }
+    }
+    boolean notable = failure != null || delay != null;
+    System.Logger.Level level = notable ? System.Logger.Level.INFO : System.Logger.Level.DEBUG;
+    if (logLevel != System.Logger.Level.OFF && level.getSeverity() >= logLevel.getSeverity() && logger.isLoggable(level))
+      logger.log(level, "calmlens " + event);
+  }
+
   private <T> T decode(Reply reply, Class<T> type) {
     JsonElement value = success(reply);
     try {
       T result = value == null || value.isJsonNull() || (!type.isArray() && !value.isJsonObject()) || (type.isArray() && !value.isJsonArray())
           ? null : Json.GSON.fromJson(value, type);
       if (result == null) throw new JsonParseException("Expected a JSON " + (type.isArray() ? "array" : "object"));
-      if (result instanceof Models.Asset asset && (asset.id() == null || asset.id().isEmpty()
-          || asset.upload() == null || asset.upload().status() == null || asset.classification() == null || asset.classification().status() == null || asset.classification().moderation() == null || asset.classification().moderation().status() == null))
-        // A JSON object that is not an asset: the body was read, but it is not what was asked for.
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected an asset with an id, upload, classification and moderation status", null, reply.status(), Map.of(), null);
+      if (result instanceof CalmLensObject model) {
+        Json.setLastResponse(model, new ApiResponse(reply.status(), reply.headers()));
+        if (responseValidation) model.validate();
+      }
+      if (responseValidation && result instanceof Object[] items) for (Object item : items) if (item instanceof CalmLensObject model) model.validate();
+      // An asset's ID, upload and classification status and moderation decision are always sent;
+      // the decision is null until decided. Without them it isn't an asset.
+      if (result instanceof Asset asset && (asset.getId().isEmpty() || asset.getUpload().getStatus() == null
+          || asset.getClassification().getStatus() == null || !asset.getClassification().getModeration().hasField("decision")
+          || asset.getContent().getStatus() == null))
+        throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The response's AssetModeration has no decision", Map.of("field", "decision"), 0, null, null, null, null);
       return result;
-    } catch (JsonParseException | IllegalStateException | IllegalArgumentException | NullPointerException cause) {
-      throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid response model: " + cause.getMessage(), null, reply.status(), reply.headers(), cause);
+    } catch (InvalidResponseException invalid) {
+      // A body that isn't the operation's model: the response was read, but it isn't what was asked for.
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, invalid.getMessage().replaceFirst("^\\[calmlens\\] ", ""), null,
+          reply.status(), Map.of(), null, null, invalid);
+    } catch (JsonParseException | IllegalStateException | IllegalArgumentException | NullPointerException | UnsupportedOperationException cause) {
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Invalid response model: " + cause.getMessage(), null, reply.status(), reply.headers(), null, null, cause);
     }
   }
 
   private static JsonObject object(Reply reply) {
     JsonElement value = success(reply);
     if (value == null || !value.isJsonObject())
-      throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a JSON object response", null, reply.status(), reply.headers(), null);
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a JSON object response", null, reply.status(), reply.headers(), null, null, null);
     return value.getAsJsonObject();
   }
 
@@ -1120,7 +1506,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   private static void checkMimeType(String type) {
     if (!isAcceptedUploadMimeType(type))
-      throw new CalmLensException(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, rejectedUploadMimeTypeMessage(type), Map.of("mimeType", type, "source", "calmlens"), null);
+      throw CalmLensException.of(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, rejectedUploadMimeTypeMessage(type), Map.of("mimeType", type, "source", "calmlens"), 0, null, null, null, null);
   }
 
   /**
@@ -1163,7 +1549,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   /** {@code upload/too-large} for the plan's limit, with the details the API sends. */
   private static CalmLensException uploadTooLarge(long limitBytes, String message) {
-    return new CalmLensException(ErrorCodes.UPLOAD_TOO_LARGE, message, Map.of("limitBytes", limitBytes, "source", "plan"), null);
+    return CalmLensException.of(ErrorCodes.UPLOAD_TOO_LARGE, message, Map.of("limitBytes", limitBytes, "source", "plan"), 0, null, null, null, null);
   }
 
   private static CalmLensException multipartImageTooLarge() {
@@ -1171,12 +1557,15 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /** The request body for upload content: exactly one source, sent without copying files or streams. */
-  private static Transport.Body payload(Models.Content content, JsonObject encoded, boolean multipart) {
+  private static Transport.Body payload(@Nullable Content content, JsonObject encoded, boolean multipart) {
+    byte[] given = content == null ? null : content.getData().orElse(null);
+    java.nio.file.Path file = content == null ? null : content.getFile().orElse(null);
+    InputStream stream = content == null ? null : content.getStream().orElse(null);
     List<String> sources = new ArrayList<>();
     for (String key : List.of("plainText", "base64", "bytes")) if (encoded.has(key) && !encoded.get(key).isJsonNull()) sources.add(key);
-    if (content != null && content.data != null) sources.add("data");
-    if (content != null && content.file != null) sources.add("file");
-    if (content != null && content.stream != null) sources.add("stream");
+    if (given != null) sources.add("data");
+    if (file != null) sources.add("file");
+    if (stream != null) sources.add("stream");
     if (sources.size() != 1) throw payloadError("Supply exactly one payload representation");
     Long declared = encoded.has("sizeInBytes") && !encoded.get("sizeInBytes").isJsonNull() ? encoded.get("sizeInBytes").getAsLong() : null;
     if (declared != null && declared < 0) throw payloadError("sizeInBytes must match the payload byte length");
@@ -1189,7 +1578,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         for (int i = 0; i < data.length; i++) {
           int b;
           try { b = values.get(i).getAsBigDecimal().intValueExact(); }
-          catch (ArithmeticException | NumberFormatException | UnsupportedOperationException e) { throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Expected integer bytes", e); }
+          catch (ArithmeticException | NumberFormatException | UnsupportedOperationException e) { throw CalmLensException.of(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Expected integer bytes", e); }
           if (b < 0 || b > 255) throw payloadError("Expected bytes between 0 and 255");
           data[i] = (byte) b;
         }
@@ -1199,17 +1588,17 @@ public final class CalmLensServerClient implements AutoCloseable {
         String text = encoded.get("base64").getAsString().replaceFirst("^.*;base64,", "").replaceAll("\\s", "");
         if (multipart && text.length() % 4 != 0) throw payloadError("Split bytes before base64-encoding each part");
         try { body = Transport.Body.ofBytes(Base64.getDecoder().decode(text)); }
-        catch (IllegalArgumentException e) { throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Invalid base64", e); }
+        catch (IllegalArgumentException e) { throw CalmLensException.of(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Invalid base64", e); }
       }
-      case "data" -> body = Transport.Body.ofBytes(content.data);
+      case "data" -> body = Transport.Body.ofBytes(given);
       case "file" -> {
         try {
-          if (!Files.isRegularFile(content.file)) throw argument("Content file must be a readable regular file");
-          body = Transport.Body.ofFile(content.file, Files.size(content.file));
-        } catch (IOException e) { throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Content file cannot be read", e); }
+          if (!Files.isRegularFile(file)) throw argument("Content file must be a readable regular file");
+          body = Transport.Body.ofFile(file, Files.size(file));
+        } catch (IOException e) { throw CalmLensException.of(ErrorCodes.SDK_INVALID_ARGUMENT, "Content file cannot be read", e); }
       }
       // A stream without a declared size is sent chunked, without sizeInBytes.
-      default -> body = Transport.Body.ofStream(content.stream, declared == null ? -1 : declared);
+      default -> body = Transport.Body.ofStream(stream, declared == null ? -1 : declared);
     }
     if (declared != null && body.length() >= 0 && declared != body.length()) throw payloadError("sizeInBytes must match the payload byte length");
     return body;
@@ -1219,7 +1608,8 @@ public final class CalmLensServerClient implements AutoCloseable {
    * Sends an upload: text keeps the API deadline, binary content uses the upload deadline. A null
    * {@code mode} is a JSON body, without {@code X-CalmLens-Upload}.
    */
-  private Reply upload(String path, JsonObject query, Transport.Body body, String contentType, String mode, String key, boolean text) {
+  private Reply upload(String path, JsonObject query, Transport.Body body, @Nullable String contentType, @Nullable String mode, @Nullable String key, boolean text) {
+    query = withExtras(query, extraQuery);
     Map<String, String> headers = baseHeaders("application/json");
     if (contentType != null) headers.put("Content-Type", contentType);
     if (mode != null) headers.put("X-CalmLens-Upload", mode);
@@ -1228,17 +1618,18 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /** Uploads an asset; {@code wait} says whether the API waits for the decision before answering. */
-  private Models.Asset submit(Models.SubmitAsset options, boolean wait, String key) {
-    JsonObject o = Models.encode(options);
+  private Asset submit(@Nullable AssetCreateParams options, boolean wait, @Nullable String key) {
+    if (options == null) throw payloadError("Either file content, URL, or multipart part is required");
+    JsonObject o = encode(options);
     if (List.of("content", "part", "url").stream().noneMatch(k -> o.has(k) && !o.get(k).isJsonNull()))
       throw payloadError("Either file content, URL, or multipart part is required");
     if (str(o, "name", "").isEmpty()) throw payloadError("Asset name is required");
     if (List.of("content", "part", "url").stream().filter(k -> o.has(k) && !o.get(k).isJsonNull()).count() != 1)
       throw payloadError("Supply exactly one of content, part, or url");
-    if (options.contextValue() != null) {
+    if (options.getContext().isPresent()) {
       // Only the posts CalmLens uses are sent, which keeps the upload's options small.
-      List<Models.ModerationContextItem> items = Models.selectModerationContextItems(options.contextValue().items());
-      o.add("context", Json.GSON.toJsonTree(new Models.ModerationContext(items)));
+      List<ModerationContextItemParams> items = ModerationContextParams.selectItems(options.getContext().get().getItems().orElse(null));
+      o.add("context", Json.GSON.toJsonTree(ModerationContextParams.of(items)));
     }
     JsonObject query = new JsonObject();
     query.addProperty("wait", wait);
@@ -1246,14 +1637,14 @@ public final class CalmLensServerClient implements AutoCloseable {
       Map<String, String> headers = baseHeaders("application/json");
       headers.put("Content-Type", "application/json");
       headers.put("Idempotency-Key", idempotencyKey(key));
-      Transport.Body body = Transport.Body.ofBytes(Json.write(o).getBytes(StandardCharsets.UTF_8));
-      return decode(execute(new Call("POST", baseUrl + project("assets") + query(query), headers, body, timeout, true)), Models.Asset.class);
+      Transport.Body body = Transport.Body.ofBytes(Json.write(withExtras(o, extraBody)).getBytes(StandardCharsets.UTF_8));
+      return decode(execute(new Call("POST", baseUrl + project("assets") + query(withExtras(query, extraQuery)), headers, body, timeout, true)), Asset.class);
     }
     boolean multipart = o.has("part");
-    Models.Content content = multipart ? options.partValue() : options.contentValue();
+    Content content = (multipart ? options.getPart() : options.getContent()).orElse(null);
     JsonObject encoded = o.getAsJsonObject(multipart ? "part" : "content");
     if (multipart && encoded.has("partNumber") && encoded.get("partNumber").getAsLong() > 1)
-      throw new CalmLensException(ErrorCodes.USE_UPLOAD_PART, "Use uploadPart for multipart upload parts after the first part");
+      throw CalmLensException.of(ErrorCodes.USE_UPLOAD_PART, "Use uploadPart for multipart upload parts after the first part");
     String type = str(encoded, "type", "");
     checkMimeType(type);
     Transport.Body body = payload(content, encoded, multipart);
@@ -1273,7 +1664,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         checkUploadSize(o.get("totalSizeInBytes").getAsLong(), mime, true);
     } else checkUploadSize(body.length(), mime, false);
     // The asset's fields go in the body, never the query, which proxies and servers log.
-    JsonObject fields = UploadForm.fields(o);
+    JsonObject fields = withExtras(UploadForm.fields(o), extraBody);
     if (text) {
       JsonObject json = fields.deepCopy();
       JsonObject plain = new JsonObject();
@@ -1287,7 +1678,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           if (o.has(k) && !o.get(k).isJsonNull()) json.add(k, o.get(k));
       } else json.add("content", plain);
       Transport.Body jsonBody = Transport.Body.ofBytes(Json.write(json).getBytes(StandardCharsets.UTF_8));
-      return decode(upload(project("assets"), query, jsonBody, "application/json", null, key, true), Models.Asset.class);
+      return decode(upload(project("assets"), query, jsonBody, "application/json", null, key, true), Asset.class);
     }
     query.addProperty("contentType", type);
     if (split) return uploadInParts(fields, query, body, type, key);
@@ -1298,7 +1689,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull()) query.add("totalSizeInBytes", o.get("totalSizeInBytes"));
     }
     UploadForm.Built form = UploadForm.build(fields, type, body);
-    return decode(upload(project("assets"), query, form.body(), form.contentType(), multipart ? "part" : "content", key, false), Models.Asset.class);
+    return decode(upload(project("assets"), query, form.body(), form.contentType(), multipart ? "part" : "content", key, false), Asset.class);
   }
 
   /**
@@ -1307,7 +1698,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * carries {@code <key>:part-<n>}, so each is retried on its own and repeating the call with the
    * same key replays the parts the API already has and sends the rest.
    */
-  private Models.Asset uploadInParts(JsonObject fields, JsonObject query, Transport.Body body, String type, String key) {
+  private Asset uploadInParts(JsonObject fields, JsonObject query, Transport.Body body, String type, String key) {
     String base = idempotencyKey(key);
     long total = body.length();
     long count = (total + partSizeBytes - 1) / partSizeBytes;
@@ -1317,8 +1708,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     query.addProperty("isFinal", false);
     query.addProperty("totalSizeInBytes", total);
     UploadForm.Built form = UploadForm.build(fields, type, first);
-    Models.Asset asset = decode(upload(project("assets"), query, form.body(), form.contentType(), "part", base, false), Models.Asset.class);
-    String path = "/assets/" + id(asset.id()) + "/part";
+    Asset asset = decode(upload(project("assets"), query, form.body(), form.contentType(), "part", base, false), Asset.class);
+    String path = "/assets/" + id(asset.getId()) + "/part";
     for (long number = 2; number <= count; ) {
       boolean last = number == count;
       long offset = (number - 1) * partSizeBytes;
@@ -1328,8 +1719,9 @@ public final class CalmLensServerClient implements AutoCloseable {
       partQuery.addProperty("isFinal", last);
       partQuery.addProperty("sizeInBytes", part.length());
       try {
-        asset = decode(upload(path, partQuery, part, null, "part", base + ":part-" + number, false), Models.Asset.class);
-      } catch (ApiException error) {
+        asset = decode(upload(path, partQuery, part, null, "part", base + ":part-" + number, false), Asset.class);
+      } catch (CalmLensException error) {
+        if (error.isLocal()) throw error;
         Object expected = error.getDetails().get("expectedPartNumber");
         if (ErrorCodes.INVALID_UPLOAD_PART_NUMBER.equals(error.getCode()) && expected instanceof Number n
             && n.doubleValue() == Math.rint(n.doubleValue()) && n.longValue() > number && n.longValue() <= count) {
@@ -1338,7 +1730,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           continue;
         }
         // The final part completed the upload, but its response was lost.
-        if (last && ErrorCodes.UPLOAD_NOT_OPEN.equals(error.getCode())) return assets.retrieve(new Models.AssetId(asset.id()));
+        if (last && ErrorCodes.UPLOAD_NOT_OPEN.equals(error.getCode())) return assets.retrieve(asset.getId());
         throw error;
       }
       number++;
@@ -1349,14 +1741,14 @@ public final class CalmLensServerClient implements AutoCloseable {
   // ------------------------------------------------------------------ Resources
 
   /** A later part of a multipart upload, sent without a {@code Content-Type}, as the API reads it. */
-  private Models.Asset sendPart(Models.UploadPart options, String key) {
-    JsonObject o = Models.encode(options);
-    String path = "/assets/" + id(str(o, "assetId", null)) + "/part";
-    if (!o.has("part")) throw argument("Part options are required");
+  private Asset sendPart(String assetId, @Nullable AssetUploadPartParams options, @Nullable String key) {
+    String path = "/assets/" + id(assetId) + "/part";
+    if (options == null || options.getPart().isEmpty()) throw argument("Part params are required");
+    JsonObject o = encode(options);
     JsonObject part = o.getAsJsonObject("part");
     if (!part.has("partNumber") || part.get("partNumber").getAsLong() < 1)
-      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, "partNumber must be a positive integer");
-    Transport.Body body = payload(options.partValue(), part, true);
+      throw CalmLensException.of(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, "partNumber must be a positive integer");
+    Transport.Body body = payload(options.getPart().get(), part, true);
     checkPartSize(body.length(), flag(part, "isFinal"), false);
     JsonObject query = new JsonObject();
     if (o.has("wait")) query.add("wait", o.get("wait"));
@@ -1364,19 +1756,70 @@ public final class CalmLensServerClient implements AutoCloseable {
     query.addProperty("isFinal", flag(part, "isFinal"));
     if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
     boolean text = part.has("plainText") && !part.get("plainText").isJsonNull();
-    return decode(upload(path, query, body, null, "part", key, text), Models.Asset.class);
+    return decode(upload(path, query, body, null, "part", key, text), Asset.class);
+  }
+
+  /** Polls an asset until it is settled; see {@link AssetService#waitForDecision(String, Duration, RequestOptions)}. */
+  private Asset awaitDecision(String assetId, @Nullable Duration timeout) {
+    id(assetId);
+    Duration limit = timeout == null ? DEFAULT_DECISION_TIMEOUT : timeout;
+    if (limit.isNegative()) throw argument("timeout must not be negative");
+    long limitNanos;
+    try { limitNanos = limit.toNanos(); } catch (ArithmeticException tooLong) { limitNanos = Long.MAX_VALUE; }
+    long started = nanoTime.getAsLong();
+    long budget = limitNanos;
+    java.util.function.LongSupplier timeLeft = () -> budget - (nanoTime.getAsLong() - started);
+    String path = baseUrl + "/assets/" + id(assetId);
+    Call lookup = new Call("GET", path, baseHeaders("application/json"), null, this.timeout, true);
+    Asset last = null;
+    long delay = DECISION_POLL_FIRST_DELAY.toNanos();
+    for (;;) {
+      if (Thread.currentThread().isInterrupted())
+        throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision");
+      Asset asset;
+      try {
+        asset = decode(execute(lookup, limit.isZero() ? null : timeLeft), Asset.class);
+      } catch (TimeoutException failure) {
+        if (limit.isZero() || timeLeft.getAsLong() > 0) throw failure;
+        break;
+      }
+      long remaining = timeLeft.getAsLong();
+      if (!limit.isZero() && remaining <= 0) break;
+      if (isSettled(asset)) return asset;
+      last = asset;
+      if (remaining <= 0) break;
+      try {
+        sleeper.sleep(Duration.ofNanos(Math.min(delay, remaining)));
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision", interrupted);
+      }
+      delay = Math.min(DECISION_POLL_MAX_DELAY.toNanos(), Math.round(delay * DECISION_POLL_DELAY_FACTOR));
+    }
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("assetId", assetId);
+    details.put("classificationStatus", last == null ? null : last.getClassification().getStatus().getValue());
+    details.put("moderationDecision", last == null ? null : last.getClassification().getModeration().getDecision().map(AssetModerationDecision::getValue).orElse(null));
+    throw CalmLensException.of(ErrorCodes.SDK_TIMEOUT, "Asset " + assetId + " did not settle within " + limit, details, 0, null, null, null, null);
+  }
+
+  /** Whether the asset is settled: its {@code classification.status} is {@code completed} or {@code failed}. */
+  private static boolean isSettled(Asset asset) {
+    AssetClassificationStatus status = asset.getClassification().getStatus();
+    return status == AssetClassificationStatus.COMPLETED || status == AssetClassificationStatus.FAILED;
   }
 
   /**
    * Every item of a cursor list from the options' cursor on: {@code list} fetches the page for a
    * cursor (null for the options' own), and pages follow {@code nextCursor} while {@code hasMore}.
    */
-  private static <T> AutoPager<T> pages(JsonObject options, java.util.function.Function<String, ? extends Models.CursorPage<T>> list) {
+  private static <T> AutoPager<T> pages(JsonObject options, java.util.function.Function<String, ? extends CursorPage<T>> list) {
     String first = options.has("cursor") && !options.get("cursor").isJsonNull() ? options.get("cursor").getAsString() : null;
     return new AutoPager<>(token -> {
-      Models.CursorPage<T> page = list.apply(token);
-      boolean more = page.hasMore() && page.nextCursor() != null && !page.items().isEmpty();
-      return new AutoPager.Chunk<>(page.items(), more ? page.nextCursor() : null, more);
+      CursorPage<T> page = list.apply(token);
+      String next = page.getNextCursor().orElse(null);
+      boolean more = page.getHasMore() && next != null && !page.getItems().isEmpty();
+      return new AutoPager.Chunk<>(page.getItems(), more ? next : null, more);
     }, first, false);
   }
 
@@ -1387,379 +1830,20 @@ public final class CalmLensServerClient implements AutoCloseable {
     return decode(json("GET", path, sent, null), type);
   }
 
-  /** Assets: uploads, moderation, listing and management. */
-  public final class Assets {
-    private Assets() {}
 
-    /**
-     * Uploads an asset and returns without waiting for its decision ({@code wait=false}): its
-     * {@code classification.status} is {@code queued} ({@code uploading} for the first part of a
-     * multipart upload). The upload carries an {@code Idempotency-Key}, so it is retried safely.
-     *
-     * <p>Content larger than {@link Builder#partSizeBytes(long)} (bytes, base64 or a file) is sent
-     * as a multipart upload in parts of that size, each retried on its own; calling again with the
-     * same idempotency key (at most 240 characters) resumes an interrupted upload. The same applies
-     * to {@code classify}.
-     *
-     * @param options name and content, part or url
-     * @return the new asset
-     */
-    public Models.Asset create(Models.SubmitAsset options) { return submit(options, false, null); }
 
-    /**
-     * @param options name and content, part or url
-     * @param requestOptions idempotency key, deadlines and retries for this call
-     * @return the new asset
-     */
-    public Models.Asset create(Models.SubmitAsset options, RequestOptions requestOptions) { return with(requestOptions).submit(options, false, key(requestOptions)); }
-
-    /**
-     * Uploads bytes and returns without waiting for their decision.
-     *
-     * @param name asset name
-     * @param bytes content
-     * @param mimeType MIME type, such as {@code image/png}
-     * @return the new asset
-     */
-    public Models.Asset create(String name, byte[] bytes, String mimeType) { return create(new Models.SubmitAsset(name, Models.Content.bytes(bytes, mimeType))); }
-
-    /**
-     * Uploads an asset and waits for its moderation decision ({@code wait=true}).
-     *
-     * @param options name and content, part or url
-     * @return the classified asset
-     */
-    public Models.Asset classify(Models.SubmitAsset options) { return classify(options, null); }
-
-    /**
-     * @param options name and content, part or url
-     * @param requestOptions idempotency key, deadlines and retries for this call
-     * @return the classified asset
-     */
-    public Models.Asset classify(Models.SubmitAsset options, RequestOptions requestOptions) {
-      if (options != null) {
-        JsonObject o = Models.encode(options);
-        if (o.has("content") && o.getAsJsonObject("content").has("plainText") && str(o.getAsJsonObject("content"), "plainText", "").isBlank())
-          throw payloadError("Text to classify must be a non-empty string");
-      }
-      return with(requestOptions).submit(options, true, key(requestOptions));
-    }
-
-    /** @param options search query @return matches, best first */
-    public Models.AssetSearchResponse search(Models.SearchAssets options) {
-      return decode(json("GET", project("assets/search"), Models.encode(options), null), Models.AssetSearchResponse.class);
-    }
-
-    /**
-     * Lists one page of the project's assets, newest first unless {@code sort} says otherwise. Pass
-     * {@code filter("folderId==fldr_...")} for one folder's assets.
-     *
-     * @param options page, filter and sort
-     * @return one page of assets
-     */
-    public Models.AssetPage list(Models.ListAssets options) {
-      return decode(json("GET", project("assets"), Models.encode(options), null), Models.AssetPage.class);
-    }
-
-    /**
-     * Iterates over every matching asset, page by page, from the supplied cursor.
-     *
-     * @param options page size, filter and sort
-     * @return a lazy iterable
-     */
-    public AutoPager<Models.Asset> iterate(Models.ListAssets options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page(project("assets"), o, cursor, Models.AssetPage.class));
-    }
-
-    /** @param options the asset @return the asset */
-    public Models.Asset retrieve(Models.AssetId options) {
-      return decode(json("GET", "/assets/" + id(str(Models.encode(options), "assetId", null)), null, null), Models.Asset.class);
-    }
-
-    /**
-     * Retrieves the asset until it is settled, its {@code classification.status} {@code completed}
-     * (with its decision in {@code classification.moderation.status}) or {@code failed}, and
-     * returns it. A {@code queued} or {@code processing} asset is still waiting, even when a
-     * reviewer has already decided it. It waits 0.5 seconds before the second check and 1.5 times
-     * longer each time after that, up to 2 seconds, never past the timeout (60 seconds by default).
-     * Webhooks report decisions without polling.
-     *
-     * @param options the asset and timeout
-     * @return the settled asset
-     * @throws CalmLensException {@link ErrorCodes#SDK_TIMEOUT} when the timeout passes before the
-     *     asset is settled, with {@code assetId} and the last {@code classificationStatus} and {@code
-     *     moderationStatus} in its details; {@link
-     *     ErrorCodes#SDK_CANCELLED} when the thread is interrupted (the interrupt flag is kept)
-     */
-    public Models.Asset waitForDecision(Models.WaitForDecision options) {
-      String assetId = str(Models.encode(options), "assetId", null);
-      id(assetId);
-      Duration limit = options.timeoutValue() == null ? DEFAULT_DECISION_TIMEOUT : options.timeoutValue();
-      if (limit.isNegative()) throw argument("timeout must not be negative");
-      long limitNanos;
-      try { limitNanos = limit.toNanos(); } catch (ArithmeticException tooLong) { limitNanos = Long.MAX_VALUE; }
-      long started = nanoTime.getAsLong();
-      long budget = limitNanos;
-      java.util.function.LongSupplier timeLeft = () -> budget - (nanoTime.getAsLong() - started);
-      String path = baseUrl + "/assets/" + id(assetId);
-      Call lookup = new Call("GET", path, baseHeaders("application/json"), null, timeout, true);
-      Models.Asset last = null;
-      long delay = DECISION_POLL_FIRST_DELAY.toNanos();
-      for (;;) {
-        if (Thread.currentThread().isInterrupted())
-          throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision");
-        Models.Asset asset;
-        try {
-          asset = decode(execute(lookup, limit.isZero() ? null : timeLeft), Models.Asset.class);
-        } catch (RequestTimeoutException failure) {
-          if (limit.isZero() || timeLeft.getAsLong() > 0) throw failure;
-          break;
-        }
-        long remaining = timeLeft.getAsLong();
-        if (!limit.isZero() && remaining <= 0) break;
-        if (isSettled(asset)) return asset;
-        last = asset;
-        if (remaining <= 0) break;
-        try {
-          sleeper.sleep(Duration.ofNanos(Math.min(delay, remaining)));
-        } catch (InterruptedException interrupted) {
-          Thread.currentThread().interrupt();
-          throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision", interrupted);
-        }
-        delay = Math.min(DECISION_POLL_MAX_DELAY.toNanos(), Math.round(delay * DECISION_POLL_DELAY_FACTOR));
-      }
-      Map<String, Object> details = new LinkedHashMap<>();
-      details.put("assetId", assetId);
-      details.put("classificationStatus", last == null ? null : last.classification().status().value());
-      details.put("moderationStatus", last == null ? null : last.classification().moderation().status().value());
-      throw new CalmLensException(ErrorCodes.SDK_TIMEOUT, "Asset " + assetId + " did not settle within " + limit, details, null);
-    }
-
-    /** Whether the asset is settled: its {@code classification.status} is {@code completed} or {@code failed}. */
-    private static boolean isSettled(Models.Asset asset) {
-      Models.AssetClassificationStatus status = asset.classification().status();
-      return Models.AssetClassificationStatus.COMPLETED.equals(status) || Models.AssetClassificationStatus.FAILED.equals(status);
-    }
-
-    /** @param options the asset and the fields to change @return the updated asset */
-    public Models.Asset update(Models.UpdateAsset options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("PATCH", "/assets/" + id(str(o, "assetId", null)), null, without(o, "assetId")), Models.Asset.class);
-    }
-
-    /**
-     * Processes an asset whose {@code classification.status} is {@code failed} again; its moderation
-     * returns to {@code pending}. Its content must still be held.
-     *
-     * @param options the asset
-     * @return the asset, processing again
-     */
-    public Models.Asset retry(Models.AssetId options) {
-      return decode(json("POST", "/assets/" + id(str(Models.encode(options), "assetId", null)) + "/retry", null, null), Models.Asset.class);
-    }
-
-    /**
-     * Records a reviewer's decision: the moderation status becomes {@code decision}, a manual review
-     * with the note is added to {@code classification.moderation.manualReviews}, and an
-     * {@code asset.<status>} event is recorded. An asset still pending moderation can only be blocked
-     * or purged; purging deletes the stored content and needs the {@code assets:delete} permission.
-     *
-     * @param options the asset, decision and note
-     * @return the asset
-     */
-    public Models.Asset decide(Models.DecideAsset options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("POST", "/assets/" + id(str(o, "assetId", null)) + "/decision", null, without(o, "assetId")), Models.Asset.class);
-    }
-
-    /**
-     * Completes the policy evidence behind a decided asset's moderation decision: the report's
-     * {@code classification.moderation.explanationComplete} becomes {@code true} and every action stays as
-     * decided. With {@code rerun} the asset is moderated again with the project's current policy,
-     * and an {@code asset.rerun-requested} event is recorded; use it when the policy changed since
-     * the decision ({@code asset/policy-changed}). The asset returns unchanged: it keeps its
-     * decision until the re-run's is stored, reported by {@code asset.classified} and {@code
-     * asset.<status>} events, and a failed re-run keeps it. A reviewed asset fails with {@code
-     * asset/reviewed}, and one whose content is gone with {@code asset/content-unavailable}.
-     *
-     * @param options the asset, and whether to moderate it again
-     * @return the asset
-     */
-    public Models.Asset explain(Models.ExplainAsset options) {
-      JsonObject body = new JsonObject();
-      if (options.rerunValue()) body.addProperty("rerun", true);
-      return decode(json("POST", "/assets/" + id(str(Models.encode(options), "assetId", null)) + "/explain", null, body), Models.Asset.class);
-    }
-
-    /**
-     * Removes the asset's stored content (the CDN stops serving it); the record and report stay,
-     * with {@code content.status} {@code removed} and {@code content.removalReason} {@code requested}.
-     *
-     * @param options the asset
-     * @return the asset
-     */
-    public Models.Asset removeContent(Models.AssetId options) {
-      return decode(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)) + "/content", null, null), Models.Asset.class);
-    }
-
-    /**
-     * Permanently deletes the asset record, its report and its stored content. An asset extracted
-     * from another (one with a {@code parentId}) fails with {@code asset/child-not-deletable}:
-     * delete its parent instead.
-     *
-     * @param options the asset
-     */
-    public void delete(Models.AssetId options) {
-      success(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)), null, null));
-    }
-
-    /**
-     * Deletes up to 500 assets ({@link Models.AssetBatchOperation#DELETE}) or removes their stored
-     * content ({@link Models.AssetBatchOperation#REMOVE_CONTENT}) in one request. Every asset must
-     * exist in the project and the key needs {@code assets:delete} for its folder, and a deletion
-     * can't name an asset extracted from another ({@code asset/child-not-deletable}), or nothing is
-     * queued. The work runs in the background and records {@code asset.deleted} or
-     * {@code asset.content-removed} for each asset, with a {@code batch-id} fact naming the
-     * response's {@code batchId}; assets under a safety hold are skipped. Not retried: it carries
-     * no {@code Idempotency-Key}.
-     *
-     * @param options the asset IDs and the operation
-     * @return the batch's ID, status and asset count
-     */
-    public Models.BatchAssetsResponse batch(Models.BatchAssets options) {
-      validateBatch(options);
-      JsonObject body = new JsonObject();
-      com.google.gson.JsonArray ids = new com.google.gson.JsonArray();
-      options.assetIdsValue().forEach(ids::add);
-      body.add("assetIds", ids);
-      body.addProperty("operation", options.operationValue().value());
-      return decode(json("POST", project("assets/batch"), null, body), Models.BatchAssetsResponse.class);
-    }
-
-    /** @param options the asset and target folder (null for the root) @return the moved asset */
-    public Models.Asset move(Models.MoveAsset options) {
-      JsonObject o = Models.encode(options);
-      JsonObject body = new JsonObject();
-      body.addProperty("folderId", options.folderIdValue());
-      return decode(json("POST", "/assets/" + id(str(o, "assetId", null)) + "/move", null, body), Models.Asset.class);
-    }
-
-    /** @param options the parent asset and page @return one page of child assets, such as images extracted from documents */
-    public Models.AssetPage listChildren(Models.ListChildren options) {
-      JsonObject o = Models.encode(options);
-      JsonObject query = new JsonObject();
-      without(o, "assetId").entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
-      return decode(json("GET", "/assets/" + id(str(o, "assetId", null)) + "/children", query, null), Models.AssetPage.class);
-    }
-
-    /**
-     * Lists one page of an audio or video asset's findings timeline, in time order.
-     * {@code classification.moderation.timeline.segmentCount} says how many segments there are.
-     *
-     * @param options the asset and page
-     * @return one page of timeline segments
-     */
-    public Models.AssetTimelinePage listTimeline(Models.ListTimeline options) {
-      JsonObject o = Models.encode(options);
-      JsonObject query = new JsonObject();
-      without(o, "assetId").entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
-      return decode(json("GET", project("assets/" + id(str(o, "assetId", null)) + "/timeline"), query, null), Models.AssetTimelinePage.class);
-    }
-
-    /** @param options the parent asset, page size and sort @return a lazy iterable over every child */
-    public AutoPager<Models.Asset> iterateChildren(Models.ListChildren options) {
-      JsonObject o = Models.encode(options);
-      String path = "/assets/" + id(str(o, "assetId", null)) + "/children";
-      JsonObject query = without(o, "assetId");
-      return pages(query, cursor -> page(path, query, cursor, Models.AssetPage.class));
-    }
-
-    /**
-     * Iterates over every segment of an audio or video asset's findings timeline, in time order.
-     *
-     * @param options the asset and page size
-     * @return a lazy iterable over every segment
-     */
-    public AutoPager<Models.MediaClassificationSegment> iterateTimeline(Models.ListTimeline options) {
-      JsonObject o = Models.encode(options);
-      String path = project("assets/" + id(str(o, "assetId", null)) + "/timeline");
-      JsonObject query = without(o, "assetId");
-      return pages(query, cursor -> page(path, query, cursor, Models.AssetTimelinePage.class));
-    }
-
-    /**
-     * Sends a later part of a multipart upload. Whether the final part waits for the decision was
-     * chosen when the upload started; {@link Models.UploadPart#wait(Boolean)} overrides it.
-     *
-     * @param options the asset and the part
-     * @return the asset; its {@code classification.status} is {@code uploading} until the final part
-     */
-    public Models.Asset uploadPart(Models.UploadPart options) { return uploadPart(options, null); }
-
-    /**
-     * @param options the asset and the part
-     * @param requestOptions idempotency key, deadlines and retries for this call
-     * @return the asset
-     */
-    public Models.Asset uploadPart(Models.UploadPart options, RequestOptions requestOptions) {
-      return with(requestOptions).sendPart(options, key(requestOptions));
-    }
-  }
-
-  /** Text moderation. */
-  public final class Text {
-    private Text() {}
-
-    /**
-     * Moderates text and waits for the decision.
-     *
-     * @param text the text
-     * @return the classified text asset
-     */
-    public Models.Asset classify(String text) { return classify(new Models.ClassifyText(text)); }
-
-    /** @param options the text, name and metadata @return the classified text asset */
-    public Models.Asset classify(Models.ClassifyText options) { return classify(options, null); }
-
-    /**
-     * @param options the text, name and metadata
-     * @param requestOptions idempotency key and timeout for this call
-     * @return the classified text asset
-     */
-    public Models.Asset classify(Models.ClassifyText options, RequestOptions requestOptions) {
-      if (options == null || options.textValue() == null || options.textValue().isBlank())
-        throw argument("Text to classify must be a non-empty string");
-      return assets.classify(options.toSubmitAsset(), requestOptions);
-    }
-  }
-
-  /** {@code client.uploadTokens}: tokens that let a browser upload through an upload preset. */
-  public final class UploadTokens {
-    private UploadTokens() {}
-
-    /**
-     * Signs a single-use upload token with this client's API key. Makes no request.
-     *
-     * @param options the preset, optional external ID and lifetime ({@code expiresIn}, 1 to 3600 seconds, default 600)
-     * @return the token and when it expires
-     */
-    public Models.SignedUploadToken sign(Models.SignUploadToken options) {
-      return signUploadToken(apiKey, options, System.currentTimeMillis(), UUID.randomUUID().toString());
-    }
-  }
 
   /**
    * Signs an upload token at {@code now} (epoch milliseconds) with {@code nonce}. The claims are
    * written as JavaScript's {@code JSON.stringify} writes them, which the API verifies byte for byte.
    */
-  static Models.SignedUploadToken signUploadToken(String apiKey, Models.SignUploadToken options, long now, String nonce) {
-    if (options == null) throw argument("Options are required");
-    String presetId = options.uploadPresetIdValue();
+  static SignedUploadToken signUploadToken(String apiKey, @Nullable UploadTokenSignParams options, long now, String nonce) {
+    if (options == null) throw argument("Params are required");
+    String presetId = options.getUploadPresetId().orElse(null);
     id(presetId);
-    int ttl = options.expiresInValue() == null ? DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS : options.expiresInValue();
+    int ttl = options.getExpiresIn().orElse(DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS);
     if (ttl < 1 || ttl > 3600) throw argument("expiresIn must be a whole number from 1 to 3600");
-    String externalId = options.externalIdValue();
+    String externalId = options.getExternalId().orElse(null);
     if (externalId != null && externalId.isEmpty()) throw argument("externalId must be a non-empty string");
     long expiresAt = now + ttl * 1000L;
     String prefix = apiKey.substring(0, Math.min(apiKey.length(), apiKey.startsWith("clsk_") ? 13 : 8));
@@ -1771,7 +1855,10 @@ public final class CalmLensServerClient implements AutoCloseable {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
       String signature = HexFormat.of().formatHex(mac.doFinal(("calmlens-upload-token:v1:" + body).getBytes(StandardCharsets.UTF_8)));
-      return new Models.SignedUploadToken("clut_" + body + "." + signature, expiresAt);
+      JsonObject token = new JsonObject();
+      token.addProperty("token", "clut_" + body + "." + signature);
+      token.addProperty("expiresAt", expiresAt);
+      return Json.GSON.fromJson(token, SignedUploadToken.class);
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException(e);
     }
@@ -1805,381 +1892,12 @@ public final class CalmLensServerClient implements AutoCloseable {
     return out.append('"').toString();
   }
 
-  /** Folders. */
-  public final class Folders {
-    private Folders() {}
 
-    /**
-     * Lists one page of child folders (the project root without {@code parentId}), searches folder
-     * names, or resolves the paths of {@code ids}. Pass the page's {@code nextCursor} as {@code cursor}
-     * for the next page.
-     *
-     * @param options parent, cursor, page size, sort and search
-     * @return one folder page
-     */
-    public Models.FolderPage list(Models.ListFolders options) {
-      Reply reply = json("GET", project("folders"), Models.encode(options), null);
-      JsonObject page = object(reply);
-      if (!page.has("items") || !page.get("items").isJsonArray() || !page.has("ancestors") || !page.get("ancestors").isJsonArray() || !page.has("hasMore") || !page.get("hasMore").isJsonPrimitive() || !page.get("hasMore").getAsJsonPrimitive().isBoolean())
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a folder page", null, reply.status(), reply.headers(), null);
-      return decode(reply, Models.FolderPage.class);
-    }
 
-    /**
-     * Iterates over every child folder of {@code parentId} (or the project root), fetching pages as
-     * needed.
-     *
-     * @param options parent, page size, sort and search
-     * @return a lazy iterable over every folder
-     */
-    public AutoPager<Models.Folder> iterate(Models.ListFolders options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page(project("folders"), o, cursor, Models.FolderPage.class));
-    }
 
-    /** @param options the folder @return the folder */
-    public Models.Folder retrieve(Models.FolderId options) {
-      return decode(json("GET", "/folders/" + id(str(Models.encode(options), "folderId", null)), null, null), Models.Folder.class);
-    }
 
-    /** @param options name, parent and description @return the new folder */
-    public Models.Folder create(Models.CreateFolder options) {
-      return decode(json("POST", project("folders"), null, Models.encode(options)), Models.Folder.class);
-    }
 
-    /** @param options the folder and fields to change @return the folder */
-    public Models.Folder update(Models.UpdateFolder options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("PATCH", "/folders/" + id(str(o, "folderId", null)), null, without(o, "folderId")), Models.Folder.class);
-    }
 
-    /** @param options the folder and new parent (null for the root) @return the folder */
-    public Models.Folder move(Models.MoveFolder options) {
-      JsonObject o = Models.encode(options);
-      JsonObject body = new JsonObject();
-      body.addProperty("parentId", options.parentIdValue());
-      return decode(json("POST", "/folders/" + id(str(o, "folderId", null)) + "/move", null, body), Models.Folder.class);
-    }
-
-    /** Deletes an empty folder. @param options the folder */
-    public void delete(Models.FolderId options) {
-      success(json("DELETE", "/folders/" + id(str(Models.encode(options), "folderId", null)), null, null));
-    }
-  }
-
-  /**
-   * Hash lists: PDQ perceptual hashes that image uploads are compared with. A {@code flag} list
-   * reports matches in {@code classification.moderation.hashMatches}; a {@code block} list also
-   * blocks close matches.
-   */
-  public final class HashLists {
-    private HashLists() {}
-
-    /** @param options cursor, page size and sort @return one page of the project's hash lists, newest first unless {@code sort} says otherwise */
-    public Models.HashListPage list(Models.ListHashLists options) {
-      return decode(json("GET", project("hash-lists"), Models.encode(options), null), Models.HashListPage.class);
-    }
-
-    /** @return the first page of the project's hash lists */
-    public Models.HashListPage list() { return list(new Models.ListHashLists()); }
-
-    /** @param options page size and sort @return a lazy iterable over every hash list */
-    public AutoPager<Models.HashList> iterate(Models.ListHashLists options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page(project("hash-lists"), o, cursor, Models.HashListPage.class));
-    }
-
-    /** @param options the hash list @return the hash list */
-    public Models.HashList retrieve(Models.HashListId options) {
-      return decode(json("GET", "/hash-lists/" + id(str(Models.encode(options), "hashListId", null)), null, null), Models.HashList.class);
-    }
-
-    /** @param options name, action and description @return the new hash list */
-    public Models.HashList create(Models.CreateHashList options) {
-      return decode(json("POST", project("hash-lists"), null, Models.encode(options)), Models.HashList.class);
-    }
-
-    /** Renames a list or changes its action; the new action applies to later uploads. @param options the hash list and fields to change @return the hash list */
-    public Models.HashList update(Models.UpdateHashList options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("PATCH", "/hash-lists/" + id(str(o, "hashListId", null)), null, without(o, "hashListId")), Models.HashList.class);
-    }
-
-    /** Deletes the list and every entry in it. @param options the hash list */
-    public void delete(Models.HashListId options) {
-      success(json("DELETE", "/hash-lists/" + id(str(Models.encode(options), "hashListId", null)), null, null));
-    }
-
-    /** @param options the hash list, cursor, page size and sort @return one page of entries, newest first unless {@code sort} says otherwise */
-    public Models.HashListEntryPage listEntries(Models.ListHashListEntries options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("GET", "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries", without(o, "hashListId"), null), Models.HashListEntryPage.class);
-    }
-
-    /** @param options the hash list, page size and sort @return a lazy iterable over every entry of the list */
-    public AutoPager<Models.HashListEntry> iterateEntries(Models.ListHashListEntries options) {
-      JsonObject o = Models.encode(options);
-      String path = "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries";
-      JsonObject query = without(o, "hashListId");
-      return pages(query, cursor -> page(path, query, cursor, Models.HashListEntryPage.class));
-    }
-
-    /**
-     * Adds a hash, or an image asset's perceptual hash; a hash the list already holds returns its
-     * existing entry.
-     *
-     * @param options the hash list and either a hash or an asset
-     * @return the entry
-     */
-    public Models.HashListEntry addEntry(Models.AddHashListEntry options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("POST", "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries", null, without(o, "hashListId")), Models.HashListEntry.class);
-    }
-
-    /** Removes a hash from its list; later uploads no longer match it. @param options the entry */
-    public void removeEntry(Models.HashListEntryId options) {
-      success(json("DELETE", "/hash-list-entries/" + id(str(Models.encode(options), "entryId", null)), null, null));
-    }
-  }
-
-  /**
-   * Moderation policies belong to the organisation and its projects share them. Every change sends
-   * the policy's {@code revision}, so a policy changed since is refused with {@code
-   * policy/revision-conflict}. Through a project's key you can change only policies no other
-   * project uses.
-   */
-  public final class Policies {
-    private Policies() {}
-
-    private String policyPath(JsonObject o) { return "/policies/" + id(str(o, "policyId", null)); }
-
-    /**
-     * Lists one page of the organisation's policies, oldest first unless {@code sort} says
-     * otherwise. {@link #retrieveAssigned()} says which one the project uses.
-     *
-     * @param options cursor, page size and sort
-     * @return one page of policies
-     */
-    public Models.PolicyPage list(Models.ListPolicies options) {
-      return decode(json("GET", "/policies", Models.encode(options), null), Models.PolicyPage.class);
-    }
-
-    /** @return the first page of the organisation's policies, oldest first */
-    public Models.PolicyPage list() { return list(new Models.ListPolicies()); }
-
-    /** @param options page size and sort @return a lazy iterable over every policy of the organisation */
-    public AutoPager<Models.Policy> iterate(Models.ListPolicies options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page("/policies", o, cursor, Models.PolicyPage.class));
-    }
-
-    /** @param options the policy @return the policy */
-    public Models.Policy retrieve(Models.PolicyId options) {
-      return decode(json("GET", policyPath(Models.encode(options)), null, null), Models.Policy.class);
-    }
-
-    /**
-     * Creates a policy from {@code settings}, or a copy of a built-in preset with {@code presetId}.
-     * It moderates nothing until it is assigned to a project or named on an upload preset.
-     *
-     * @param options settings and a name, or a preset
-     * @return the new policy
-     */
-    public Models.Policy create(Models.CreatePolicy options) {
-      return decode(json("POST", "/policies", null, Models.encode(options)), Models.Policy.class);
-    }
-
-    /**
-     * Changes the name, description or settings; later moderation uses them. Saving a {@code live}
-     * policy pins it under the same ID.
-     *
-     * @param options the policy, its revision and the fields to change
-     * @return the saved policy
-     */
-    public Models.Policy update(Models.UpdatePolicy options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("PATCH", policyPath(o), null, without(o, "policyId")), Models.Policy.class);
-    }
-
-    /**
-     * Restores the settings of the preset release a {@code pinned} or {@code copy} policy is at,
-     * discarding its edits.
-     *
-     * @param options the policy, its revision and the {@code preset.version} you reviewed
-     * @return the saved policy
-     */
-    public Models.Policy reset(Models.ResetPolicy options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("POST", policyPath(o) + "/reset", null, without(o, "policyId")), Models.Policy.class);
-    }
-
-    /**
-     * Moves a {@code pinned} or {@code copy} policy whose settings are unchanged from its preset
-     * release to the latest release of the preset.
-     *
-     * @param options the policy, its revision and the {@code preset.latestVersion} you reviewed
-     * @return the saved policy
-     */
-    public Models.Policy upgrade(Models.UpgradePolicy options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("POST", policyPath(o) + "/upgrade", null, without(o, "policyId")), Models.Policy.class);
-    }
-
-    /**
-     * Switches automatic updates on ({@code live}) or off ({@code pinned}) for the organisation's
-     * own preset policy.
-     *
-     * @param options the policy, whether it follows the preset, its revision and the preset version
-     * @return the saved policy
-     */
-    public Models.Policy setAutomaticUpdates(Models.SetPolicyAutomaticUpdates options) {
-      JsonObject o = Models.encode(options);
-      return decode(json("PUT", policyPath(o) + "/automatic-updates", null, without(o, "policyId")), Models.Policy.class);
-    }
-
-    /** Deletes a policy that no project or upload preset uses. @param options the policy */
-    public void delete(Models.PolicyId options) {
-      success(json("DELETE", policyPath(Models.encode(options)), null, null));
-    }
-
-    /** @return the policy the project moderates with */
-    public Models.Policy retrieveAssigned() {
-      return decode(json("GET", project("policy"), null, null), Models.Policy.class);
-    }
-
-    /** Chooses the policy the project moderates with. @param options the policy @return the policy */
-    public Models.Policy assign(Models.PolicyId options) {
-      return decode(json("PUT", project("policy"), null, Models.encode(options)), Models.Policy.class);
-    }
-  }
-
-  /**
-   * The project's upload presets: the rules for uploads from browsers and apps. {@link #ensure}
-   * creates or replaces presets by key, for deploys that declare them in code; send each preset's
-   * {@code revision} to refuse a change made since you read it.
-   */
-  public final class UploadPresets {
-    private UploadPresets() {}
-
-    /** @param options cursor, page size and sort @return one page of the project's upload presets, oldest first unless {@code sort} says otherwise */
-    public Models.UploadPresetPage list(Models.ListUploadPresets options) {
-      return decode(json("GET", project("upload-presets"), Models.encode(options), null), Models.UploadPresetPage.class);
-    }
-
-    /** @return the first page of the project's upload presets, oldest first */
-    public Models.UploadPresetPage list() { return list(new Models.ListUploadPresets()); }
-
-    /** @param options page size and sort @return a lazy iterable over every upload preset of the project */
-    public AutoPager<Models.UploadPreset> iterate(Models.ListUploadPresets options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page(project("upload-presets"), o, cursor, Models.UploadPresetPage.class));
-    }
-
-    /**
-     * Creates each preset, or replaces it with the definition sent, by key. Every preset is checked
-     * before any is saved; an unchanged preset keeps its revision.
-     *
-     * @param options the preset definitions
-     * @return the stored presets, in the order sent
-     */
-    public Models.EnsureUploadPresetsResponse ensure(Models.EnsureUploadPresets options) {
-      return decode(json("PUT", project("upload-presets"), null, Models.encode(options)), Models.EnsureUploadPresetsResponse.class);
-    }
-
-    /** Deletes an upload preset; assets already uploaded through it stay. @param options the upload preset */
-    public void delete(Models.UploadPresetId options) {
-      success(json("DELETE", "/upload-presets/" + id(str(Models.encode(options), "uploadPresetId", null)), null, null));
-    }
-  }
-
-  /**
-   * The project's settings, with defaults filled in. {@link #update} replaces them: settings left
-   * out return to their defaults. Send the {@code revision} you read to refuse a change made since.
-   */
-  public final class ProjectSettings {
-    private ProjectSettings() {}
-
-    /** @return the project's settings and their revision */
-    public Models.ProjectSettingsResource get() {
-      return decode(json("GET", project("settings"), null, null), Models.ProjectSettingsResource.class);
-    }
-
-    /** @param options the complete settings and, optionally, the revision you read @return the saved settings */
-    public Models.ProjectSettingsResource update(Models.UpdateProjectSettings options) {
-      return decode(json("PUT", project("settings"), null, Models.encode(options)), Models.ProjectSettingsResource.class);
-    }
-  }
-
-  /**
-   * The project's metadata fields. They share the project settings' {@code revision}; {@link
-   * #ensure} creates or replaces fields by ID and keeps the others.
-   */
-  public final class MetadataFields {
-    private MetadataFields() {}
-
-    /** @return the project's metadata fields and their revision */
-    public Models.MetadataFieldsResource list() {
-      return decode(json("GET", project("metadata-fields"), null, null), Models.MetadataFieldsResource.class);
-    }
-
-    /** @param options the fields to create or replace and, optionally, the revision you read @return every field after the change */
-    public Models.MetadataFieldsResource ensure(Models.EnsureMetadataFields options) {
-      return decode(json("PUT", project("metadata-fields"), null, Models.encode(options)), Models.MetadataFieldsResource.class);
-    }
-
-    /** Deletes a field definition; assets keep their values. @param options the field and, optionally, the revision you read */
-    public void delete(Models.DeleteMetadataField options) {
-      JsonObject o = Models.encode(options);
-      success(json("DELETE", project("metadata-fields/" + id(str(o, "fieldId", null))), without(o, "fieldId"), null));
-    }
-  }
-
-  /** The events feed. Prefer webhooks in production. */
-  public final class Events {
-    private Events() {}
-
-    /** The query for {@code options}: the API takes {@code types} as one comma-separated value. */
-    private JsonObject eventsQuery(Models.ListEvents options) {
-      JsonObject query = Models.encode(options);
-      query.remove("types");
-      List<String> types = options.typesValue();
-      if (types != null && !types.isEmpty()) query.addProperty("types", String.join(",", types));
-      return query;
-    }
-
-    /**
-     * Lists events after a cursor. Without {@code cursor} it returns no events and a
-     * {@code nextCursor} for the current time. {@code types} and {@code assetId} narrow the feed to
-     * some event types or one asset's events; pass the same filters with each {@code cursor}.
-     *
-     * @param options cursor, page size and filters
-     * @return one page of events
-     */
-    public Models.EventsPage list(Models.ListEvents options) {
-      return decode(json("GET", project("events"), eventsQuery(options), null), Models.EventsPage.class);
-    }
-
-    /**
-     * Yields pages of events after {@code cursor} until no more are waiting, like the JavaScript
-     * SDK's {@code events.pages}. Save each page's {@code nextCursor()} after handling it to resume
-     * later. Without {@code cursor}, it yields one empty page whose cursor is "now". Each page keeps
-     * the filters of {@code options}.
-     *
-     * @param options cursor, page size and filters
-     * @return a lazy iterable of pages
-     */
-    public AutoPager<Models.EventsPage> pages(Models.ListEvents options) {
-      JsonObject o = eventsQuery(options);
-      return new AutoPager<>(token -> {
-        JsonObject query = o.deepCopy();
-        if (token != null) query.addProperty("cursor", token);
-        Models.EventsPage page = decode(json("GET", project("events"), query, null), Models.EventsPage.class);
-        if (page.nextCursor() == null || page.nextCursor().isEmpty())
-          throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no nextCursor", null, 200, Map.of(), null);
-        return new AutoPager.Chunk<>(List.of(page), page.nextCursor(), page.hasMore());
-      }, str(o, "cursor", null), true);
-    }
-  }
 
 
   /**
@@ -2247,8 +1965,1251 @@ public final class CalmLensServerClient implements AutoCloseable {
     return url + viewerClaimsQuery(o.get("viewerClaims"));
   }
 
+
+  // ------------------------------------------------------------------ Lenses
+
+
+
+
+
+  /** Assets: uploads, moderation, listing and management. Reached through {@link CalmLensServerClient#assets()}. */
+  public final class AssetService {
+    private AssetService() {}
+
+    /**
+     * Uploads an asset and returns without waiting for its decision ({@code wait=false}): its
+     * {@code classification.status} is {@code queued} ({@code uploading} for the first part of a
+     * multipart upload). The upload carries an {@code Idempotency-Key}, so it is retried safely.
+     *
+     * <p>Content larger than {@link Builder#partSizeBytes(long)} (bytes, base64 or a file) is sent
+     * as a multipart upload in parts of that size, each retried on its own; calling again with the
+     * same idempotency key (at most 240 characters) resumes an interrupted upload. The same applies
+     * to {@code classify}.
+     *
+     * @param params name and content, part or url
+     * @return the new asset
+     */
+    public Asset create(AssetCreateParams params) { return create(params, null); }
+
+    /**
+     * @param params name and content, part or url
+     * @param requestOptions idempotency key, deadlines, retries and headers for this call
+     * @return the new asset
+     */
+    public Asset create(AssetCreateParams params, @Nullable RequestOptions requestOptions) {
+      return with(requestOptions, "assets.create").submit(params, false, key(requestOptions));
+    }
+
+    /**
+     * Uploads bytes and returns without waiting for their decision.
+     *
+     * @param name asset name
+     * @param bytes content
+     * @param mimeType MIME type, such as {@code image/png}
+     * @return the new asset
+     */
+    public Asset create(String name, byte[] bytes, String mimeType) {
+      return create(AssetCreateParams.builder().setName(name).setContent(Content.bytes(bytes, mimeType)).build());
+    }
+
+    /**
+     * Uploads an asset and waits for its moderation decision ({@code wait=true}).
+     *
+     * @param params name and content, part or url
+     * @return the classified asset
+     */
+    public Asset classify(AssetCreateParams params) { return classify(params, null); }
+
+    /**
+     * @param params name and content, part or url
+     * @param requestOptions idempotency key, deadlines, retries and headers for this call
+     * @return the classified asset
+     */
+    public Asset classify(AssetCreateParams params, @Nullable RequestOptions requestOptions) {
+      if (params != null && params.getContent().flatMap(Content::getPlainText).map(String::isBlank).orElse(false))
+        throw payloadError("Text to classify must be a non-empty string");
+      return with(requestOptions, "assets.classify").submit(params, true, key(requestOptions));
+    }
+
+    /** @param params search query @return matches, best first */
+    public AssetSearchResponse search(AssetSearchParams params) { return search(params, null); }
+
+    /**
+     * @param params search query
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return matches, best first
+     */
+    public AssetSearchResponse search(AssetSearchParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.search");
+      return c.decode(c.json("GET", project("assets/search"), encode(required(params)), null), AssetSearchResponse.class);
+    }
+
+    /** @return the first page of the project's assets, newest first */
+    public AssetPage list() { return list(null, null); }
+
+    /**
+     * Lists one page of the project's assets, newest first unless {@code sort} says otherwise. Pass
+     * {@code setFilter("folderId==fldr_...")} for one folder's assets.
+     *
+     * @param params page, filter and sort, or null for the first page
+     * @return one page of assets
+     */
+    public AssetPage list(@Nullable AssetListParams params) { return list(params, null); }
+
+    /**
+     * @param params page, filter and sort, or null for the first page
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of assets
+     */
+    public AssetPage list(@Nullable AssetListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.list");
+      return c.decode(c.json("GET", project("assets"), encode(params), null), AssetPage.class);
+    }
+
+    /**
+     * Iterates over every matching asset, page by page, from the supplied cursor.
+     *
+     * @param params page size, filter and sort, or null for every asset
+     * @return a lazy iterable
+     */
+    public AutoPager<Asset> iterate(@Nullable AssetListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params page size, filter and sort, or null for every asset
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable
+     */
+    public AutoPager<Asset> iterate(@Nullable AssetListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page(project("assets"), o, cursor, AssetPage.class));
+    }
+
+    /** @param assetId the asset @return the asset */
+    public Asset retrieve(String assetId) { return retrieve(assetId, null); }
+
+    /**
+     * @param assetId the asset
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the asset
+     */
+    public Asset retrieve(String assetId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.retrieve");
+      return c.decode(c.json("GET", "/assets/" + id(assetId), null, null), Asset.class);
+    }
+
+    /**
+     * Retrieves the asset until it is settled, waiting up to {@link #DEFAULT_DECISION_TIMEOUT}.
+     *
+     * @param assetId the asset
+     * @return the settled asset
+     * @see #waitForDecision(String, Duration, RequestOptions)
+     */
+    public Asset waitForDecision(String assetId) { return waitForDecision(assetId, null, null); }
+
+    /**
+     * Retrieves the asset until it is settled.
+     *
+     * @param assetId the asset
+     * @param timeout how long to wait; {@link #DEFAULT_DECISION_TIMEOUT} when null, and zero checks once
+     * @return the settled asset
+     * @see #waitForDecision(String, Duration, RequestOptions)
+     */
+    public Asset waitForDecision(String assetId, @Nullable Duration timeout) { return waitForDecision(assetId, timeout, null); }
+
+    /**
+     * Retrieves the asset until it is settled, its {@code classification.status} {@code completed}
+     * (with its decision in {@code classification.moderation.decision}) or {@code failed}, and
+     * returns it. A {@code queued} or {@code processing} asset is still waiting, even when a
+     * reviewer has already decided it. It waits 0.5 seconds before the second check and 1.5 times
+     * longer each time after that, up to 2 seconds, never past the timeout (60 seconds by default).
+     * Webhooks report decisions without polling.
+     *
+     * @param assetId the asset
+     * @param timeout how long to wait; {@link #DEFAULT_DECISION_TIMEOUT} when null, and zero checks once
+     * @param requestOptions deadlines, retries and headers for each check
+     * @return the settled asset
+     * @throws com.calmlens.exception.TimeoutException when the timeout passes before the asset is
+     *     settled, with {@code assetId} and the last {@code classificationStatus} and {@code
+     *     moderationDecision} in its details
+     * @throws com.calmlens.exception.CancelledException when the thread is interrupted (the
+     *     interrupt flag is kept)
+     */
+    public Asset waitForDecision(String assetId, @Nullable Duration timeout, @Nullable RequestOptions requestOptions) {
+      return with(requestOptions, "assets.waitForDecision").awaitDecision(assetId, timeout);
+    }
+
+    /** @param assetId the asset @param params the fields to change @return the updated asset */
+    public Asset update(String assetId, AssetUpdateParams params) { return update(assetId, params, null); }
+
+    /**
+     * @param assetId the asset
+     * @param params the fields to change
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the updated asset
+     */
+    public Asset update(String assetId, AssetUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.update");
+      return c.decode(c.json("PATCH", "/assets/" + id(assetId), null, encode(required(params))), Asset.class);
+    }
+
+    /**
+     * Processes an asset whose {@code classification.status} is {@code failed} again; its
+     * moderation decision returns to null. Its content must still be held.
+     *
+     * @param assetId the asset
+     * @return the asset, processing again
+     */
+    public Asset retry(String assetId) { return retry(assetId, null); }
+
+    /**
+     * @param assetId the asset
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the asset, processing again
+     */
+    public Asset retry(String assetId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.retry");
+      return c.decode(c.json("POST", "/assets/" + id(assetId) + "/retry", null, null), Asset.class);
+    }
+
+    /**
+     * Records a reviewer's decision: the moderation decision becomes {@code decision}, a manual
+     * review with the note is added to {@code classification.moderation.manualReviews}, and an
+     * {@code asset.<status>} event is recorded. An asset still pending moderation can only be
+     * blocked or purged; purging deletes the stored content and needs the {@code assets:delete}
+     * permission.
+     *
+     * @param assetId the asset
+     * @param params the decision and note
+     * @return the asset
+     */
+    public Asset decide(String assetId, AssetDecideParams params) { return decide(assetId, params, null); }
+
+    /**
+     * @param assetId the asset
+     * @param params the decision and note
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the asset
+     */
+    public Asset decide(String assetId, AssetDecideParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.decide");
+      return c.decode(c.json("POST", "/assets/" + id(assetId) + "/decision", null, encode(required(params))), Asset.class);
+    }
+
+    /**
+     * Completes the policy evidence behind a decided asset's moderation decision.
+     *
+     * @param assetId the asset
+     * @return the asset
+     * @see #explain(String, AssetExplainParams, RequestOptions)
+     */
+    public Asset explain(String assetId) { return explain(assetId, null, null); }
+
+    /**
+     * Completes the policy evidence behind a decided asset's moderation decision.
+     *
+     * @param assetId the asset
+     * @param params whether to moderate it again, or null
+     * @return the asset
+     * @see #explain(String, AssetExplainParams, RequestOptions)
+     */
+    public Asset explain(String assetId, @Nullable AssetExplainParams params) { return explain(assetId, params, null); }
+
+    /**
+     * Completes the policy evidence behind a decided asset's moderation decision: the report's
+     * {@code classification.moderation.explanationComplete} becomes {@code true} and every action
+     * stays as decided. With {@code rerun} the asset is moderated again with the project's current
+     * policy, and an {@code asset.rerun-requested} event is recorded; use it when the policy
+     * changed since the decision ({@code asset/policy-changed}). The asset returns unchanged: it
+     * keeps its decision until the re-run's is stored, reported by {@code asset.classified} and
+     * {@code asset.<status>} events, and a failed re-run keeps it. A reviewed asset fails with
+     * {@code asset/reviewed}, and one whose content is gone with {@code asset/content-unavailable}.
+     *
+     * @param assetId the asset
+     * @param params whether to moderate it again, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the asset
+     */
+    public Asset explain(String assetId, @Nullable AssetExplainParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.explain");
+      JsonObject body = encode(params);
+      if (body.has("rerun") && !body.get("rerun").isJsonNull() && !body.get("rerun").getAsBoolean()) body.remove("rerun");
+      return c.decode(c.json("POST", "/assets/" + id(assetId) + "/explain", null, body), Asset.class);
+    }
+
+    /**
+     * Removes the asset's stored content (the CDN stops serving it); the record and report stay,
+     * with {@code content.status} {@code removed} and {@code content.removalReason} {@code requested}.
+     *
+     * @param assetId the asset
+     * @return the asset
+     */
+    public Asset removeContent(String assetId) { return removeContent(assetId, null); }
+
+    /**
+     * @param assetId the asset
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the asset
+     */
+    public Asset removeContent(String assetId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.removeContent");
+      return c.decode(c.json("DELETE", "/assets/" + id(assetId) + "/content", null, null), Asset.class);
+    }
+
+    /**
+     * Permanently deletes the asset record, its report and its stored content. An asset extracted
+     * from another (one with a {@code parentId}) fails with {@code asset/child-not-deletable}:
+     * delete its parent instead.
+     *
+     * @param assetId the asset
+     */
+    public void delete(String assetId) { delete(assetId, null); }
+
+    /**
+     * @param assetId the asset
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String assetId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.delete");
+      success(c.json("DELETE", "/assets/" + id(assetId), null, null));
+    }
+
+    /**
+     * Deletes up to 500 assets ({@link AssetBatchOperation#DELETE}) or removes their stored content
+     * ({@link AssetBatchOperation#REMOVE_CONTENT}) in one request. Every asset must exist in the
+     * project and the key needs {@code assets:delete} for its folder, and a deletion can't name an
+     * asset extracted from another ({@code asset/child-not-deletable}), or nothing is queued. The
+     * work runs in the background and records {@code asset.deleted} or {@code asset.content-removed}
+     * for each asset, with a {@code batch-id} fact naming the response's {@code batchId}; assets
+     * under a safety hold are skipped. Not retried: it carries no {@code Idempotency-Key}.
+     *
+     * @param params the asset IDs and the operation
+     * @return the batch's ID, status and asset count
+     */
+    public BatchAssetsResponse batch(AssetBatchParams params) { return batch(params, null); }
+
+    /**
+     * @param params the asset IDs and the operation
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the batch's ID, status and asset count
+     */
+    public BatchAssetsResponse batch(AssetBatchParams params, @Nullable RequestOptions requestOptions) {
+      validateBatch(params);
+      CalmLensServerClient c = with(requestOptions, "assets.batch");
+      return c.decode(c.json("POST", project("assets/batch"), null, encode(params)), BatchAssetsResponse.class);
+    }
+
+    /** @param assetId the asset @param params the target folder, or cleared for the root @return the moved asset */
+    public Asset move(String assetId, AssetMoveParams params) { return move(assetId, params, null); }
+
+    /**
+     * @param assetId the asset
+     * @param params the target folder, or cleared for the root
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the moved asset
+     */
+    public Asset move(String assetId, AssetMoveParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.move");
+      return c.decode(c.json("POST", "/assets/" + id(assetId) + "/move", null, encode(required(params))), Asset.class);
+    }
+
+    /** @param assetId the parent asset @return the first page of its child assets */
+    public AssetPage listChildren(String assetId) { return listChildren(assetId, null, null); }
+
+    /** @param assetId the parent asset @param params the page, or null @return one page of child assets, such as images extracted from documents */
+    public AssetPage listChildren(String assetId, @Nullable AssetListChildrenParams params) { return listChildren(assetId, params, null); }
+
+    /**
+     * @param assetId the parent asset
+     * @param params the page, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of child assets
+     */
+    public AssetPage listChildren(String assetId, @Nullable AssetListChildrenParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.listChildren");
+      return c.decode(c.json("GET", "/assets/" + id(assetId) + "/children", encode(params), null), AssetPage.class);
+    }
+
+    /** @param assetId the parent asset @param params page size and sort, or null @return a lazy iterable over every child */
+    public AutoPager<Asset> iterateChildren(String assetId, @Nullable AssetListChildrenParams params) { return iterateChildren(assetId, params, null); }
+
+    /**
+     * @param assetId the parent asset
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every child
+     */
+    public AutoPager<Asset> iterateChildren(String assetId, @Nullable AssetListChildrenParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.iterateChildren");
+      String path = "/assets/" + id(assetId) + "/children";
+      JsonObject query = encode(params);
+      return pages(query, cursor -> c.page(path, query, cursor, AssetPage.class));
+    }
+
+    /**
+     * Lists one page of an audio or video asset's findings timeline, in time order.
+     * {@code classification.moderation.timeline.segmentCount} says how many segments there are.
+     *
+     * @param assetId the asset
+     * @param params the page, or null
+     * @return one page of timeline segments
+     */
+    public AssetTimelinePage listTimeline(String assetId, @Nullable AssetListTimelineParams params) { return listTimeline(assetId, params, null); }
+
+    /**
+     * @param assetId the asset
+     * @param params the page, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of timeline segments
+     */
+    public AssetTimelinePage listTimeline(String assetId, @Nullable AssetListTimelineParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.listTimeline");
+      return c.decode(c.json("GET", project("assets/" + id(assetId) + "/timeline"), encode(params), null), AssetTimelinePage.class);
+    }
+
+    /**
+     * Iterates over every segment of an audio or video asset's findings timeline, in time order.
+     *
+     * @param assetId the asset
+     * @param params page size, or null
+     * @return a lazy iterable over every segment
+     */
+    public AutoPager<MediaClassificationSegment> iterateTimeline(String assetId, @Nullable AssetListTimelineParams params) {
+      return iterateTimeline(assetId, params, null);
+    }
+
+    /**
+     * @param assetId the asset
+     * @param params page size, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every segment
+     */
+    public AutoPager<MediaClassificationSegment> iterateTimeline(String assetId, @Nullable AssetListTimelineParams params,
+        @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "assets.iterateTimeline");
+      String path = project("assets/" + id(assetId) + "/timeline");
+      JsonObject query = encode(params);
+      return pages(query, cursor -> c.page(path, query, cursor, AssetTimelinePage.class));
+    }
+
+    /**
+     * Sends a later part of a multipart upload. Whether the final part waits for the decision was
+     * chosen when the upload started; {@link AssetUploadPartParams.Builder#setWait(Boolean)} overrides it.
+     *
+     * @param assetId the uploading asset
+     * @param params the part
+     * @return the asset; its {@code classification.status} is {@code uploading} until the final part
+     */
+    public Asset uploadPart(String assetId, AssetUploadPartParams params) { return uploadPart(assetId, params, null); }
+
+    /**
+     * @param assetId the uploading asset
+     * @param params the part
+     * @param requestOptions idempotency key, deadlines, retries and headers for this call
+     * @return the asset
+     */
+    public Asset uploadPart(String assetId, AssetUploadPartParams params, @Nullable RequestOptions requestOptions) {
+      return with(requestOptions, "assets.uploadPart").sendPart(assetId, params, key(requestOptions));
+    }
+  }
+
+  /** Text moderation. Reached through {@link CalmLensServerClient#text()}. */
+  public final class TextService {
+    private TextService() {}
+
+    /**
+     * Moderates text and waits for the decision.
+     *
+     * @param text the text
+     * @return the classified text asset
+     */
+    public Asset classify(String text) { return classify(TextClassifyParams.builder().setText(text).build(), null); }
+
+    /** @param params the text, name and metadata @return the classified text asset */
+    public Asset classify(TextClassifyParams params) { return classify(params, null); }
+
+    /**
+     * @param params the text, name and metadata
+     * @param requestOptions idempotency key, deadlines, retries and headers for this call
+     * @return the classified text asset
+     */
+    public Asset classify(TextClassifyParams params, @Nullable RequestOptions requestOptions) {
+      if (params == null || params.getText().map(String::isBlank).orElse(true)) throw argument("Text to classify must be a non-empty string");
+      JsonObject o = encode(params);
+      String text = o.remove("text").getAsString();
+      if (!o.has("name")) o.addProperty("name", "text");
+      o.add("content", Json.GSON.toJsonTree(Content.text(text)));
+      AssetCreateParams upload = Json.GSON.fromJson(o, AssetCreateParams.class);
+      return assets.classify(upload, requestOptions);
+    }
+  }
+
+  /** Tokens that let a browser upload through an upload preset. Reached through {@link CalmLensServerClient#uploadTokens()}. */
+  public final class UploadTokenService {
+    private UploadTokenService() {}
+
+    /**
+     * Signs a single-use upload token with this client's API key. Makes no request.
+     *
+     * @param params the preset, optional external ID and lifetime ({@code expiresIn}, 1 to 3600 seconds, default 600)
+     * @return the token and when it expires
+     */
+    public SignedUploadToken sign(UploadTokenSignParams params) {
+      return signUploadToken(apiKey, params, System.currentTimeMillis(), UUID.randomUUID().toString());
+    }
+  }
+
+  /** Folders. Reached through {@link CalmLensServerClient#folders()}. */
+  public final class FolderService {
+    private FolderService() {}
+
+    /** @return the first page of folders at the project root */
+    public FolderPage list() { return list(null, null); }
+
+    /**
+     * Lists one page of child folders (the project root without {@code parentId}), or searches
+     * folder names. Pass the page's {@code nextCursor} as {@code cursor} for the next page.
+     *
+     * @param params parent, cursor, page size, sort and search, or null
+     * @return one folder page
+     */
+    public FolderPage list(@Nullable FolderListParams params) { return list(params, null); }
+
+    /**
+     * @param params parent, cursor, page size, sort and search, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one folder page
+     */
+    public FolderPage list(@Nullable FolderListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.list");
+      return c.decode(c.json("GET", project("folders"), encode(params), null), FolderPage.class);
+    }
+
+    /**
+     * Iterates over every child folder of {@code parentId} (or the project root), fetching pages as
+     * needed.
+     *
+     * @param params parent, page size, sort and search, or null
+     * @return a lazy iterable over every folder
+     */
+    public AutoPager<Folder> iterate(@Nullable FolderListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params parent, page size, sort and search, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every folder
+     */
+    public AutoPager<Folder> iterate(@Nullable FolderListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page(project("folders"), o, cursor, FolderPage.class));
+    }
+
+    /** @param folderId the folder @return the folder */
+    public Folder retrieve(String folderId) { return retrieve(folderId, null); }
+
+    /**
+     * @param folderId the folder
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the folder
+     */
+    public Folder retrieve(String folderId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.retrieve");
+      return c.decode(c.json("GET", "/folders/" + id(folderId), null, null), Folder.class);
+    }
+
+    /** @param params name and parent @return the new folder */
+    public Folder create(FolderCreateParams params) { return create(params, null); }
+
+    /**
+     * @param params name and parent
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the new folder
+     */
+    public Folder create(FolderCreateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.create");
+      return c.decode(c.json("POST", project("folders"), null, encode(required(params))), Folder.class);
+    }
+
+    /** @param folderId the folder @param params the fields to change @return the folder */
+    public Folder update(String folderId, FolderUpdateParams params) { return update(folderId, params, null); }
+
+    /**
+     * @param folderId the folder
+     * @param params the fields to change
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the folder
+     */
+    public Folder update(String folderId, FolderUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.update");
+      return c.decode(c.json("PATCH", "/folders/" + id(folderId), null, encode(required(params))), Folder.class);
+    }
+
+    /** @param folderId the folder @param params the new parent, or cleared for the root @return the folder */
+    public Folder move(String folderId, FolderMoveParams params) { return move(folderId, params, null); }
+
+    /**
+     * @param folderId the folder
+     * @param params the new parent, or cleared for the root
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the folder
+     */
+    public Folder move(String folderId, FolderMoveParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.move");
+      return c.decode(c.json("POST", "/folders/" + id(folderId) + "/move", null, encode(required(params))), Folder.class);
+    }
+
+    /** Deletes an empty folder. @param folderId the folder */
+    public void delete(String folderId) { delete(folderId, null); }
+
+    /**
+     * Deletes an empty folder.
+     *
+     * @param folderId the folder
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String folderId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "folders.delete");
+      success(c.json("DELETE", "/folders/" + id(folderId), null, null));
+    }
+  }
+
   /**
-   * CDN URLs, signed asset URLs, asset display info and downloads.
+   * Hash lists: PDQ perceptual hashes that image uploads are compared with. A {@code flag} list
+   * reports matches in {@code classification.moderation.raw.hashMatches}; a {@code block} list also
+   * blocks close matches. Reached through {@link CalmLensServerClient#hashLists()}.
+   */
+  public final class HashListService {
+    private HashListService() {}
+
+    /** @return the first page of the project's hash lists */
+    public HashListPage list() { return list(null, null); }
+
+    /** @param params cursor, page size and sort, or null @return one page of the project's hash lists, newest first unless {@code sort} says otherwise */
+    public HashListPage list(@Nullable HashListListParams params) { return list(params, null); }
+
+    /**
+     * @param params cursor, page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of hash lists
+     */
+    public HashListPage list(@Nullable HashListListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.list");
+      return c.decode(c.json("GET", project("hash-lists"), encode(params), null), HashListPage.class);
+    }
+
+    /** @param params page size and sort, or null @return a lazy iterable over every hash list */
+    public AutoPager<HashList> iterate(@Nullable HashListListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every hash list
+     */
+    public AutoPager<HashList> iterate(@Nullable HashListListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page(project("hash-lists"), o, cursor, HashListPage.class));
+    }
+
+    /** @param hashListId the hash list @return the hash list */
+    public HashList retrieve(String hashListId) { return retrieve(hashListId, null); }
+
+    /**
+     * @param hashListId the hash list
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the hash list
+     */
+    public HashList retrieve(String hashListId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.retrieve");
+      return c.decode(c.json("GET", "/hash-lists/" + id(hashListId), null, null), HashList.class);
+    }
+
+    /** @param params name, action and description @return the new hash list */
+    public HashList create(HashListCreateParams params) { return create(params, null); }
+
+    /**
+     * @param params name, action and description
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the new hash list
+     */
+    public HashList create(HashListCreateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.create");
+      return c.decode(c.json("POST", project("hash-lists"), null, encode(required(params))), HashList.class);
+    }
+
+    /**
+     * Renames a list or changes its action; the new action applies to later uploads.
+     *
+     * @param hashListId the hash list
+     * @param params the fields to change
+     * @return the hash list
+     */
+    public HashList update(String hashListId, HashListUpdateParams params) { return update(hashListId, params, null); }
+
+    /**
+     * @param hashListId the hash list
+     * @param params the fields to change
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the hash list
+     */
+    public HashList update(String hashListId, HashListUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.update");
+      return c.decode(c.json("PATCH", "/hash-lists/" + id(hashListId), null, encode(required(params))), HashList.class);
+    }
+
+    /** Deletes the list and every entry in it. @param hashListId the hash list */
+    public void delete(String hashListId) { delete(hashListId, null); }
+
+    /**
+     * Deletes the list and every entry in it.
+     *
+     * @param hashListId the hash list
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String hashListId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.delete");
+      success(c.json("DELETE", "/hash-lists/" + id(hashListId), null, null));
+    }
+
+    /** @param hashListId the hash list @param params cursor, page size and sort, or null @return one page of entries, newest first unless {@code sort} says otherwise */
+    public HashListEntryPage listEntries(String hashListId, @Nullable HashListListEntriesParams params) { return listEntries(hashListId, params, null); }
+
+    /**
+     * @param hashListId the hash list
+     * @param params cursor, page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of entries
+     */
+    public HashListEntryPage listEntries(String hashListId, @Nullable HashListListEntriesParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.listEntries");
+      return c.decode(c.json("GET", "/hash-lists/" + id(hashListId) + "/entries", encode(params), null), HashListEntryPage.class);
+    }
+
+    /** @param hashListId the hash list @param params page size and sort, or null @return a lazy iterable over every entry of the list */
+    public AutoPager<HashListEntry> iterateEntries(String hashListId, @Nullable HashListListEntriesParams params) {
+      return iterateEntries(hashListId, params, null);
+    }
+
+    /**
+     * @param hashListId the hash list
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every entry of the list
+     */
+    public AutoPager<HashListEntry> iterateEntries(String hashListId, @Nullable HashListListEntriesParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.iterateEntries");
+      String path = "/hash-lists/" + id(hashListId) + "/entries";
+      JsonObject query = encode(params);
+      return pages(query, cursor -> c.page(path, query, cursor, HashListEntryPage.class));
+    }
+
+    /**
+     * Adds a hash, or an image asset's perceptual hash; a hash the list already holds returns its
+     * existing entry.
+     *
+     * @param hashListId the hash list
+     * @param params either a hash or an asset
+     * @return the entry
+     */
+    public HashListEntry addEntry(String hashListId, HashListAddEntryParams params) { return addEntry(hashListId, params, null); }
+
+    /**
+     * @param hashListId the hash list
+     * @param params either a hash or an asset
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the entry
+     */
+    public HashListEntry addEntry(String hashListId, HashListAddEntryParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.addEntry");
+      return c.decode(c.json("POST", "/hash-lists/" + id(hashListId) + "/entries", null, encode(required(params))), HashListEntry.class);
+    }
+
+    /** Removes a hash from its list; later uploads no longer match it. @param entryId the entry */
+    public void removeEntry(String entryId) { removeEntry(entryId, null); }
+
+    /**
+     * Removes a hash from its list; later uploads no longer match it.
+     *
+     * @param entryId the entry
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void removeEntry(String entryId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "hashLists.removeEntry");
+      success(c.json("DELETE", "/hash-list-entries/" + id(entryId), null, null));
+    }
+  }
+
+  /**
+   * Moderation policies belong to the organisation and its projects share them. Every change sends
+   * the policy's {@code revision}, so a policy changed since is refused with {@code
+   * policy/revision-conflict}. Through a project's key you can change only policies no other
+   * project uses. Reached through {@link CalmLensServerClient#policies()}.
+   */
+  public final class PolicyService {
+    private PolicyService() {}
+
+    /** @return the first page of the organisation's policies, oldest first */
+    public PolicyPage list() { return list(null, null); }
+
+    /**
+     * Lists one page of the organisation's policies, oldest first unless {@code sort} says
+     * otherwise. {@link #retrieveAssigned()} says which one the project uses.
+     *
+     * @param params cursor, page size and sort, or null
+     * @return one page of policies
+     */
+    public PolicyPage list(@Nullable PolicyListParams params) { return list(params, null); }
+
+    /**
+     * @param params cursor, page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of policies
+     */
+    public PolicyPage list(@Nullable PolicyListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.list");
+      return c.decode(c.json("GET", "/policies", encode(params), null), PolicyPage.class);
+    }
+
+    /** @param params page size and sort, or null @return a lazy iterable over every policy of the organisation */
+    public AutoPager<Policy> iterate(@Nullable PolicyListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every policy of the organisation
+     */
+    public AutoPager<Policy> iterate(@Nullable PolicyListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page("/policies", o, cursor, PolicyPage.class));
+    }
+
+    /** @param policyId the policy @return the policy */
+    public Policy retrieve(String policyId) { return retrieve(policyId, null); }
+
+    /**
+     * @param policyId the policy
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the policy
+     */
+    public Policy retrieve(String policyId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.retrieve");
+      return c.decode(c.json("GET", "/policies/" + id(policyId), null, null), Policy.class);
+    }
+
+    /**
+     * Creates a policy from {@code settings}, or a copy of a built-in preset with {@code presetId}.
+     * It moderates nothing until it is assigned to a project or named on an upload preset.
+     *
+     * @param params settings and a name, or a preset
+     * @return the new policy
+     */
+    public Policy create(PolicyCreateParams params) { return create(params, null); }
+
+    /**
+     * @param params settings and a name, or a preset
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the new policy
+     */
+    public Policy create(PolicyCreateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.create");
+      return c.decode(c.json("POST", "/policies", null, encode(required(params))), Policy.class);
+    }
+
+    /**
+     * Changes the name, description or settings; later moderation uses them. Saving a {@code live}
+     * policy pins it under the same ID.
+     *
+     * @param policyId the policy
+     * @param params its revision and the fields to change
+     * @return the saved policy
+     */
+    public Policy update(String policyId, PolicyUpdateParams params) { return update(policyId, params, null); }
+
+    /**
+     * @param policyId the policy
+     * @param params its revision and the fields to change
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved policy
+     */
+    public Policy update(String policyId, PolicyUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.update");
+      return c.decode(c.json("PATCH", "/policies/" + id(policyId), null, encode(required(params))), Policy.class);
+    }
+
+    /**
+     * Restores the settings of the preset release a {@code pinned} or {@code copy} policy is at,
+     * discarding its edits.
+     *
+     * @param policyId the policy
+     * @param params its revision and the {@code preset.version} you reviewed
+     * @return the saved policy
+     */
+    public Policy reset(String policyId, PolicyResetParams params) { return reset(policyId, params, null); }
+
+    /**
+     * @param policyId the policy
+     * @param params its revision and the {@code preset.version} you reviewed
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved policy
+     */
+    public Policy reset(String policyId, PolicyResetParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.reset");
+      return c.decode(c.json("POST", "/policies/" + id(policyId) + "/reset", null, encode(required(params))), Policy.class);
+    }
+
+    /**
+     * Moves a {@code pinned} or {@code copy} policy whose settings are unchanged from its preset
+     * release to the latest release of the preset.
+     *
+     * @param policyId the policy
+     * @param params its revision and the {@code preset.latestVersion} you reviewed
+     * @return the saved policy
+     */
+    public Policy upgrade(String policyId, PolicyUpgradeParams params) { return upgrade(policyId, params, null); }
+
+    /**
+     * @param policyId the policy
+     * @param params its revision and the {@code preset.latestVersion} you reviewed
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved policy
+     */
+    public Policy upgrade(String policyId, PolicyUpgradeParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.upgrade");
+      return c.decode(c.json("POST", "/policies/" + id(policyId) + "/upgrade", null, encode(required(params))), Policy.class);
+    }
+
+    /**
+     * Switches automatic updates on ({@code live}) or off ({@code pinned}) for the organisation's
+     * own preset policy.
+     *
+     * @param policyId the policy
+     * @param params whether it follows the preset, its revision and the preset version
+     * @return the saved policy
+     */
+    public Policy setAutomaticUpdates(String policyId, PolicySetAutomaticUpdatesParams params) { return setAutomaticUpdates(policyId, params, null); }
+
+    /**
+     * @param policyId the policy
+     * @param params whether it follows the preset, its revision and the preset version
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved policy
+     */
+    public Policy setAutomaticUpdates(String policyId, PolicySetAutomaticUpdatesParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.setAutomaticUpdates");
+      return c.decode(c.json("PUT", "/policies/" + id(policyId) + "/automatic-updates", null, encode(required(params))), Policy.class);
+    }
+
+    /** Deletes a policy that no project or upload preset uses. @param policyId the policy */
+    public void delete(String policyId) { delete(policyId, null); }
+
+    /**
+     * Deletes a policy that no project or upload preset uses.
+     *
+     * @param policyId the policy
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String policyId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.delete");
+      success(c.json("DELETE", "/policies/" + id(policyId), null, null));
+    }
+
+    /** @return the policy the project moderates with */
+    public Policy retrieveAssigned() { return retrieveAssigned(null); }
+
+    /**
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the policy the project moderates with
+     */
+    public Policy retrieveAssigned(@Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.retrieveAssigned");
+      return c.decode(c.json("GET", project("policy"), null, null), Policy.class);
+    }
+
+    /** Chooses the policy the project moderates with. @param policyId the policy @return the policy */
+    public Policy assign(String policyId) { return assign(policyId, null); }
+
+    /**
+     * Chooses the policy the project moderates with.
+     *
+     * @param policyId the policy
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the policy
+     */
+    public Policy assign(String policyId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "policies.assign");
+      JsonObject body = new JsonObject();
+      body.addProperty("policyId", policyId);
+      return c.decode(c.json("PUT", project("policy"), null, body), Policy.class);
+    }
+  }
+
+  /**
+   * The project's upload presets: the rules for uploads from browsers and apps. {@link #ensure}
+   * creates or replaces presets by key, for deploys that declare them in code; send each preset's
+   * {@code revision} to refuse a change made since you read it. Reached through {@link
+   * CalmLensServerClient#uploadPresets()}.
+   */
+  public final class UploadPresetService {
+    private UploadPresetService() {}
+
+    /** @return the first page of the project's upload presets, oldest first */
+    public UploadPresetPage list() { return list(null, null); }
+
+    /** @param params cursor, page size and sort, or null @return one page of the project's upload presets, oldest first unless {@code sort} says otherwise */
+    public UploadPresetPage list(@Nullable UploadPresetListParams params) { return list(params, null); }
+
+    /**
+     * @param params cursor, page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of upload presets
+     */
+    public UploadPresetPage list(@Nullable UploadPresetListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "uploadPresets.list");
+      return c.decode(c.json("GET", project("upload-presets"), encode(params), null), UploadPresetPage.class);
+    }
+
+    /** @param params page size and sort, or null @return a lazy iterable over every upload preset of the project */
+    public AutoPager<UploadPreset> iterate(@Nullable UploadPresetListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every upload preset of the project
+     */
+    public AutoPager<UploadPreset> iterate(@Nullable UploadPresetListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "uploadPresets.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page(project("upload-presets"), o, cursor, UploadPresetPage.class));
+    }
+
+    /**
+     * Creates each preset, or replaces it with the definition sent, by key. Every preset is checked
+     * before any is saved; an unchanged preset keeps its revision.
+     *
+     * @param uploadPresets the preset definitions
+     * @return the stored presets, in the order sent
+     */
+    public EnsureUploadPresetsResponse ensure(List<UploadPresetParams> uploadPresets) { return ensure(uploadPresets, null); }
+
+    /**
+     * @param uploadPresets the preset definitions
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the stored presets, in the order sent
+     */
+    public EnsureUploadPresetsResponse ensure(List<UploadPresetParams> uploadPresets, @Nullable RequestOptions requestOptions) {
+      if (uploadPresets == null) throw argument("uploadPresets is required");
+      CalmLensServerClient c = with(requestOptions, "uploadPresets.ensure");
+      JsonObject body = new JsonObject();
+      body.add("uploadPresets", Json.GSON.toJsonTree(uploadPresets));
+      return c.decode(c.json("PUT", project("upload-presets"), null, body), EnsureUploadPresetsResponse.class);
+    }
+
+    /** Deletes an upload preset; assets already uploaded through it stay. @param uploadPresetId the upload preset */
+    public void delete(String uploadPresetId) { delete(uploadPresetId, null); }
+
+    /**
+     * Deletes an upload preset; assets already uploaded through it stay.
+     *
+     * @param uploadPresetId the upload preset
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String uploadPresetId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "uploadPresets.delete");
+      success(c.json("DELETE", "/upload-presets/" + id(uploadPresetId), null, null));
+    }
+  }
+
+  /**
+   * The project's settings, with defaults filled in. {@link #update} replaces them: settings left
+   * out return to their defaults. Send the {@code revision} you read to refuse a change made since.
+   * Reached through {@link CalmLensServerClient#projectSettings()}.
+   */
+  public final class ProjectSettingsService {
+    private ProjectSettingsService() {}
+
+    /** @return the project's settings and their revision */
+    public ProjectSettingsResource get() { return get(null); }
+
+    /**
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the project's settings and their revision
+     */
+    public ProjectSettingsResource get(@Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "projectSettings.get");
+      return c.decode(c.json("GET", project("settings"), null, null), ProjectSettingsResource.class);
+    }
+
+    /** @param params the complete settings and, optionally, the revision you read @return the saved settings */
+    public ProjectSettingsResource update(ProjectSettingsUpdateParams params) { return update(params, null); }
+
+    /**
+     * @param params the complete settings and, optionally, the revision you read
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved settings
+     */
+    public ProjectSettingsResource update(ProjectSettingsUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "projectSettings.update");
+      return c.decode(c.json("PUT", project("settings"), null, encode(required(params))), ProjectSettingsResource.class);
+    }
+  }
+
+  /**
+   * The project's metadata fields. They share the project settings' {@code revision}; {@link
+   * #ensure} creates or replaces fields by ID and keeps the others. Reached through {@link
+   * CalmLensServerClient#metadataFields()}.
+   */
+  public final class MetadataFieldService {
+    private MetadataFieldService() {}
+
+    /** @return the project's metadata fields and their revision */
+    public MetadataFieldsResource list() { return list(null); }
+
+    /**
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the project's metadata fields and their revision
+     */
+    public MetadataFieldsResource list(@Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "metadataFields.list");
+      return c.decode(c.json("GET", project("metadata-fields"), null, null), MetadataFieldsResource.class);
+    }
+
+    /** @param params the fields to create or replace and, optionally, the revision you read @return every field after the change */
+    public MetadataFieldsResource ensure(MetadataFieldsEnsureParams params) { return ensure(params, null); }
+
+    /**
+     * @param params the fields to create or replace and, optionally, the revision you read
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return every field after the change
+     */
+    public MetadataFieldsResource ensure(MetadataFieldsEnsureParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "metadataFields.ensure");
+      return c.decode(c.json("PUT", project("metadata-fields"), null, encode(required(params))), MetadataFieldsResource.class);
+    }
+
+    /** Deletes a field definition; assets keep their values. @param fieldId the field */
+    public void delete(String fieldId) { delete(fieldId, null, null); }
+
+    /**
+     * Deletes a field definition; assets keep their values.
+     *
+     * @param fieldId the field
+     * @param params the revision you read, or null
+     */
+    public void delete(String fieldId, @Nullable MetadataFieldsDeleteParams params) { delete(fieldId, params, null); }
+
+    /**
+     * @param fieldId the field
+     * @param params the revision you read, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String fieldId, @Nullable MetadataFieldsDeleteParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "metadataFields.delete");
+      success(c.json("DELETE", project("metadata-fields/" + id(fieldId)), encode(params), null));
+    }
+  }
+
+  /** The events feed. Prefer webhooks in production. Reached through {@link CalmLensServerClient#events()}. */
+  public final class EventService {
+    private EventService() {}
+
+    /** The query for {@code params}: the API takes {@code types} as one comma-separated value. */
+    private JsonObject eventsQuery(@Nullable EventListParams params) {
+      JsonObject query = encode(params);
+      if (query.has("types")) {
+        List<String> types = new ArrayList<>();
+        query.remove("types").getAsJsonArray().forEach(type -> types.add(type.getAsString()));
+        if (!types.isEmpty()) query.addProperty("types", String.join(",", types));
+      }
+      return query;
+    }
+
+    /** @return no events, and a {@code nextCursor} for the current time */
+    public EventsPage list() { return list(null, null); }
+
+    /**
+     * Lists events after a cursor. Without {@code cursor} it returns no events and a
+     * {@code nextCursor} for the current time. {@code types} and {@code assetId} narrow the feed to
+     * some event types or one asset's events; pass the same filters with each {@code cursor}.
+     *
+     * @param params cursor, page size and filters, or null
+     * @return one page of events
+     */
+    public EventsPage list(@Nullable EventListParams params) { return list(params, null); }
+
+    /**
+     * @param params cursor, page size and filters, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of events
+     */
+    public EventsPage list(@Nullable EventListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "events.list");
+      return c.decode(c.json("GET", project("events"), eventsQuery(params), null), EventsPage.class);
+    }
+
+    /**
+     * Yields every event after {@code cursor}, page by page, until no more are waiting. Without
+     * {@code cursor} it starts from now, so it yields nothing; use {@link #pages} to keep each
+     * page's {@code nextCursor} and resume later.
+     *
+     * @param params cursor, page size and filters, or null
+     * @return a lazy iterable of events
+     */
+    public AutoPager<Event> iterate(@Nullable EventListParams params) { return iterate(params, null); }
+
+    /**
+     * @param params cursor, page size and filters, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable of events
+     */
+    public AutoPager<Event> iterate(@Nullable EventListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "events.iterate");
+      JsonObject o = eventsQuery(params);
+      return new AutoPager<>(token -> {
+        JsonObject query = o.deepCopy();
+        if (token != null) query.addProperty("cursor", token);
+        EventsPage page = c.decode(c.json("GET", project("events"), query, null), EventsPage.class);
+        String next = page.getNextCursor();
+        if (next == null || next.isEmpty())
+          throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no nextCursor", null, 200, Map.of(), null, null, null);
+        return new AutoPager.Chunk<>(page.getItems(), next, page.getHasMore());
+      }, str(o, "cursor", null), true);
+    }
+
+    /**
+     * Yields pages of events after {@code cursor} until no more are waiting. Save each page's
+     * {@code getNextCursor()} after handling it to resume later. Without {@code cursor}, it yields
+     * one empty page whose cursor is "now". Each page keeps the filters of {@code params}.
+     *
+     * @param params cursor, page size and filters, or null
+     * @return a lazy iterable of pages
+     */
+    public AutoPager<EventsPage> pages(@Nullable EventListParams params) { return pages(params, null); }
+
+    /**
+     * @param params cursor, page size and filters, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable of pages
+     */
+    public AutoPager<EventsPage> pages(@Nullable EventListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "events.pages");
+      JsonObject o = eventsQuery(params);
+      return new AutoPager<>(token -> {
+        JsonObject query = o.deepCopy();
+        if (token != null) query.addProperty("cursor", token);
+        EventsPage page = c.decode(c.json("GET", project("events"), query, null), EventsPage.class);
+        String next = page.getNextCursor();
+        if (next == null || next.isEmpty())
+          throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Events page has no nextCursor", null, 200, Map.of(), null, null, null);
+        return new AutoPager.Chunk<>(List.of(page), next, page.getHasMore());
+      }, str(o, "cursor", null), true);
+    }
+  }
+
+  /**
+   * CDN URLs, signed asset URLs, asset display info and downloads. Reached through {@link
+   * CalmLensServerClient#cdn()}.
    *
    * <p>Every asset has one URL, {@code {cdnBaseUrl}/assets/{projectId}/{asset}}, and each resource
    * is a path beneath it ({@link #CDN_RESOURCES}). The asset segment is the asset ID or {@code
@@ -2256,10 +3217,10 @@ public final class CalmLensServerClient implements AutoCloseable {
    * use {@link #signAssetUrl} if the asset is private, {@link #getAssetUrl} otherwise, and add
    * viewer claims to either.
    */
-  public final class Cdn {
-    private Cdn() {}
+  public final class CdnService {
+    private CdnService() {}
 
-    private String assetUrl(JsonObject o, Object transform) {
+    private String assetUrl(JsonObject o, @Nullable Object transform) {
       String base = cdnBaseUrl + "/assets/" + id(str(o, "projectId", projectId)) + "/" + assetSegment(o);
       return appendAssetLocation(base, o, transform);
     }
@@ -2274,29 +3235,37 @@ public final class CalmLensServerClient implements AutoCloseable {
      * {@code transform/invalid}); the SDK refuses them without a resource and on the other
      * resources. Viewer claims are assertions from your app; CalmLens doesn't verify them.
      *
-     * @param options the asset, resource, selector and viewer claims
+     * @param params the asset, resource, selector and viewer claims
      * @return the URL
-     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+     * @throws com.calmlens.exception.InvalidArgumentException for invalid params
      */
-    public String getAssetUrl(Models.CdnRequest options) {
-      return assetUrl(Models.encode(options), options.transformValue());
+    public String getAssetUrl(CdnRequestParams params) {
+      return assetUrl(encode(required(params)), params.getTransform().orElse(null));
     }
 
     /**
      * Signs a private asset's URL on your server, so browsers and apps can load it without an API
      * key until it expires. Every resource is a path beneath it, as beneath a public asset URL; the
-     * {@code original} only when signed with {@code original(true)}. With a {@code resource}, it
+     * {@code original} only when signed with {@code setOriginal(true)}. With a {@code resource}, it
      * returns that resource's URL beneath the grant, with the lens, transform and viewer claims
-     * appended as {@link #getAssetUrl} appends them. The options are checked before anything is
+     * appended as {@link #getAssetUrl} appends them. The params are checked before anything is
      * sent; the lifetime defaults to {@link #DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS}.
      *
-     * @param options the asset, lifetime, original access and the location beneath the grant
+     * @param params the asset, lifetime, original access and the location beneath the grant
      * @return the signed URL and its expiry
-     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+     * @throws com.calmlens.exception.InvalidArgumentException for invalid params
      */
-    public Models.SignedAssetUrl signAssetUrl(Models.SignAssetUrlOptions options) {
-      JsonObject o = Models.encode(options);
-      Object transform = options.transformValue();
+    public SignedAssetUrl signAssetUrl(CdnSignAssetUrlParams params) { return signAssetUrl(params, null); }
+
+    /**
+     * @param params the asset, lifetime, original access and the location beneath the grant
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the signed URL and its expiry
+     */
+    public SignedAssetUrl signAssetUrl(CdnSignAssetUrlParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "cdn.signAssetUrl");
+      JsonObject o = encode(required(params));
+      Object transform = params.getTransform().orElse(null);
       assetSegment(o);
       long expiresIn = DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS;
       if (o.has("expiresIn")) {
@@ -2311,10 +3280,13 @@ public final class CalmLensServerClient implements AutoCloseable {
       body.addProperty("expiresIn", expiresIn);
       body.addProperty("original", flag(o, "original"));
       String path = "/projects/" + id(str(o, "projectId", projectId)) + "/signed-asset-urls";
-      Models.SignedAssetUrl signed = decode(json("POST", path, null, body), Models.SignedAssetUrl.class);
-      if (signed.url() == null || signed.url().isEmpty())
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL", null, 200, Map.of(), null);
-      return new Models.SignedAssetUrl(appendAssetLocation(signed.url(), o, transform), signed.expiresAt());
+      Reply reply = c.json("POST", path, null, body);
+      SignedAssetUrl signed = c.decode(reply, SignedAssetUrl.class);
+      if (signed.getUrl().isEmpty())
+        throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL", null, 200, Map.of(), null, null, null);
+      JsonObject located = object(reply).deepCopy();
+      located.addProperty("url", appendAssetLocation(signed.getUrl(), o, transform));
+      return Json.GSON.fromJson(located, SignedAssetUrl.class);
     }
 
     /**
@@ -2323,24 +3295,34 @@ public final class CalmLensServerClient implements AutoCloseable {
      *
      * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
      * @return the asset's type, size, rendered file, preview and stream, and whether the viewer can see it
-     * @see #getAssetInfo(String, Models.ViewerClaims)
+     * @see #getAssetInfo(String, ViewerClaims, RequestOptions)
      */
-    public Models.AssetInfo getAssetInfo(String url) { return getAssetInfo(url, null); }
+    public AssetInfo getAssetInfo(String url) { return getAssetInfo(url, null, null); }
+
+    /**
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @param viewerClaims the viewer's claims, replacing those the URL carries; null keeps the URL's
+     * @return the display info
+     * @see #getAssetInfo(String, ViewerClaims, RequestOptions)
+     */
+    public AssetInfo getAssetInfo(String url, @Nullable ViewerClaims viewerClaims) { return getAssetInfo(url, viewerClaims, null); }
 
     /**
      * Fetches the display info of an asset URL, public or signed ({@code {url}/info}): its type,
      * size, rendered file, preview and stream, and whether the viewer its claims describe can see
      * it. It sends no API key, as a browser would, and is retried like API reads. A refusal throws
-     * {@link ApiException} with the CDN's code, such as {@link ErrorCodes#SIGNED_URL_EXPIRED} or
+     * an {@link ApiException} with the CDN's code, such as {@link ErrorCodes#SIGNED_URL_EXPIRED} or
      * {@code asset/not-available}.
      *
      * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
      * @param viewerClaims the viewer's claims, replacing those the URL carries; null keeps the URL's
+     * @param requestOptions deadlines, retries and headers for this call
      * @return the display info
-     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when the URL isn't absolute
-     *     or its claims are invalid
+     * @throws com.calmlens.exception.InvalidArgumentException when the URL isn't absolute or its
+     *     claims are invalid
      */
-    public Models.AssetInfo getAssetInfo(String url, Models.ViewerClaims viewerClaims) {
+    public AssetInfo getAssetInfo(String url, @Nullable ViewerClaims viewerClaims, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "cdn.getAssetInfo");
       URI parsed;
       try {
         parsed = url == null ? null : new URI(url);
@@ -2361,19 +3343,15 @@ public final class CalmLensServerClient implements AutoCloseable {
             throw argument("The asset URL's viewerClaims are not JSON");
           }
         }
-      Map<String, String> headers = new LinkedHashMap<>();
+      Map<String, String> headers = new LinkedHashMap<>(c.extraHeaders);
       headers.put("User-Agent", userAgent);
       headers.put("Accept", "application/json");
-      Reply reply = execute(new Call("GET", base + "/info" + viewerClaimsQuery(claims), headers, null, timeout, true));
-      Models.AssetInfo info;
+      Reply reply = c.execute(new Call("GET", base + "/info" + viewerClaimsQuery(claims), headers, null, c.timeout, true));
       try {
-        info = reply.json() != null && reply.json().isJsonObject() ? Json.GSON.fromJson(reply.json(), Models.AssetInfo.class) : null;
-      } catch (JsonParseException | IllegalStateException | IllegalArgumentException invalid) {
-        info = null;
+        return c.decode(reply, AssetInfo.class);
+      } catch (InvalidResponseException invalid) {
+        throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The CDN returned no asset info", null, reply.status(), reply.headers(), null, null, invalid);
       }
-      if (info == null || info.id() == null || info.projectId() == null || info.type() == null || info.content() == null || info.availability() == null)
-        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "The CDN returned no asset info", null, reply.status(), reply.headers(), null);
-      return info;
     }
 
     /**
@@ -2382,53 +3360,52 @@ public final class CalmLensServerClient implements AutoCloseable {
      * response when done. Transport failures and HTTP 429, 500, 502, 503 and 504 are retried like API
      * reads, and once retries run out the last response is returned.
      *
-     * @param options the asset, selector, method and headers
+     * @param params the asset, selector, method and headers
      * @return the streamed response
      */
-    public CdnResponse serve(Models.CdnRequest options) { return serve(options, null); }
+    public CdnResponse serve(CdnRequestParams params) { return serve(params, null); }
 
     /**
-     * @param options the asset, selector, method and headers
+     * @param params the asset, selector, method and headers
      * @param requestOptions {@code timeout} (the wait for the response headers and between received
-     *     bytes) and {@code maxRetries} for this call
+     *     bytes), {@code maxRetries} and headers for this call
      * @return the streamed response
      */
-    public CdnResponse serve(Models.CdnRequest options, RequestOptions requestOptions) {
-      CalmLensServerClient derived = with(requestOptions);
-      if (derived != CalmLensServerClient.this) return derived.cdn.serve(options);
-      JsonObject o = Models.encode(options);
+    public CdnResponse serve(CdnRequestParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "cdn.serve");
+      JsonObject o = encode(required(params));
       if (!o.has("resource")) o.addProperty("resource", "rendered");
-      String url = assetUrl(o, options.transformValue());
+      String url = assetUrl(o, params.getTransform().orElse(null));
       // No Accept unless the caller sets one: the CDN answers with the content's own type.
-      Map<String, String> headers = baseHeaders(null);
-      Models.HttpOptions init = options.initValue();
-      String method = init == null || init.methodValue() == null ? "GET" : init.methodValue().toUpperCase(Locale.ROOT);
+      Map<String, String> headers = c.baseHeaders(null);
+      HttpOptions init = params.getInit().orElse(null);
+      String method = init == null || init.getMethod().isEmpty() ? "GET" : init.getMethod().get().toUpperCase(Locale.ROOT);
       if (!method.equals("GET") && !method.equals("HEAD")) throw argument("CDN requests use GET or HEAD");
-      if (init != null && init.headersValue() != null)
-        init.headersValue().forEach((name, value) -> { if (name == null || !name.equalsIgnoreCase("X-Api-Key")) header(headers, name, value); });
-      Call call = new Call(method, url, headers, null, timeout, true);
+      if (init != null && init.getHeaders().isPresent())
+        init.getHeaders().get().forEach((name, value) -> { if (name == null || !name.equalsIgnoreCase("X-Api-Key")) header(headers, name, value); });
+      Call call = new Call(method, url, headers, null, c.timeout, true);
       for (int attempt = 0; ; attempt++) {
         Transport.Response response;
         try {
-          response = send(call);
-        } catch (TransportException failure) {
-          if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) { pause(retryDelay(attempt, ThreadLocalRandom.current().nextDouble())); continue; }
+          response = c.send(call);
+        } catch (ConnectionException | TimeoutException failure) {
+          if (c.canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) { c.pause(retryDelay(attempt, ThreadLocalRandom.current().nextDouble())); continue; }
           throw failure;
         }
         if (isRedirect(response.status())) {
           try { response.close(); } catch (IOException ignored) { /* failing */ }
-          throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null);
+          throw CalmLensException.of(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null, null, null);
         }
-        if (retryableStatus(response.status()) && canRetry(call, attempt)) {
-          Duration retryAfter = ApiException.retryAfter(response.header("retry-after"));
+        if (retryableStatus(response.status()) && c.canRetry(call, attempt)) {
+          Duration retryAfter = CalmLensException.retryAfter(response.header("retry-after"));
           Duration wait = retryAfter != null ? retryAfter : retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
           if (wait.compareTo(RETRY_AFTER_MAX) <= 0) {
             try { response.close(); } catch (IOException ignored) { /* retrying */ }
-            pause(wait);
+            c.pause(wait);
             continue;
           }
         }
-        return new CdnResponse(response, new Timeouts.IdleTimeoutInputStream(response.body(), timeout));
+        return new CdnResponse(response, new Timeouts.IdleTimeoutInputStream(response.body(), c.timeout));
       }
     }
   }
@@ -2438,69 +3415,116 @@ public final class CalmLensServerClient implements AutoCloseable {
   /**
    * The project's lenses: named image transforms the CDN applies at {@code /@<identifier>}. The CDN
    * serves files made with each lens's current definition. {@link #ensureLenses} creates or changes
-   * lenses by identifier, for applications that declare theirs in code.
+   * lenses by identifier, for applications that declare theirs in code. Reached through {@link
+   * CalmLensServerClient#lenses()}.
    */
-  public final class Lenses {
-    private Lenses() {}
-
-    private String lensPath(JsonObject o) { return "/lenses/" + id(str(o, "lensId", null)); }
+  public final class LensService {
+    private LensService() {}
 
     /** A lens changed here no longer has the definition {@code ensureLens} cached for it. */
-    private void forget(java.util.function.Predicate<Models.Lens> matches) {
+    private void forget(java.util.function.Predicate<Lens> matches) {
       lensCache.ensured.values().removeIf(matches);
     }
 
-    /** @param options cursor, page size and sort @return one page of the project's lenses, newest first unless {@code sort} says otherwise */
-    public Models.LensPage list(Models.ListLenses options) {
-      return decode(json("GET", project("lenses"), Models.encode(options), null), Models.LensPage.class);
+    /** @return the first page of the project's lenses, newest first */
+    public LensPage list() { return list(null, null); }
+
+    /** @param params cursor, page size and sort, or null @return one page of the project's lenses, newest first unless {@code sort} says otherwise */
+    public LensPage list(@Nullable LensListParams params) { return list(params, null); }
+
+    /**
+     * @param params cursor, page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return one page of lenses
+     */
+    public LensPage list(@Nullable LensListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.list");
+      return c.decode(c.json("GET", project("lenses"), encode(params), null), LensPage.class);
     }
 
-    /** @return the first page of the project's lenses, newest first */
-    public Models.LensPage list() { return list(new Models.ListLenses()); }
+    /** @param params page size and sort, or null @return a lazy iterable over every lens of the project */
+    public AutoPager<Lens> iterate(@Nullable LensListParams params) { return iterate(params, null); }
 
-    /** @param options page size and sort @return a lazy iterable over every lens of the project */
-    public AutoPager<Models.Lens> iterate(Models.ListLenses options) {
-      JsonObject o = Models.encode(options);
-      return pages(o, cursor -> page(project("lenses"), o, cursor, Models.LensPage.class));
+    /**
+     * @param params page size and sort, or null
+     * @param requestOptions deadlines, retries and headers for each page's request
+     * @return a lazy iterable over every lens of the project
+     */
+    public AutoPager<Lens> iterate(@Nullable LensListParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.iterate");
+      JsonObject o = encode(params);
+      return pages(o, cursor -> c.page(project("lenses"), o, cursor, LensPage.class));
     }
 
     /**
      * Creates a lens; its identifier must be new to the project ({@code lens/identifier-taken}
      * otherwise).
      *
-     * @param options the lens definition
+     * @param params the lens definition
      * @return the new lens
      */
-    public Models.Lens create(Models.LensDefinition options) {
-      Models.Lens lens = decode(json("POST", project("lenses"), null, Models.encode(options)), Models.Lens.class);
-      forget(cached -> java.util.Objects.equals(cached.identifier(), lens.identifier()));
+    public Lens create(LensCreateParams params) { return create(params, null); }
+
+    /**
+     * @param params the lens definition
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the new lens
+     */
+    public Lens create(LensCreateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.create");
+      Lens lens = c.decode(c.json("POST", project("lenses"), null, encode(required(params))), Lens.class);
+      forget(cached -> cached.getIdentifier().equals(lens.getIdentifier()));
       return lens;
     }
 
-    /** @param options the lens @return the lens */
-    public Models.Lens retrieve(Models.LensId options) {
-      return decode(json("GET", lensPath(Models.encode(options)), null, null), Models.Lens.class);
+    /** @param lensId the lens @return the lens */
+    public Lens retrieve(String lensId) { return retrieve(lensId, null); }
+
+    /**
+     * @param lensId the lens
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the lens
+     */
+    public Lens retrieve(String lensId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.retrieve");
+      return c.decode(c.json("GET", "/lenses/" + id(lensId), null, null), Lens.class);
     }
 
     /**
      * Changes a lens's name, description, type, transform or whether the CDN serves it.
      *
-     * @param options the lens and the fields to change
+     * @param lensId the lens
+     * @param params the fields to change
      * @return the saved lens
      */
-    public Models.Lens update(Models.UpdateLens options) {
-      JsonObject o = Models.encode(options);
-      Models.Lens lens = decode(json("PATCH", lensPath(o), null, without(o, "lensId")), Models.Lens.class);
-      forget(cached -> java.util.Objects.equals(cached.id(), lens.id()));
+    public Lens update(String lensId, LensUpdateParams params) { return update(lensId, params, null); }
+
+    /**
+     * @param lensId the lens
+     * @param params the fields to change
+     * @param requestOptions deadlines, retries and headers for this call
+     * @return the saved lens
+     */
+    public Lens update(String lensId, LensUpdateParams params, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.update");
+      Lens lens = c.decode(c.json("PATCH", "/lenses/" + id(lensId), null, encode(required(params))), Lens.class);
+      forget(cached -> cached.getId().equals(lens.getId()));
       return lens;
     }
 
-    /** Deletes a lens; URLs that select it stop being served. @param options the lens */
-    public void delete(Models.LensId options) {
-      JsonObject o = Models.encode(options);
-      String lensId = str(o, "lensId", null);
-      success(json("DELETE", lensPath(o), null, null));
-      forget(cached -> java.util.Objects.equals(cached.id(), lensId));
+    /** Deletes a lens; URLs that select it stop being served. @param lensId the lens */
+    public void delete(String lensId) { delete(lensId, null); }
+
+    /**
+     * Deletes a lens; URLs that select it stop being served.
+     *
+     * @param lensId the lens
+     * @param requestOptions deadlines, retries and headers for this call
+     */
+    public void delete(String lensId, @Nullable RequestOptions requestOptions) {
+      CalmLensServerClient c = with(requestOptions, "lenses.delete");
+      success(c.json("DELETE", "/lenses/" + id(lensId), null, null));
+      forget(cached -> cached.getId().equals(lensId));
     }
   }
 
@@ -2508,29 +3532,38 @@ public final class CalmLensServerClient implements AutoCloseable {
    * Creates a named lens, or changes it to this definition. Sending the same definition again
    * returns the lens unchanged, from this client's lens cache once it has seen it.
    *
-   * @param options the lens definition
+   * @param params the lens definition
    * @return the lens
    */
-  public Models.Lens ensureLens(Models.LensDefinition options) {
-    return ensureLenses(new Models.EnsureLenses(List.of(options))).get(0);
-  }
+  public Lens ensureLens(LensCreateParams params) { return ensureLenses(List.of(required(params))).get(0); }
 
   /** The most lens definitions {@link #ensureLenses} sends in one request. */
   public static final int ENSURE_LENSES_MAX_PER_REQUEST = 100;
 
   /**
-   * Creates or changes lenses by identifier, as {@link #ensureLens} does. Definitions already ensured by this client (or a client derived from
-   * it with {@link #withRequestOptions}) are not sent again, and concurrent calls for the same new
-   * definitions share one request. More than {@link #ENSURE_LENSES_MAX_PER_REQUEST} new definitions
-   * are sent in consecutive requests, in order.
+   * Creates or changes lenses by identifier, as {@link #ensureLens} does.
    *
-   * @param options the lens definitions
+   * @param lenses the lens definitions
+   * @return the lenses, in the order given
+   * @see #ensureLenses(List, RequestOptions)
+   */
+  public List<Lens> ensureLenses(List<LensCreateParams> lenses) { return ensureLenses(lenses, null); }
+
+  /**
+   * Creates or changes lenses by identifier, as {@link #ensureLens} does. Definitions already
+   * ensured by this client (or a client derived from it with {@link #withRequestOptions}) are not
+   * sent again, and concurrent calls for the same new definitions share one request. More than
+   * {@link #ENSURE_LENSES_MAX_PER_REQUEST} new definitions are sent in consecutive requests, in
+   * order.
+   *
+   * @param lenses the lens definitions
+   * @param requestOptions deadlines, retries and headers for each request
    * @return the lenses, in the order given
    */
-  public List<Models.Lens> ensureLenses(Models.EnsureLenses options) {
-    JsonObject o = Models.encode(options);
-    JsonArray definitions = o.has("lenses") && o.get("lenses").isJsonArray() ? o.getAsJsonArray("lenses") : null;
-    if (definitions == null || definitions.isEmpty()) throw argument("At least one lens is required");
+  public List<Lens> ensureLenses(List<LensCreateParams> lenses, @Nullable RequestOptions requestOptions) {
+    CalmLensServerClient c = with(requestOptions, "ensureLenses");
+    if (lenses == null || lenses.isEmpty()) throw argument("At least one lens is required");
+    JsonArray definitions = Json.GSON.toJsonTree(lenses).getAsJsonArray();
     LinkedHashMap<String, JsonObject> missing = new LinkedHashMap<>();
     List<String> keys = new ArrayList<>();
     for (JsonElement lens : definitions) {
@@ -2547,7 +3580,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       java.util.concurrent.CompletableFuture<Void> running = lensCache.pending.putIfAbsent(batch, mine);
       if (running == null) {
         try {
-          submitLenses(new ArrayList<>(missing.values()));
+          c.submitLenses(new ArrayList<>(missing.values()));
           mine.complete(null);
         } catch (RuntimeException failure) {
           mine.completeExceptionally(failure);
@@ -2560,19 +3593,18 @@ public final class CalmLensServerClient implements AutoCloseable {
           running.get();
         } catch (InterruptedException interrupted) {
           Thread.currentThread().interrupt();
-          throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for lenses", interrupted);
+          throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for lenses", interrupted);
         } catch (java.util.concurrent.ExecutionException failed) {
           if (failed.getCause() instanceof RuntimeException cause) throw cause;
           throw new IllegalStateException(failed.getCause());
         }
       }
     }
-    List<Models.Lens> result = new ArrayList<>();
+    List<Lens> result = new ArrayList<>();
     for (int i = 0; i < keys.size(); i++) {
-      Models.Lens lens = lensCache.ensured.get(keys.get(i));
+      Lens lens = lensCache.ensured.get(keys.get(i));
       // Another call may have replaced this definition with a changed one meanwhile.
-      if (lens == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE,
-          "CalmLens did not return lens \"" + str(definitions.get(i).getAsJsonObject(), "identifier", "") + "\"");
+      if (lens == null) throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "CalmLens did not return lens \"" + str(definitions.get(i).getAsJsonObject(), "identifier", "") + "\"");
       result.add(lens);
     }
     return List.copyOf(result);
@@ -2612,14 +3644,14 @@ public final class CalmLensServerClient implements AutoCloseable {
       JsonElement returned = object(reply).get("lenses");
       int count = returned != null && returned.isJsonArray() ? returned.getAsJsonArray().size() : 0;
       if (count != chunk.size())
-        throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected " + chunk.size() + " lenses but CalmLens returned " + count);
-      Models.Lens[] created = decode(new Reply(reply.status(), reply.headers(), reply.body(), returned), Models.Lens[].class);
+        throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Expected " + chunk.size() + " lenses but CalmLens returned " + count);
+      Lens[] created = decode(new Reply(reply.status(), reply.headers(), reply.body(), returned), Lens[].class);
       for (int index = 0; index < chunk.size(); index++) {
-        Models.Lens lens = created[index];
+        Lens lens = created[index];
         String identifier = str(chunk.get(index), "identifier", "");
-        if (lens == null || !identifier.equals(lens.identifier()))
-          throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected lens \"" + identifier + "\" at position " + index);
-        lensCache.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().identifier()));
+        if (lens == null || !identifier.equals(lens.getIdentifier()))
+          throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "Expected lens \"" + identifier + "\" at position " + index);
+        lensCache.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().getIdentifier()));
         lensCache.ensured.put(lensCacheKey(chunk.get(index)), lens);
       }
     }
@@ -2677,19 +3709,16 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param event the event
    * @return its delivery payload
    */
-  public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
-    if (event.json() == null)
-      return new Models.WebhookEventPayload(event.id(), event.projectId(), event.actor(), event.type(), event.severity(), event.title(),
-          event.description(), event.assetId(), event.assetSequence(), event.asset(), event.facts(), event.createdAt());
+  public static WebhookEventPayload toWebhookEventPayload(Event event) {
     // From the event as received, so asset and fact fields this SDK version does not model are kept.
-    Map<String, Object> json = event.json();
-    Map<String, Object> payload = new LinkedHashMap<>();
+    JsonObject json = event.getRawJsonObject();
+    JsonObject payload = new JsonObject();
     for (String key : List.of("id", "projectId", "actor", "type", "severity", "title", "description", "assetId", "assetSequence", "asset"))
       // A delivery's actor is optional: one the event lacks stays out.
-      if (!key.equals("actor") || json.containsKey(key)) payload.put(key, json.get(key));
-    payload.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
-    payload.put("createdAt", json.get("createdAt"));
-    return Json.GSON.fromJson(Json.WRITE.toJsonTree(payload), Models.WebhookEventPayload.class);
+      if (!key.equals("actor") || json.has(key)) payload.add(key, json.has(key) ? json.get(key) : JsonNull.INSTANCE);
+    payload.add("facts", json.has("facts") ? json.get("facts") : new JsonArray());
+    payload.add("createdAt", json.get("createdAt"));
+    return Json.GSON.fromJson(payload, WebhookEventPayload.class);
   }
 
   /**
@@ -2699,15 +3728,15 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param event a parsed delivery
    * @return whether it is a test send
    */
-  public static boolean isTestWebhookEvent(Models.WebhookEventPayload event) {
-    return event != null && isTestFacts(event.facts());
+  public static boolean isTestWebhookEvent(WebhookEventPayload event) {
+    return event != null && isTestFacts(event.getFacts());
   }
 
   /**
    * @param event an event from {@code events.list}
    * @return whether it is a test send
    */
-  public static boolean isTestWebhookEvent(Models.Event event) { return event != null && isTestFacts(event.facts()); }
+  public static boolean isTestWebhookEvent(Event event) { return event != null && isTestFacts(event.getFacts()); }
 
   /**
    * The value of one of an event's facts, by key, such as {@code flagged-categories} on {@code
@@ -2719,39 +3748,39 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param key the fact key
    * @return the fact's value, or null
    */
-  public static Object getEventFact(Models.WebhookEventPayload event, String key) { return event == null ? null : factValue(event.facts(), key); }
+  public static Object getEventFact(WebhookEventPayload event, String key) { return event == null ? null : factValue(event.getFacts(), key); }
 
   /**
    * @param event an event from {@code events.list}
    * @param key the fact key
    * @return the fact's value, or null
    */
-  public static Object getEventFact(Models.Event event, String key) { return event == null ? null : factValue(event.facts(), key); }
+  public static Object getEventFact(Event event, String key) { return event == null ? null : factValue(event.getFacts(), key); }
 
   /**
    * An event's facts as values by key, in the event's order, such as {@code {"flagged-categories":
    * ["hate"]}}. A key the event repeats keeps its first value, as {@link
-   * #getEventFact(Models.WebhookEventPayload, String)} reads it; a null value is kept.
+   * #getEventFact(WebhookEventPayload, String)} reads it; a null value is kept.
    *
    * @param event a parsed delivery
    * @return the values by key, unmodifiable
    */
-  public static Map<String, Object> getEventFacts(Models.WebhookEventPayload event) { return factValues(event == null ? null : event.facts()); }
+  public static Map<String, Object> getEventFacts(WebhookEventPayload event) { return factValues(event == null ? null : event.getFacts()); }
 
   /**
    * @param event an event from {@code events.list}
    * @return the values by key, unmodifiable
    */
-  public static Map<String, Object> getEventFacts(Models.Event event) { return factValues(event == null ? null : event.facts()); }
+  public static Map<String, Object> getEventFacts(Event event) { return factValues(event == null ? null : event.getFacts()); }
 
-  private static Object factValue(List<Models.EventFact> facts, String key) {
-    if (facts != null) for (Models.EventFact fact : facts) if (fact != null && Objects.equals(fact.key(), key)) return fact.value();
+  private static Object factValue(List<EventFact> facts, String key) {
+    if (facts != null) for (EventFact fact : facts) if (fact != null && Objects.equals(fact.getKey(), key)) return fact.getValue();
     return null;
   }
 
-  private static Map<String, Object> factValues(List<Models.EventFact> facts) {
+  private static Map<String, Object> factValues(List<EventFact> facts) {
     Map<String, Object> values = new LinkedHashMap<>();
-    if (facts != null) for (Models.EventFact fact : facts) if (fact != null && fact.key() != null && !values.containsKey(fact.key())) values.put(fact.key(), fact.value());
+    if (facts != null) for (EventFact fact : facts) if (fact != null && !values.containsKey(fact.getKey())) values.put(fact.getKey(), fact.getValue());
     return Collections.unmodifiableMap(values);
   }
 
@@ -2767,8 +3796,8 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param lastSequence the highest {@code assetSequence} applied for the event's asset, or null
    * @return whether the event is newer than what you have applied
    */
-  public static boolean isNewerAssetEvent(Models.WebhookEventPayload event, Long lastSequence) {
-    return isNewerSequence(event.assetSequence(), lastSequence);
+  public static boolean isNewerAssetEvent(WebhookEventPayload event, Long lastSequence) {
+    return isNewerSequence(event.getAssetSequence().orElse(null), lastSequence);
   }
 
   /**
@@ -2776,16 +3805,16 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param lastSequence the highest {@code assetSequence} applied for the event's asset, or null
    * @return whether the event is newer than what you have applied
    */
-  public static boolean isNewerAssetEvent(Models.Event event, Long lastSequence) {
-    return isNewerSequence(event.assetSequence(), lastSequence);
+  public static boolean isNewerAssetEvent(Event event, Long lastSequence) {
+    return isNewerSequence(event.getAssetSequence().orElse(null), lastSequence);
   }
 
   private static boolean isNewerSequence(Long sequence, Long lastSequence) {
     return sequence == null || lastSequence == null || sequence > lastSequence;
   }
 
-  private static boolean isTestFacts(List<Models.EventFact> facts) {
-    return facts != null && facts.stream().anyMatch(fact -> fact != null && "test".equals(fact.key()) && Boolean.TRUE.equals(fact.value()));
+  private static boolean isTestFacts(List<EventFact> facts) {
+    return facts != null && facts.stream().anyMatch(fact -> fact != null && "test".equals(fact.getKey()) && Boolean.TRUE.equals(fact.getValue()));
   }
 
   private static byte[] webhookMac(String secret, String timestamp, byte[] body) {
@@ -2919,7 +3948,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param secret the webhook signing secret
    * @return the delivery
    */
-  public static Models.WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret) {
+  public static WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret) {
     return parseWebhookRequest(headers, payload, secret, System.currentTimeMillis() / 1000, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
   }
 
@@ -2931,7 +3960,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param toleranceSeconds the largest accepted clock distance
    * @return the delivery
    */
-  public static Models.WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret, long nowSeconds, long toleranceSeconds) {
+  public static WebhookEventPayload parseWebhookRequest(Map<String, ?> headers, byte[] payload, String secret, long nowSeconds, long toleranceSeconds) {
     return parseWebhookEvent(payload, webhookHeader(headers, WEBHOOK_SIGNATURE_HEADER), webhookHeader(headers, WEBHOOK_TIMESTAMP_HEADER),
         secret, nowSeconds, toleranceSeconds);
   }
@@ -2971,7 +4000,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    *     timestamp does not verify (respond 401), {@link ErrorCodes#SDK_INVALID_WEBHOOK_PAYLOAD} when a
    *     verified body is not a webhook event
    */
-  public static Models.WebhookEventPayload parseWebhookEvent(byte[] payload, String signature, String timestamp, String secret) {
+  public static WebhookEventPayload parseWebhookEvent(byte[] payload, String signature, String timestamp, String secret) {
     return parseWebhookEvent(payload, signature, timestamp, secret, System.currentTimeMillis() / 1000, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS);
   }
 
@@ -2984,9 +4013,9 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param toleranceSeconds the largest accepted clock distance
    * @return the delivery
    */
-  public static Models.WebhookEventPayload parseWebhookEvent(byte[] payload, String signature, String timestamp, String secret, long nowSeconds, long toleranceSeconds) {
+  public static WebhookEventPayload parseWebhookEvent(byte[] payload, String signature, String timestamp, String secret, long nowSeconds, long toleranceSeconds) {
     if (!verifyWebhookSignature(payload, signature, timestamp, secret, nowSeconds, toleranceSeconds))
-      throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, "Webhook signature or timestamp did not verify");
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, "Webhook signature or timestamp did not verify");
     return readWebhookEvent(new String(payload, StandardCharsets.UTF_8));
   }
 
@@ -2999,8 +4028,8 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param secret the webhook signing secret
    * @return the delivery
    */
-  public static Models.WebhookEventPayload parseWebhookEvent(String payload, String signature, String timestamp, String secret) {
-    if (payload == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, "Webhook body is required");
+  public static WebhookEventPayload parseWebhookEvent(String payload, String signature, String timestamp, String secret) {
+    if (payload == null) throw CalmLensException.of(ErrorCodes.SDK_INVALID_WEBHOOK_SIGNATURE, "Webhook body is required");
     return parseWebhookEvent(payload.getBytes(StandardCharsets.UTF_8), signature, timestamp, secret);
   }
 
@@ -3009,19 +4038,19 @@ public final class CalmLensServerClient implements AutoCloseable {
    * {@code type} and {@code projectId} and a numeric {@code createdAt}; the other known fields, when
    * present, have the API's types. Unknown fields are kept in {@code json()}.
    */
-  static Models.WebhookEventPayload readWebhookEvent(String payload) {
+  static WebhookEventPayload readWebhookEvent(String payload) {
     JsonElement json;
     try {
       json = payload == null ? null : Json.GSON.fromJson(payload, JsonElement.class);
     } catch (JsonParseException | IllegalStateException cause) {
-      throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not JSON", cause);
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not JSON", cause);
     }
     if (json == null || !isWebhookEvent(json))
-      throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event");
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event");
     try {
-      return Json.GSON.fromJson(json, Models.WebhookEventPayload.class);
+      return Json.GSON.fromJson(json, WebhookEventPayload.class);
     } catch (JsonParseException | IllegalStateException | IllegalArgumentException cause) {
-      throw new CalmLensException(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event", cause);
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event", cause);
     }
   }
 

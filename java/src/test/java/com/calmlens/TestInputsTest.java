@@ -2,6 +2,9 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.CalmLensException;
+import com.calmlens.testing.TestInput;
+import com.calmlens.testing.TestInputs;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -14,7 +17,9 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,13 +96,45 @@ class TestInputsTest {
     assertEquals(expected, actual);
   }
 
+  private static void assertDetectionsAccepted(TestInput.Detections detections) {
+    String code = TestInputs.generateTestTextCode(TestInputs.CLEAN.withDetections(detections), KEY);
+    assertTrue(code.startsWith("<!calmlens-test "), code);
+  }
+
+  private static void assertDetectionsRejected(TestInput.Detections detections) {
+    CalmLensException error = assertThrows(CalmLensException.class,
+        () -> TestInputs.generateTestTextCode(TestInputs.CLEAN.withDetections(detections), KEY), detections.toString());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
+  }
+
+  private static TestInput.Detections people(int count, TestInput.Box box) {
+    return new TestInput.Detections(TestInput.DetectionList.of(java.util.Collections.nCopies(count, new TestInput.Person(box))), null);
+  }
+
+  private static TestInput.Detections face(TestInput.FaceAge age) {
+    return new TestInput.Detections(null, TestInput.DetectionList.of(new TestInput.Face(new TestInput.Box(0, 0, 1, 1)).withAge(age)));
+  }
+
+  private static final String KEY = "0123456789abcdef0123456789abcdef";
+
+  /** The fixture's limits are where the SDK starts refusing a scenario: entries per list, box basis points and ages. */
   @Test
   void detectionLimitsMatchTheFixture() throws Exception {
     JsonObject detections = fixture().getAsJsonObject("detections");
-    assertEquals(List.of(detections.get("maxEntries").getAsInt(), detections.get("boxMax").getAsInt(), detections.get("ageMax").getAsInt()),
-        List.of(MockClassification.TEST_DETECTIONS_MAX, MockClassification.TEST_DETECTION_BOX_MAX, MockClassification.TEST_FACE_AGE_MAX));
+    int maxEntries = detections.get("maxEntries").getAsInt();
+    int boxMax = detections.get("boxMax").getAsInt();
+    int ageMax = detections.get("ageMax").getAsInt();
+    TestInput.Box small = new TestInput.Box(0, 0, 1, 1);
+    assertDetectionsAccepted(people(maxEntries, small));
+    assertDetectionsRejected(people(maxEntries + 1, small));
+    assertDetectionsAccepted(people(1, new TestInput.Box(0, 0, boxMax, boxMax)));
+    assertDetectionsRejected(people(1, new TestInput.Box(0, 0, boxMax + 1, 1)));
+    assertDetectionsRejected(people(1, new TestInput.Box(0, 0, 1, boxMax + 1)));
+    assertDetectionsAccepted(face(new TestInput.FaceAge.Range(0, ageMax)));
+    assertDetectionsRejected(face(new TestInput.FaceAge.Range(0, ageMax + 1)));
     List<String> presets = List.copyOf(detections.getAsJsonObject("agePresets").keySet());
-    assertEquals(presets, MockClassification.TEST_FACE_AGE_PRESETS);
+    for (String preset : presets) assertDetectionsAccepted(face(new TestInput.FaceAge.Preset(preset)));
+    assertDetectionsRejected(face(new TestInput.FaceAge.Preset("elderly")));
     assertEquals(presets, Stream.of(TestInput.FaceAge.ADULT, TestInput.FaceAge.MINOR).map(age -> ((TestInput.FaceAge.Preset) age).name()).toList());
   }
 
@@ -156,6 +193,9 @@ class TestInputsTest {
         : TestInputs.paintTestImage(input(c.get("input")), key);
   }
 
+  /** The grid's data levels (luma), as packages/shared/src/TestImageGrid.ts defines them, for decoding the fixture's images. */
+  private static final int[] GRID_LEVELS = {72, 128, 184, 240};
+
   /** Each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for the outer ring, else the data level (0-3) nearest the luma of the cell's top-left pixel. */
   private static String fixtureLevels(TestInputs.TestImage image, int cells) {
     int size = image.width() / cells;
@@ -170,8 +210,8 @@ class TestInputsTest {
         byte[] rgba = image.rgba();
         int luma = (77 * (rgba[offset] & 255) + 150 * (rgba[offset + 1] & 255) + 29 * (rgba[offset + 2] & 255)) >> 8;
         int nearest = 0;
-        for (int level = 1; level < TestImageGrid.LEVELS.length; level++)
-          if (Math.abs(TestImageGrid.LEVELS[level] - luma) < Math.abs(TestImageGrid.LEVELS[nearest] - luma)) nearest = level;
+        for (int level = 1; level < GRID_LEVELS.length; level++)
+          if (Math.abs(GRID_LEVELS[level] - luma) < Math.abs(GRID_LEVELS[nearest] - luma)) nearest = level;
         levels.append(nearest);
       }
     return levels.toString();
@@ -232,7 +272,19 @@ class TestInputsTest {
     expected.put(1.5e-7, "1.5e-7");
     expected.put(2e-323, "2e-323");
     Map<Double, String> actual = new LinkedHashMap<>();
-    expected.keySet().forEach(value -> actual.put(value, TestInputs.jsNumber(value)));
+    expected.keySet().forEach(value -> actual.put(value, signedScore(value)));
     assertEquals(expected, actual);
+  }
+
+  /** The score as the signed text code's scenario JSON carries it. */
+  private static String signedScore(double score) {
+    TestInput input = TestInputs.CLEAN.withInstances(List.of(new TestInput.Instance("harassment", List.of("harassment-abuse")).withScore(score)));
+    String code = TestInputs.generateTestTextCode(input, KEY);
+    String payload = code.substring(code.lastIndexOf(' ') + 1, code.length() - 1);
+    String json = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
+    // The JSON is printed by the SDK, not parsed here, so the number's exact spelling survives.
+    int start = json.indexOf("\"score\":") + "\"score\":".length();
+    assertTrue(start >= "\"score\":".length(), json);
+    return json.substring(start, json.indexOf(',', start));
   }
 }

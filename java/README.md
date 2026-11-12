@@ -1,6 +1,6 @@
 # CalmLens Java SDK
 
-A synchronous, thread-safe Java 17+ client for [CalmLens](https://calmlens.com) moderation, storage, events, webhooks and CDN delivery, with typed requests and immutable response records.
+A thread-safe Java 17+ client for [CalmLens](https://calmlens.com) moderation, storage, events, webhooks and CDN delivery, with immutable request params, typed response models and an asynchronous form.
 
 ## Installation
 
@@ -12,53 +12,64 @@ A synchronous, thread-safe Java 17+ client for [CalmLens](https://calmlens.com) 
 </dependency>
 ```
 
-The JAR declares the module name `com.calmlens` (`requires com.calmlens;`).
+The JAR is the module `com.calmlens` (`requires com.calmlens;`). It needs Java 17 or later; its one runtime dependency is Gson, and its nullness annotations are JSpecify's.
 
 Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
 
-## Entry points
+## Packages
 
-| Class                                   | Use                                                                |
-| --------------------------------------- | ------------------------------------------------------------------ |
-| `com.calmlens.CalmLensServerClient`     | The server client: create one per API key, share it across threads |
-| `com.calmlens.Models`                   | Request builders and response records                              |
-| `com.calmlens.MockCalmLensServerClient` | The real client in front of an in-memory CalmLens, for tests       |
+| Package                  | Contents                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `com.calmlens`           | `CalmLensServerClient`, its asynchronous form, `RequestOptions` and the transport             |
+| `com.calmlens.params`    | Request params, made with their builders                                                      |
+| `com.calmlens.models`    | Response models and enums                                                                     |
+| `com.calmlens.exception` | `CalmLensException` and a subclass for each kind of failure                                   |
+| `com.calmlens.testing`   | `MockCalmLensServerClient`, the real client in front of an in-memory CalmLens, and test inputs |
 
 ## Quick start
 
-Keep your API key on your server. Create one client, share it across threads and close it on shutdown.
+Keep your API key on your server. Create one client, share it across threads and close it on shutdown. `fromEnv()` reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and, optionally, `CALMLENS_BASE_URL`.
 
 ```java
 import com.calmlens.CalmLensServerClient;
-import com.calmlens.Models.*;
+import com.calmlens.models.*;
+import com.calmlens.params.*;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
-try (var client = CalmLensServerClient.builder(System.getenv("CALMLENS_API_KEY"), System.getenv("CALMLENS_PROJECT_ID")).build()) {
-  Asset asset = client.text.classify("Hello world");
-  if (asset.classification().moderation().status() == AssetModerationStatus.ALLOWED) System.out.println(asset.id());
+try (var client = CalmLensServerClient.fromEnv()) {
+  Asset asset = client.text().classify("Hello world");
+  if (asset.getClassification().getModeration().getDecision().orElse(null) == AssetModerationDecision.ALLOWED)
+    System.out.println(asset.getId());
 
-  Asset queued = client.assets.create(new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg"))
-      .externalId("post-42").tags(List.of("posts")).visibility(Visibility.PRIVATE));
-  Asset decided = client.assets.waitForDecision(new WaitForDecision(queued.id()).timeout(Duration.ofSeconds(30)));
-  client.assets.update(new UpdateAsset(decided.id()).description(Patch.clear()));
+  Asset queued = client.assets().create(AssetCreateParams.builder()
+      .setName("photo.jpg")
+      .setContent(Content.file(Path.of("photo.jpg"), "image/jpeg"))
+      .setExternalId("post-42")
+      .setTags(List.of("posts"))
+      .setVisibility(Visibility.PRIVATE)
+      .build());
+  Asset decided = client.assets().waitForDecision(queued.getId(), Duration.ofSeconds(30));
+  client.assets().update(decided.getId(), AssetUpdateParams.builder().clearDescription().build());
 }
 ```
 
-`assets.create` queues processing; `assets.classify` and `text.classify` wait for the decision. `waitForDecision` returns once the asset is settled: its `classification().status()` is `COMPLETED` or `FAILED`. Webhooks report queued decisions without polling.
+`assets().create` queues processing; `assets().classify` and `text().classify` wait for the decision. `waitForDecision` returns once the asset is settled: its `getClassification().getStatus()` is `COMPLETED` or `FAILED`. Webhooks report queued decisions without polling.
 
-Act on `asset.classification().moderation().status()`:
+Act on `asset.getClassification().getModeration().getDecision()`:
 
-| Status           | What to do                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `ALLOWED`        | Show it                                                                                 |
-| `LIMITED`        | Show it, but keep it out of recommendations, trending and notifications                 |
-| `AGE_RESTRICTED` | Show it only after your own age check, with `ViewerClaims().ageConfirmed(true)`          |
-| `BLOCKED`        | Don't show it                                                                           |
-| `PURGED`         | Don't show it; the content has been removed                                             |
-| `PENDING`        | Not decided yet: wait for a webhook or `waitForDecision`                                |
-| Unknown          | A status added after your SDK version (`isKnown()` is `false`): treat it as not allowed |
+| Decision         | What to do                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `ALLOWED`        | Show it                                                                                   |
+| `LIMITED`        | Show it, but keep it out of recommendations, trending and notifications                   |
+| `AGE_RESTRICTED` | Show it only after your own age check, with `ViewerClaims.builder().setAgeConfirmed(true)` |
+| `BLOCKED`        | Don't show it                                                                             |
+| `PURGED`         | Don't show it; the content has been removed                                               |
+| Empty            | Not decided yet: wait for a webhook or `waitForDecision`                                  |
+| `UNKNOWN`        | A decision added after your SDK version: treat it as not allowed                          |
+
+Every method also takes a `RequestOptions` as its last argument, for one call's timeout, retries, idempotency key, headers and extra query or body fields. `client.async()` has the same methods, each returning a `CompletableFuture`.
 
 ## What you can do
 
@@ -70,11 +81,12 @@ Act on `asset.classification().moderation().status()`:
 - [Search](https://calmlens.com/docs/guides/search), list and [page through](https://calmlens.com/docs/sdk/java/reference#pagination) assets, [folders](https://calmlens.com/docs/sdk/java/reference#folders), hash lists, policies, lenses and the [events feed](https://calmlens.com/docs/api/events#reading-the-feed), sorted with `sort` or item by item with an `iterate` method.
 - Block or flag known images with [hash lists](https://calmlens.com/docs/sdk/java/reference#hash-lists).
 - [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/java/reference#policies) and choose the one the project uses.
-- Keep a project's configuration in code: `uploadPresets` (`list`, `iterate`, `ensure` by key and `delete`), `projectSettings` (`get` and `update`) and `metadataFields` (`list`, `ensure` by ID and `delete`). Send the `revision` you read to refuse a change made since.
+- Keep a project's configuration in code: `uploadPresets()` (`list`, `iterate`, `ensure` by key and `delete`), `projectSettings()` (`get` and `update`) and `metadataFields()` (`list`, `ensure` by ID and `delete`). Send the `revision` you read to refuse a change made since.
 - Sign [upload tokens](https://calmlens.com/docs/sdk/java/reference#upload-tokens) for browser uploads through [upload presets](https://calmlens.com/docs/guides/upload-presets).
 - [Verify and parse webhooks](https://calmlens.com/docs/sdk/java/reference#webhooks) in Spring or servlets.
 - [Deliver content through the CDN](https://calmlens.com/docs/sdk/java/reference#cdn): build URLs, stream content, sign URLs, apply and manage [lenses and transforms](https://calmlens.com/docs/sdk/java/reference#transforms) and pass [viewer claims](https://calmlens.com/docs/sdk/java/reference#viewer-claims).
-- Handle [errors](https://calmlens.com/docs/sdk/java/reference#errors) by stable code, and tune [retries and timeouts](https://calmlens.com/docs/sdk/java/reference#retries-and-timeouts).
+- Handle [errors](https://calmlens.com/docs/sdk/java/reference#errors) by exception class or stable code, and tune [retries and timeouts](https://calmlens.com/docs/sdk/java/reference#retries-and-timeouts).
+- Read each result's request ID with `getLastResponse()`, log requests with `CALMLENS_LOG` or a `System.Logger`, watch every attempt with a `RequestListener`, and call API paths the SDK has no method for yet with `client.request(...)`.
 
 ## Testing
 

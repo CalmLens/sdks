@@ -2,6 +2,18 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.CalmLensException;
+import com.calmlens.exception.ConnectionException;
+import com.calmlens.exception.InvalidResponseException;
+import com.calmlens.exception.TimeoutException;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.LensType;
+import com.calmlens.params.AssetCreateParams;
+import com.calmlens.params.CdnRequestParams;
+import com.calmlens.params.Content;
+import com.calmlens.params.LensCreateParams;
+import com.calmlens.params.ModerationContextItemParams;
+import com.calmlens.params.ModerationContextParams;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -85,11 +97,11 @@ class TransportErrorTest {
   }
 
   private static CalmLensServerClient client(String baseUrl, Duration timeout) {
-    return CalmLensServerClient.builder("key", "project").baseUrl(baseUrl).cdnBaseUrl(baseUrl).timeout(timeout).maxRetries(0).build();
+    return CalmLensServerClient.builder().apiKey("key").projectId("project").baseUrl(baseUrl).cdnBaseUrl(baseUrl).timeout(timeout).maxRetries(0).build();
   }
 
   private static CalmLensException retrieveFails(CalmLensServerClient client, String code) {
-    var error = assertThrows(CalmLensException.class, () -> client.assets.retrieve(new Models.AssetId("asset")));
+    var error = assertThrows(CalmLensException.class, () -> client.assets().retrieve("asset"));
     assertEquals(code, error.getCode(), String.valueOf(error.getCause()));
     assertNotNull(error.getCause());
     return error;
@@ -97,13 +109,13 @@ class TransportErrorTest {
 
   @Test void truncatedBody() throws Exception {
     String url = serve(socket -> write(socket, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{\"id\":"));
-    assertInstanceOf(TransportException.class, retrieveFails(client(url, Duration.ofSeconds(5)), ErrorCodes.SDK_TRANSPORT_ERROR));
+    assertInstanceOf(ConnectionException.class, retrieveFails(client(url, Duration.ofSeconds(5)), ErrorCodes.SDK_TRANSPORT_ERROR));
   }
 
   @Test void truncatedCdnBody() throws Exception {
     String url = serve(socket -> write(socket, "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\npartial"));
-    try (CdnResponse response = client(url, Duration.ofSeconds(5)).cdn.serve(new Models.CdnRequest("asset"))) {
-      var error = assertThrows(TransportException.class, () -> response.readAllBytes(1000));
+    try (CdnResponse response = client(url, Duration.ofSeconds(5)).cdn().serve(CdnRequestParams.builder().setAssetId("asset").build())) {
+      var error = assertThrows(ConnectionException.class, () -> response.readAllBytes(1000));
       assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, error.getCode());
       assertInstanceOf(IOException.class, error.getCause());
     }
@@ -141,7 +153,7 @@ class TransportErrorTest {
     String url = serve(socket -> { try { release.await(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) { } });
     try {
       var error = retrieveFails(client(url, Duration.ofMillis(200)), ErrorCodes.SDK_TIMEOUT);
-      assertInstanceOf(RequestTimeoutException.class, error);
+      assertInstanceOf(TimeoutException.class, error);
       assertInstanceOf(java.net.http.HttpTimeoutException.class, error.getCause());
     } finally {
       release.countDown();
@@ -178,10 +190,10 @@ class TransportErrorTest {
         write(socket, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + asset.length() + "\r\n\r\n" + asset);
       } catch (IOException | InterruptedException e) { throw new IllegalStateException(e); }
     });
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project").baseUrl(url).timeout(Duration.ofSeconds(1)).uploadTimeout(Duration.ofSeconds(30)).build();
-    Models.SubmitAsset upload = new Models.SubmitAsset("document.pdf", Models.Content.file(file, "application/pdf"))
-        .description("Homework").authorId("pupil-7").context(new Models.ModerationContext(List.of(new Models.ModerationContextItem("An earlier post"))));
-    assertEquals("asset-1", client.assets.create(upload).id());
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project").baseUrl(url).timeout(Duration.ofSeconds(1)).uploadTimeout(Duration.ofSeconds(30)).build();
+    AssetCreateParams upload = AssetCreateParams.builder().setName("document.pdf").setContent(Content.file(file, "application/pdf"))
+        .setDescription("Homework").setAuthorId("pupil-7").setContext(ModerationContextParams.of(List.of(ModerationContextItemParams.of("An earlier post")))).build();
+    assertEquals("asset-1", client.assets().create(upload).getId());
     String head = heads.get(0);
     // The asset's fields travel in the form's options part; the URL holds only transport values.
     String target = head.substring(0, head.indexOf("\r\n"));
@@ -200,32 +212,34 @@ class TransportErrorTest {
 
   @Test void customTransportFailuresAreWrapped() {
     var unchecked = new UncheckedIOException(new SocketException("Connection reset"));
-    assertSame(unchecked, retrieveFails(CalmLensServerClient.builder("key", "project").maxRetries(0).transport(request -> { throw unchecked; }).build(), ErrorCodes.SDK_TRANSPORT_ERROR).getCause());
+    assertSame(unchecked, retrieveFails(CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0).transport(request -> { throw unchecked; }).build(), ErrorCodes.SDK_TRANSPORT_ERROR).getCause());
     var runtime = new IllegalStateException("decompression failed");
-    assertSame(runtime, retrieveFails(CalmLensServerClient.builder("key", "project").maxRetries(0).transport(request -> { throw runtime; }).build(), ErrorCodes.SDK_TRANSPORT_ERROR).getCause());
-    assertInstanceOf(RequestTimeoutException.class, retrieveFails(CalmLensServerClient.builder("key", "project").maxRetries(0)
+    assertSame(runtime, retrieveFails(CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0).transport(request -> { throw runtime; }).build(), ErrorCodes.SDK_TRANSPORT_ERROR).getCause());
+    assertInstanceOf(TimeoutException.class, retrieveFails(CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0)
         .transport(request -> { throw new SocketTimeoutException("read timed out"); }).build(), ErrorCodes.SDK_TIMEOUT));
-    retrieveFails(CalmLensServerClient.builder("key", "project").maxRetries(0)
+    retrieveFails(CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0)
         .transport(request -> { throw new UncheckedIOException(new java.net.http.HttpTimeoutException("slow")); }).build(), ErrorCodes.SDK_TIMEOUT);
-    var missing = assertThrows(TransportException.class, () -> CalmLensServerClient.builder("key", "project").maxRetries(0).transport(request -> null).build().assets.retrieve(new Models.AssetId("asset")));
+    var missing = assertThrows(ConnectionException.class, () -> CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0).transport(request -> null).build().assets().retrieve("asset"));
     assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, missing.getCode());
   }
 
   @Test void nonObjectResponsesAreInvalid() {
     for (String body : List.of("[]", "\"text\"", "null")) {
-      var client = CalmLensServerClient.builder("key", "project").transport(request -> Fixtures.json(200, body)).build();
-      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.assets.classify(Models.SubmitAsset.text("hi"))).getCode(), body);
-      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.folders.list(new Models.ListFolders())).getCode(), body);
-      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(ApiException.class, () -> client.ensureLens(new Models.LensDefinition().identifier("thumb"))).getCode(), body);
+      var client = CalmLensServerClient.builder().apiKey("key").projectId("project").transport(request -> Fixtures.json(200, body)).build();
+      AssetCreateParams text = AssetCreateParams.builder().setName("post").setContent(Content.text("hi")).build();
+      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(InvalidResponseException.class, () -> client.assets().classify(text)).getCode(), body);
+      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(InvalidResponseException.class, () -> client.folders().list()).getCode(), body);
+      LensCreateParams lens = LensCreateParams.builder().setIdentifier("thumb").setName("Thumb").setType(LensType.IMAGE).build();
+      assertEquals(ErrorCodes.SDK_INVALID_RESPONSE, assertThrows(InvalidResponseException.class, () -> client.ensureLens(lens)).getCode(), body);
     }
   }
 
   @Test void builderValidatesOptionsFirst() {
-    var timeout = assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder("key", "project").timeout(Duration.ofSeconds(-1)).build());
+    var timeout = assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder().apiKey("key").projectId("project").timeout(Duration.ofSeconds(-1)).build());
     assertEquals(ErrorCodes.SDK_INVALID_CONFIG, timeout.getCode());
     for (String url : Arrays.asList(null, "", "api.calmlens.com/v1", "ftp://host/v1", "http://bad host/v1")) {
-      assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder("key", "project").baseUrl(url).build(), String.valueOf(url)).getCode());
-      assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder("key", "project").cdnBaseUrl(url).build(), String.valueOf(url)).getCode());
+      assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder().apiKey("key").projectId("project").baseUrl(url).build(), String.valueOf(url)).getCode());
+      assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> CalmLensServerClient.builder().apiKey("key").projectId("project").cdnBaseUrl(url).build(), String.valueOf(url)).getCode());
     }
   }
 }

@@ -1,7 +1,7 @@
 package calmmarket;
 
 import com.calmlens.CalmLensServerClient;
-import com.calmlens.MockCalmLensServerClient;
+import com.calmlens.testing.MockCalmLensServerClient;
 import java.net.ConnectException;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -21,9 +21,11 @@ final class Demo implements Calmmarket.Backend {
   /** A demo photo stays pending this long, then takes the selected outcome. */
   static final Duration REVIEW_DELAY = Duration.ofSeconds(2);
 
+  private static final String PROJECT = "demo-project";
+
   /** A fresh mock per call. The mock makes no retries, so each queued answer is used exactly once. */
   private static MockCalmLensServerClient mock() {
-    return new MockCalmLensServerClient(CalmLensServerClient.builder("demo-key", "demo-project")
+    return new MockCalmLensServerClient(CalmLensServerClient.builder().apiKey("demo-key").projectId(PROJECT)
         .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"));
   }
 
@@ -31,22 +33,22 @@ final class Demo implements Calmmarket.Backend {
 
   @Override public CalmLensServerClient textModeration(String choice) {
     MockCalmLensServerClient mock = mock();
-    if (choice.equals("unavailable")) return mock.enqueueFailure(new ConnectException("Connection refused")).client;
+    if (choice.equals("unavailable")) return mock.enqueueFailure(new ConnectException("Connection refused")).client();
     boolean blocked = choice.equals("description-blocked");
-    return mock.enqueue(200, asset(id("asset"), "allowed", null, null))
-        .enqueue(200, asset(id("asset"), blocked ? "blocked" : "allowed", null, null)).client;
+    return mock.enqueue(200, text(id("asset"), "allowed", null))
+        .enqueue(200, text(id("asset"), blocked ? "blocked" : "allowed", null)).client();
   }
 
   @Override public CalmLensServerClient photoUploads(int photos) {
     MockCalmLensServerClient mock = mock();
     for (int i = 0; i < photos; i++) mock.enqueue(200, asset(id("asset"), "pending", null, null));
-    return mock.client;
+    return mock.client();
   }
 
   @Override public CalmLensServerClient photo(Calmmarket.Photo photo) {
     MockCalmLensServerClient mock = mock();
     if (Duration.between(photo.submittedAt, Instant.now()).compareTo(REVIEW_DELAY) < 0)
-      return mock.enqueue(200, asset(photo.assetId, "pending", photo.externalId, null)).client;
+      return mock.enqueue(200, asset(photo.assetId, "pending", photo.externalId, null)).client();
     // The simulated policy blocks photos it acts on; clean ones matched nothing.
     String status = "allowed";
     Map<String, Object> report = null;
@@ -78,33 +80,31 @@ final class Demo implements Calmmarket.Backend {
       default -> report = report(Map.of());
     }
     Map<String, Object> asset = asset(photo.assetId, status, photo.externalId, report);
-    asset.put("type", "image");
+    asset.put("name", photo.name);
     if (extractedText != null) asset.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", extractedText)));
     if (photo.demoReviewerBlocked) {
       // A reviewer's decision replaces the automated one.
       Map<String, Object> moderation = moderation(asset);
-      moderation.put("status", "blocked");
-      moderation.put("manualReviews", java.util.List.of(Map.of("id", id("rev"), "decision", "blocked", "note", "Simulated portal decision", "decidedBy", Map.of("type", "user", "id", "demo-reviewer"), "reviewedAt", System.currentTimeMillis(), "applied", true)));
+      moderation.put("decision", "blocked");
+      moderation.put("manualReviews", List.of(Map.of("id", id("rev"), "decision", "blocked", "note", "Simulated portal decision", "decidedBy", Map.of("type", "user", "id", "demo-reviewer"), "reviewedAt", System.currentTimeMillis(), "applied", true)));
     }
-    mock.enqueue(200, asset);
-
-    return mock.client;
+    return mock.enqueue(200, asset).client();
   }
 
   @Override public CalmLensServerClient textAsset(String assetId, String externalId) {
-    return mock().enqueue(200, asset(assetId, "allowed", externalId, null)).client;
+    return mock().enqueue(200, text(assetId, "allowed", externalId)).client();
   }
 
   @Override public CalmLensServerClient contentRemoval(String assetId) {
     Map<String, Object> removed = asset(assetId, "allowed", null, null);
     removed.put("content", Map.of("status", "removed", "removalReason", "requested", "updatedAt", System.currentTimeMillis()));
-    return mock().enqueue(200, removed).client;
+    return mock().enqueue(200, removed).client();
   }
 
   /** The demo CDN answers with the bytes kept for the photo, or 404 once they are removed. */
   @Override public CalmLensServerClient preview(Calmmarket.Photo photo) {
     byte[] bytes = photo.demoBytes;
-    return (bytes == null ? mock().enqueueCdn(404, "text/plain", new byte[0]) : mock().enqueueCdn(200, photo.mime, bytes)).client;
+    return (bytes == null ? mock().enqueueCdn(404, "text/plain", new byte[0]) : mock().enqueueCdn(200, photo.mime, bytes)).client();
   }
 
   @Override public CalmLensServerClient events() { return null; }
@@ -115,7 +115,7 @@ final class Demo implements Calmmarket.Backend {
     Map<String, Object> event = new LinkedHashMap<>();
     event.put("id", id);
     event.put("type", "asset.blocked");
-    event.put("projectId", "demo-project");
+    event.put("projectId", PROJECT);
     event.put("createdAt", System.currentTimeMillis());
     event.put("actor", Map.of("type", "user", "id", "demo-reviewer"));
     event.put("severity", "high");
@@ -123,13 +123,13 @@ final class Demo implements Calmmarket.Backend {
     event.put("assetId", photo.assetId);
     event.put("asset", Map.of("id", photo.assetId, "externalId", photo.externalId,
         "upload", Map.of("status", "completed"),
-        "classification", Map.of("status", "completed", "moderation", Map.of("status", "blocked")),
+        "classification", Map.of("status", "completed", "testInput", false, "moderation", Map.of("decision", "blocked")),
         "content", Map.of("status", "stored")));
     event.put("facts", List.of(
         Map.of("key", "asset-name", "value", photo.name),
         Map.of("key", "asset-type", "value", "image"),
         Map.of("key", "note", "value", "Simulated portal decision")));
-    return mock().enqueueEvents("demo-" + id, false, event).client;
+    return mock().enqueueEvents("demo-" + id, false, event).client();
   }
 
   // ---------------------------------------------------------------- Synthetic responses
@@ -152,6 +152,14 @@ final class Demo implements Calmmarket.Backend {
   private static Map<String, Object> asset(String id, String status, String externalId, Map<String, Object> report) {
     Map<String, Object> asset = new LinkedHashMap<>();
     asset.put("id", Objects.requireNonNull(id));
+    asset.put("name", "listing-photo");
+    asset.put("projectId", PROJECT);
+    asset.put("type", "image");
+    asset.put("metadata", List.of());
+    asset.put("parentPages", List.of());
+    asset.put("createdAt", System.currentTimeMillis());
+    asset.put("tags", List.of());
+    asset.put("visibility", "private");
     if (externalId != null) asset.put("externalId", externalId);
     String processing = switch (status) {
       case "pending" -> "processing";
@@ -160,22 +168,31 @@ final class Demo implements Calmmarket.Backend {
     };
     Map<String, Object> classification = new LinkedHashMap<>();
     classification.put("status", processing);
+    classification.put("testInput", false);
     asset.put("upload", Map.of("status", "completed"));
     asset.put("classification", classification);
     Map<String, Object> moderation = new LinkedHashMap<>();
-    moderation.put("status", status.equals("error") ? "pending" : status);
-    moderation.put("manualReviews", java.util.List.of());
-    if (report != null) { moderation.putAll(report); moderation.remove("processedAt"); }
+    // The decision is null until there is one: moderation is pending.
+    moderation.put("decision", status.equals("pending") || status.equals("error") ? null : status);
+    moderation.put("manualReviews", List.of());
+    moderation.put("flaggedCategories", List.of());
+    moderation.put("regions", List.of());
+    if (report != null) moderation.putAll(report);
     classification.put("moderation", moderation);
     asset.put("content", Map.of("status", "stored"));
     return asset;
   }
 
+  /** A synthetic text asset for a title or description. */
+  private static Map<String, Object> text(String id, String status, String externalId) {
+    Map<String, Object> asset = asset(id, status, externalId, null);
+    asset.put("name", "listing-text");
+    asset.put("type", "plaintext-document");
+    return asset;
+  }
+
   @SuppressWarnings("unchecked")
   private static Map<String, Object> moderation(Map<String, Object> asset) { return (Map<String, Object>) ((Map<String, Object>) asset.get("classification")).get("moderation"); }
-
-
-
 
   /** A synthetic report: every category evaluated at a low score unless overridden. */
   private static Map<String, Object> report(Map<String, Map<String, Object>> overrides) {
@@ -186,9 +203,9 @@ final class Demo implements Calmmarket.Backend {
     }
     // The simulated policy acts on every overridden category, as a real report's policy decision names them.
     List<String> flagged = overrides.keySet().stream().sorted().toList();
-    return Map.of("raw", Map.of("categories", categories), "categories", Map.of(),
+    return Map.of("raw", Map.of("categories", categories, "hashMatches", List.of()), "categories", Map.of(),
         "source", "policy", "automatedStatus", flagged.isEmpty() ? "allowed" : "blocked",
-        "flaggedCategories", flagged, "regions", List.of(), "explanationComplete", true);
+        "flaggedCategories", flagged, "explanationComplete", true);
   }
 
   private static Map<String, Object> evaluated(double score) {

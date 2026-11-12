@@ -1,7 +1,7 @@
 package calmmarket;
 
-import com.calmlens.Models;
-import com.calmlens.Models.AssetModerationStatus;
+import com.calmlens.models.AssetModerationDecision;
+import com.calmlens.models.ExtractedText;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -350,9 +350,9 @@ final class Page {
   static List<Part> parts(Calmmarket.Listing listing) {
     List<Part> parts = new ArrayList<>();
     for (String field : Calmmarket.TEXT_FIELDS.keySet()) {
-      AssetModerationStatus status = listing.textStatus.get(field);
+      AssetModerationDecision decision = listing.textStatus.get(field);
       String name = Character.toUpperCase(field.charAt(0)) + field.substring(1);
-      parts.add(new Part(name, textStatus(status), status == null ? "off" : Calmmarket.Photo.shown(status) ? "ok" : "bad", null));
+      parts.add(new Part(name, textStatus(decision), Calmmarket.Photo.shown(decision) ? "ok" : "bad", null));
     }
     for (Calmmarket.Photo photo : listing.photos) {
       String tone = photo.allowed() ? "ok" : photo.held() || photo.refreshError != null ? "bad" : "wait";
@@ -362,11 +362,13 @@ final class Page {
     return parts;
   }
 
-  static String textStatus(AssetModerationStatus status) {
-    if (status == null) return "Unknown";
-    if (Calmmarket.Photo.shown(status)) return "Approved";
-    if (status == AssetModerationStatus.PENDING) return "Checking";
-    return "Rejected";
+  /** A text field's decision in words; null means it is still being checked. */
+  static String textStatus(AssetModerationDecision decision) {
+    if (decision == null) return "Checking";
+    return switch (decision) {
+      case ALLOWED, LIMITED -> "Approved";
+      case AGE_RESTRICTED, BLOCKED, PURGED, UNKNOWN -> "Rejected";
+    };
   }
 
   static String photoStatus(Calmmarket.Photo photo, Calmmarket.Listing listing) {
@@ -374,21 +376,23 @@ final class Page {
     if (photo.processingFailed()) return "Couldn't be checked";
     if (photo.refreshError != null) return "Couldn't refresh";
     if (!photo.decided()) return "Checking";
-    if (photo.moderation == AssetModerationStatus.ALLOWED) return "Approved";
-    if (photo.moderation == AssetModerationStatus.LIMITED) return "Approved, ranked lower";
-    if (photo.moderation == AssetModerationStatus.PURGED) return "Removed";
-    if (photo.moderation == AssetModerationStatus.AGE_RESTRICTED) return "Not allowed here";
-    if (photo.moderation == AssetModerationStatus.BLOCKED) return "Rejected";
-    return "On hold";
+    return switch (photo.moderation) {
+      case ALLOWED -> "Approved";
+      case LIMITED -> "Approved, ranked lower";
+      case PURGED -> "Removed";
+      case AGE_RESTRICTED -> "Not allowed here";
+      case BLOCKED -> "Rejected";
+      case UNKNOWN -> "On hold";
+    };
   }
 
   /** Why a held photo was held: the categories the policy acted on, or a reviewer's decision. */
   static String reason(Calmmarket.Photo photo) {
     if (photo.processingFailed()) return "The photo couldn't be processed. Try a different file.";
     if (photo.driver() == Calmmarket.Driver.REVIEWER) return "Rejected by a reviewer";
-    if (photo.moderation == AssetModerationStatus.AGE_RESTRICTED) return "Age-restricted, which this marketplace doesn't show";
+    if (photo.moderation == AssetModerationDecision.AGE_RESTRICTED) return "Age-restricted, which this marketplace doesn't show";
     List<String> flagged = photo.flagged().stream().map(key -> Calmmarket.CATEGORY_LABELS.getOrDefault(key, key)).toList();
-    String what = photo.moderation == AssetModerationStatus.PURGED ? "Removed" : "Rejected";
+    String what = photo.moderation == AssetModerationDecision.PURGED ? "Removed" : "Rejected";
     if (flagged.isEmpty()) return what + " by the moderation policy";
     return what + " for " + String.join(", ", flagged).toLowerCase(Locale.ROOT);
   }
@@ -429,9 +433,10 @@ final class Page {
   }
 
   private static String extracted(Calmmarket.Photo photo) {
-    Models.ExtractedText extracted = photo.extractedText;
-    if (extracted == null || extracted.content() == null || extracted.content().isBlank()) return null;
-    String text = extracted.content().strip().replaceAll("\\s+", " ");
+    ExtractedText extracted = photo.extractedText;
+    String content = extracted == null ? null : extracted.getContent().orElse(null);
+    if (content == null || content.isBlank()) return null;
+    String text = content.strip().replaceAll("\\s+", " ");
     return text.length() > Calmmarket.MAX_EXTRACTED_TEXT_SHOWN ? text.substring(0, Calmmarket.MAX_EXTRACTED_TEXT_SHOWN) + "…" : text;
   }
 

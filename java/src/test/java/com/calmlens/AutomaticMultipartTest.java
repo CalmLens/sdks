@@ -2,6 +2,16 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.CalmLensException;
+import com.calmlens.internal.ClientAccess;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.Asset;
+import com.calmlens.models.AssetClassificationStatus;
+import com.calmlens.params.AssetCreateParams;
+import com.calmlens.params.Content;
+import com.calmlens.params.ProcessingOptionsParams;
+import com.calmlens.testing.MockCalmLensServerClient;
+import com.calmlens.testing.MockDecision;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -71,6 +81,12 @@ class AutomaticMultipartTest {
     return out.toByteArray();
   }
 
+  private static AssetCreateParams upload(String name, Content content) {
+    return AssetCreateParams.builder().setName(name).setContent(content).build();
+  }
+
+  private static RequestOptions key(String idempotencyKey) { return RequestOptions.builder().setIdempotencyKey(idempotencyKey).build(); }
+
   private static List<Object> each(List<Sent> sent, java.util.function.Function<Sent, Object> field) {
     List<Object> values = new ArrayList<>();
     for (Sent request : sent) values.add(field.apply(request));
@@ -79,10 +95,10 @@ class AutomaticMultipartTest {
 
   @Test void contentLargerThanPartSizeBytesIsSentInPartsWithDerivedKeys() {
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").partSizeBytes(5L * MIB)
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1").partSizeBytes(5L * MIB)
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
     byte[] file = fileOf(11 * MIB);
-    client.assets.classify(new Models.SubmitAsset("clip.mp4", Models.Content.bytes(file, "video/mp4")), new RequestOptions().idempotencyKey("upload-1"));
+    client.assets().classify(upload("clip.mp4", Content.bytes(file, "video/mp4")), key("upload-1"));
 
     assertEquals(List.of("/v1/projects/project-1/assets", "/v1/assets/asset-1/part", "/v1/assets/asset-1/part"), each(sent, Sent::path));
     assertEquals(List.of("upload-1", "upload-1:part-2", "upload-1:part-3"), each(sent, Sent::key));
@@ -100,9 +116,9 @@ class AutomaticMultipartTest {
     byte[] file = fileOf(12 * MIB + 3);
     Files.write(path, file);
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").partSizeBytes(5L * MIB)
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1").partSizeBytes(5L * MIB)
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
-    client.assets.create(new Models.SubmitAsset("report.pdf", Models.Content.file(path, "application/pdf")));
+    client.assets().create(upload("report.pdf", Content.file(path, "application/pdf")));
     assertEquals(List.of("1", "2", "3"), each(sent, r -> r.query().get("partNumber")));
     assertArrayEquals(file, joined(sent));
     // Without a caller's key, the parts share a generated one.
@@ -111,28 +127,29 @@ class AutomaticMultipartTest {
 
   @Test void contentOfOnePartOrLessAndStreamsGoInOneRequest() {
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1")
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1")
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
-    client.assets.create(new Models.SubmitAsset("exact.pdf", Models.Content.bytes(fileOf(8 * MIB), "application/pdf")));
+    client.assets().create(upload("exact.pdf", Content.bytes(fileOf(8 * MIB), "application/pdf")));
     byte[] streamed = fileOf(9 * MIB);
-    client.assets.create(new Models.SubmitAsset("stream.pdf", Models.Content.stream(new ByteArrayInputStream(streamed), streamed.length, "application/pdf")));
+    client.assets().create(upload("stream.pdf", Content.stream(new ByteArrayInputStream(streamed), streamed.length, "application/pdf")));
     assertEquals(java.util.Arrays.asList(null, null), each(sent, r -> r.query().get("partNumber")));
     assertEquals(List.of(8 * MIB, 9 * MIB), each(sent, r -> r.body().length));
   }
 
   @Test void aFailedPartIsRetriedWithItsOwnKeyAndAPartTheApiHasIsSkipped() {
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").partSizeBytes(5L * MIB).maxRetries(1)
-        .transport(scripted(sent, (request, index) -> {
+    // Retries wait on no clock: a sleeper that returns at once.
+    CalmLensServerClient client = ClientAccess.Holder.get().build(CalmLensServerClient.builder().apiKey("key").projectId("project-1").partSizeBytes(5L * MIB).maxRetries(1),
+        scripted(sent, (request, index) -> {
           if (index == 1) return Fixtures.json(503, "{}", Map.of("Retry-After", List.of("0")));
           // Part 3's response was lost before: the API asks for part 4.
           if ("3".equals(request.query().get("partNumber")))
             return apiError(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, 409, "{\"expectedPartNumber\":4,\"receivedPartNumber\":3}");
           return uploadResponse(request);
-        })).build(null, delay -> {});
-    Models.Asset result = client.assets.create(new Models.SubmitAsset("report.pdf", Models.Content.bytes(fileOf(16 * MIB), "application/pdf")),
-        new RequestOptions().idempotencyKey("upload-2"));
-    assertEquals(Models.AssetClassificationStatus.COMPLETED, result.classification().status());
+        }), delay -> {}, System::nanoTime, CalmLensServerClient.DEFAULT_MAX_RETRIES, false);
+    Asset result = client.assets().create(upload("report.pdf", Content.bytes(fileOf(16 * MIB), "application/pdf")),
+        key("upload-2"));
+    assertEquals(AssetClassificationStatus.COMPLETED, result.getClassification().getStatus());
     assertEquals(List.of("upload-2", "upload-2:part-2", "upload-2:part-2", "upload-2:part-3", "upload-2:part-4"), each(sent, Sent::key));
     assertArrayEquals(sent.get(1).body(), sent.get(2).body());
     assertEquals("true", sent.get(4).query().get("isFinal"));
@@ -140,53 +157,53 @@ class AutomaticMultipartTest {
 
   @Test void aFinalPartThatFindsTheUploadCompletedReadsTheAssetBack() {
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1")
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1")
         .transport(scripted(sent, (request, index) -> request.path().endsWith("/part") ? apiError(ErrorCodes.UPLOAD_NOT_OPEN, 409, "{}")
             : Fixtures.json(200, Fixtures.assetJson("asset-1", "completed", "allowed")))).build();
-    Models.Asset result = client.assets.create(new Models.SubmitAsset("clip.mp4", Models.Content.bytes(fileOf(9 * MIB), "video/mp4")));
-    assertEquals("asset-1", result.id());
+    Asset result = client.assets().create(upload("clip.mp4", Content.bytes(fileOf(9 * MIB), "video/mp4")));
+    assertEquals("asset-1", result.getId());
     assertEquals(List.of("/v1/projects/project-1/assets", "/v1/assets/asset-1/part", "/v1/assets/asset-1"), each(sent, Sent::path));
   }
 
   @Test void refusesAPartSizeOutsideItsRangeAnOverLongKeyAndAnImageOver20MiB() {
     for (long size : new long[] {5L * MIB - 1, 64L * MIB + 1})
       assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class,
-          () -> CalmLensServerClient.builder("key", "project-1").partSizeBytes(size).build()).getCode());
+          () -> CalmLensServerClient.builder().apiKey("key").projectId("project-1").partSizeBytes(size).build()).getCode());
     List<Sent> sent = new ArrayList<>();
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1")
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1")
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.create(
-        new Models.SubmitAsset("clip.mp4", Models.Content.bytes(fileOf(9 * MIB), "video/mp4")), new RequestOptions().idempotencyKey("k".repeat(241)))).getCode());
-    CalmLensException tooLarge = assertThrows(CalmLensException.class, () -> client.assets.create(
-        new Models.SubmitAsset("huge.png", Models.Content.bytes(fileOf(21 * MIB), "image/png"))));
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets().create(
+        upload("clip.mp4", Content.bytes(fileOf(9 * MIB), "video/mp4")), key("k".repeat(241)))).getCode());
+    CalmLensException tooLarge = assertThrows(CalmLensException.class, () -> client.assets().create(
+        upload("huge.png", Content.bytes(fileOf(21 * MIB), "image/png"))));
     assertEquals(ErrorCodes.UPLOAD_TOO_LARGE, tooLarge.getCode());
     assertEquals(Map.of("limitBytes", 20L * MIB, "source", "plan"), tooLarge.getDetails());
     assertEquals(List.of(), sent);
     // An image over the one-request limit goes in parts.
-    client.assets.create(new Models.SubmitAsset("large.png", Models.Content.bytes(fileOf(12 * MIB), "image/png")));
+    client.assets().create(upload("large.png", Content.bytes(fileOf(12 * MIB), "image/png")));
     assertEquals(List.of("1", "2"), each(sent, r -> r.query().get("partNumber")));
   }
 
   @Test void theMockJoinsThePartsAndResumesAnUploadWithTheSameKeyAfterAFailedPart() {
     List<Integer> moderated = new ArrayList<>();
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(), "project-1")
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder().apiKey(MockCalmLensServerClient.createMockApiKey()).projectId("project-1")
         .partSizeBytes(5L * MIB), new MockCalmLensServerClient.Options().moderate(input -> {
           moderated.add(1);
           return MockDecision.of("allowed");
         }));
     byte[] file = fileOf(12 * MIB);
-    Models.SubmitAsset options = new Models.SubmitAsset("report.pdf", Models.Content.bytes(file, "application/pdf"))
-        .processingOptions(new Models.ProcessingOptions().retainContent(true));
-    RequestOptions key = new RequestOptions().idempotencyKey("upload-3");
+    AssetCreateParams options = AssetCreateParams.builder().setName("report.pdf").setContent(Content.bytes(file, "application/pdf"))
+        .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true).build()).build();
+    RequestOptions key = key("upload-3");
     mock.failNextRequest("transport-error", new MockCalmLensServerClient.FailureOptions().operation("assets.uploadPart"));
-    assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, assertThrows(CalmLensException.class, () -> mock.client.assets.classify(options, key)).getCode());
-    Models.Asset finished = mock.client.assets.classify(options, key);
-    assertEquals(Models.AssetClassificationStatus.COMPLETED, finished.classification().status());
-    assertEquals(List.of(finished.id()), mock.client.assets.list(new Models.ListAssets()).items().stream().map(Models.Asset::id).toList());
+    assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, assertThrows(CalmLensException.class, () -> mock.client().assets().classify(options, key)).getCode());
+    Asset finished = mock.client().assets().classify(options, key);
+    assertEquals(AssetClassificationStatus.COMPLETED, finished.getClassification().getStatus());
+    assertEquals(List.of(finished.getId()), mock.client().assets().list().getItems().stream().map(Asset::getId).toList());
     assertEquals(List.of(1), moderated);
     mock.withStorage(storage -> {
       ByteArrayOutputStream stored = new ByteArrayOutputStream();
-      var parts = storage.content.get(finished.id()).parts();
+      var parts = storage.content.get(finished.getId()).parts();
       assertEquals(List.of(1, 2, 3), List.copyOf(parts.keySet()));
       parts.values().forEach(stored::writeBytes);
       assertArrayEquals(file, stored.toByteArray());

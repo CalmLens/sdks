@@ -2,6 +2,13 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.*;
+import com.calmlens.internal.Json;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.*;
+import com.calmlens.params.*;
+import com.calmlens.testing.*;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -71,17 +78,17 @@ class ClientCasesTest {
     JsonObject surface = Fixtures.read("surface.json").getAsJsonObject();
     java.util.Set<String> caseNames = new java.util.HashSet<>();
     Fixtures.read("client-cases.json").getAsJsonObject().getAsJsonArray("cases").forEach(c -> caseNames.add(c.getAsJsonObject().get("name").getAsString()));
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").build();
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1").build();
     Map<String, Object> values = new HashMap<>();
-    values.put("baseUrl", client.baseUrl());
-    values.put("cdnBaseUrl", client.cdnBaseUrl());
-    values.put("timeoutMs", client.timeout().toMillis());
-    values.put("uploadTimeoutMs", client.uploadTimeout());
-    values.put("maxRetries", (long) client.maxRetries());
+    values.put("baseUrl", client.getBaseUrl());
+    values.put("cdnBaseUrl", client.getCdnBaseUrl());
+    values.put("timeoutMs", client.getTimeout().toMillis());
+    values.put("uploadTimeoutMs", client.getUploadTimeout().orElse(null));
+    values.put("maxRetries", (long) client.getMaxRetries());
     values.put("retryBaseDelayMs", CalmLensServerClient.RETRY_BASE_DELAY.toMillis());
     values.put("retryMaxDelayMs", CalmLensServerClient.RETRY_MAX_DELAY.toMillis());
     values.put("retryAfterMaxMs", CalmLensServerClient.RETRY_AFTER_MAX.toMillis());
-    values.put("maxResponseBytes", client.maxResponseBytes());
+    values.put("maxResponseBytes", client.getMaxResponseBytes());
     values.put("signedUrlExpiresIn", CalmLensServerClient.DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS);
     values.put("uploadTokenExpiresInSeconds", (long) CalmLensServerClient.DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS);
     values.put("waitForDecisionTimeoutMs", CalmLensServerClient.DEFAULT_DECISION_TIMEOUT.toMillis());
@@ -89,7 +96,7 @@ class ClientCasesTest {
     values.put("waitForDecisionIntervalFactor", CalmLensServerClient.DECISION_POLL_DELAY_FACTOR);
     values.put("waitForDecisionMaxIntervalMs", CalmLensServerClient.DECISION_POLL_MAX_DELAY.toMillis());
     values.put("ensureLensesBatchSize", (long) CalmLensServerClient.ENSURE_LENSES_MAX_PER_REQUEST);
-    values.put("partSizeBytes", client.partSizeBytes());
+    values.put("partSizeBytes", client.getPartSizeBytes());
     List<DynamicTest> tests = new ArrayList<>();
     for (JsonElement element : surface.getAsJsonArray("defaults")) {
       JsonObject entry = element.getAsJsonObject();
@@ -104,7 +111,12 @@ class ClientCasesTest {
     return tests.stream();
   }
 
-  @TestFactory Stream<DynamicTest> clientCases() throws Exception {
+  @TestFactory Stream<DynamicTest> clientCases() throws Exception { return clientCases(false); }
+
+  /** The client cases again through {@link CalmLensServerClient#async()}, with the same results. */
+  @TestFactory Stream<DynamicTest> clientCasesThroughTheAsyncClient() throws Exception { return clientCases(true); }
+
+  private static Stream<DynamicTest> clientCases(boolean async) throws Exception {
     JsonObject fixture = Fixtures.read("client-cases.json").getAsJsonObject();
     Map<String, JsonObject> capabilities = new HashMap<>();
     Fixtures.read("surface.json").getAsJsonObject().getAsJsonArray("capabilities")
@@ -123,14 +135,14 @@ class ClientCasesTest {
             Assumptions.abort("not applicable: " + reason);
           }
         }
-        run(fixture, clientCase);
+        run(fixture, clientCase, async);
       }));
     }
     assertFalse(tests.isEmpty());
     return tests.stream();
   }
 
-  private static void run(JsonObject fixture, JsonObject clientCase) throws Exception {
+  private static void run(JsonObject fixture, JsonObject clientCase, boolean async) throws Exception {
     String name = clientCase.get("name").getAsString();
     JsonObject options = fixture.getAsJsonObject("client").deepCopy();
     if (clientCase.has("client")) clientCase.getAsJsonObject("client").entrySet().forEach(e -> options.add(e.getKey(), e.getValue()));
@@ -176,7 +188,9 @@ class ClientCasesTest {
     CalmLensServerClient client = null;
     CalmLensException constructionError = null;
     try {
-      CalmLensServerClient.Builder builder = CalmLensServerClient.builder(string(options, "apiKey"), string(options, "projectId"));
+      CalmLensServerClient.Builder builder = CalmLensServerClient.builder();
+      if (string(options, "apiKey") != null) builder.apiKey(string(options, "apiKey"));
+      if (string(options, "projectId") != null) builder.projectId(string(options, "projectId"));
       if (options.has("baseUrl")) builder.baseUrl(options.get("baseUrl").getAsString());
       if (options.has("cdnBaseUrl")) builder.cdnBaseUrl(options.get("cdnBaseUrl").getAsString());
       if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
@@ -184,7 +198,8 @@ class ClientCasesTest {
       if (options.has("maxResponseBytes")) builder.maxResponseBytes(options.get("maxResponseBytes").getAsLong());
       if (options.has("partSizeBytes")) builder.partSizeBytes(options.get("partSizeBytes").getAsLong());
       // Waits are recorded and skipped; the client's clock moves on by each one.
-      client = builder.build(transport, delay -> { sleeps.add(delay.toMillis()); slept[0] += delay.toNanos(); }, () -> System.nanoTime() + slept[0]);
+      client = com.calmlens.internal.ClientAccess.Holder.get().build(builder, transport, delay -> { sleeps.add(delay.toMillis()); slept[0] += delay.toNanos(); },
+          () -> System.nanoTime() + slept[0], CalmLensServerClient.DEFAULT_MAX_RETRIES, false);
     } catch (CalmLensException refused) {
       constructionError = refused;
     }
@@ -200,7 +215,7 @@ class ClientCasesTest {
         Throwable error = constructionError;
         if (error == null) {
           try {
-            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject());
+            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject(), async);
           } catch (Throwable thrown) {
             error = thrown;
           }
@@ -370,7 +385,7 @@ class ClientCasesTest {
    * $bytes} or {@code $fill}) are the SDK's byte input and {@code data} ({@code $stream}) its
    * one-shot stream input.
    */
-  private static Models.Content content(JsonObject json) {
+  private static Content content(JsonObject json) {
     JsonObject plain = json.deepCopy();
     byte[] bytes = null;
     byte[] stream = null;
@@ -379,9 +394,13 @@ class ClientCasesTest {
       bytes = bytes(plain.remove(key).getAsJsonObject());
     }
     if (plain.has("data")) stream = bytes(plain.remove("data").getAsJsonObject());
-    Models.Content content = Json.GSON.fromJson(plain, Models.Content.class);
-    if (bytes != null) content.data = bytes;
-    if (stream != null) content.stream = new ByteArrayInputStream(stream);
+    Content content = Json.GSON.fromJson(plain, Content.class);
+    try {
+      if (bytes != null) setField(content, "data", bytes);
+      if (stream != null) setField(content, "stream", new ByteArrayInputStream(stream));
+    } catch (ReflectiveOperationException unreachable) {
+      throw new IllegalStateException(unreachable);
+    }
     return content;
   }
 
@@ -394,39 +413,60 @@ class ClientCasesTest {
     return filled;
   }
 
-  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args) throws Throwable {
+  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args, boolean async) throws Throwable {
     JsonObject options = args.deepCopy();
-    RequestOptions request = options.has("idempotencyKey") ? new RequestOptions().idempotencyKey(options.remove("idempotencyKey").getAsString()) : null;
+    RequestOptions request = options.has("idempotencyKey") ? RequestOptions.builder().setIdempotencyKey(options.remove("idempotencyKey").getAsString()).build() : null;
+    Object root = async ? client.async() : client;
     switch (operation) {
       case "assets.create", "assets.classify": {
         JsonObject content = options.has("content") ? options.remove("content").getAsJsonObject() : null;
         JsonObject part = options.has("part") ? options.remove("part").getAsJsonObject() : null;
-        Models.SubmitAsset submit = Fixtures.decode(options, Models.SubmitAsset.class);
+        AssetCreateParams submit = Fixtures.decode(options, AssetCreateParams.class);
         if (content != null) setField(submit, "content", content(content));
         if (part != null) setField(submit, "part", content(part));
-        return operation.equals("assets.create") ? client.assets.create(submit, request) : client.assets.classify(submit, request);
+        return call(resource(root, "assets"), operation.substring("assets.".length()), submit, request);
       }
       case "assets.uploadPart": {
         JsonObject part = options.remove("part").getAsJsonObject();
-        Models.UploadPart upload = Fixtures.decode(options, Models.UploadPart.class);
+        String assetId = options.has("assetId") ? options.remove("assetId").getAsString() : null;
+        AssetUploadPartParams upload = Fixtures.decode(options, AssetUploadPartParams.class);
         setField(upload, "part", content(part));
-        return client.assets.uploadPart(upload, request);
+        return call(resource(root, "assets"), "uploadPart", assetId, upload, request);
       }
       case "text.classify":
-        return client.text.classify(Fixtures.decode(options, Models.ClassifyText.class), request);
-      case "assets.waitForDecision": {
-        Models.WaitForDecision wait = new Models.WaitForDecision(options.get("assetId").getAsString());
-        if (options.has("timeoutMs")) wait.timeout(Duration.ofMillis(options.get("timeoutMs").getAsLong()));
-        return client.assets.waitForDecision(wait);
-      }
-      case "events.iterate": return collect(client.events.pages(Fixtures.decode(options, Models.ListEvents.class)));
-      case "cdn.serve": return client.cdn.serve(Fixtures.decode(options, Models.CdnRequest.class));
+        return call(resource(root, "text"), "classify", Fixtures.decode(options, TextClassifyParams.class), request);
+      case "cdn.serve": return call(resource(root, "cdn"), "serve", Fixtures.decode(options, CdnRequestParams.class), null);
       default: {
-        Object result = Fixtures.invoke(client, operation, options);
+        // The async client has no lazy iterators: they run on the synchronous one.
+        Object result = Fixtures.invoke(client, operation, options, async && !Fixtures.isIterator(operation));
         // Every list's iterator yields its items in order.
         return Fixtures.isIterator(operation) ? collect((Iterable<?>) result) : result;
       }
     }
+  }
+
+  private static Object resource(Object root, String name) throws ReflectiveOperationException { return root.getClass().getMethod(name).invoke(root); }
+
+  /** Calls {@code name} on {@code target} with {@code args} (the last one {@link RequestOptions}), waiting for a future's result. */
+  private static Object call(Object target, String name, Object... args) throws Throwable {
+    for (java.lang.reflect.Method method : target.getClass().getMethods()) {
+      if (!method.getName().equals(name) || method.getParameterCount() != args.length) continue;
+      if (method.getParameterTypes()[args.length - 1] != RequestOptions.class) continue;
+      try {
+        Object result = method.invoke(target, args);
+        if (result instanceof java.util.concurrent.CompletableFuture<?> future) {
+          try {
+            return future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+          } catch (java.util.concurrent.ExecutionException failed) {
+            throw failed.getCause();
+          }
+        }
+        return result;
+      } catch (java.lang.reflect.InvocationTargetException failure) {
+        throw failure.getCause();
+      }
+    }
+    throw new AssertionError("no " + name + " taking " + args.length + " arguments");
   }
 
   private static void setField(Object target, String name, Object value) throws ReflectiveOperationException {

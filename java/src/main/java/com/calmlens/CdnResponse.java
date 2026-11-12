@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.calmlens.exception.CalmLensException;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,7 +17,7 @@ import java.util.Map;
  * java.net.http.HttpTimeoutException}.
  *
  * <pre>{@code
- * try (CdnResponse response = client.cdn.serve(new CdnRequest(assetId))) {
+ * try (CdnResponse response = client.cdn().serve(CdnRequestParams.builder().setAssetId(assetId).build())) {
  *   if (response.status() == 200) response.transferTo(output);
  * }
  * }</pre>
@@ -49,7 +51,7 @@ public final class CdnResponse implements Closeable {
    *
    * @param out destination
    * @return bytes copied
-   * @throws CalmLensException {@link TransportException} or {@link RequestTimeoutException} when the body cannot be read
+   * @throws CalmLensException {@link com.calmlens.exception.ConnectionException} or {@link com.calmlens.exception.TimeoutException} when the body cannot be read
    */
   public long transferTo(OutputStream out) {
     try {
@@ -67,13 +69,13 @@ public final class CdnResponse implements Closeable {
    * @param maxBytes the largest body accepted
    * @return the body
    * @throws CalmLensException {@link ErrorCodes#SDK_RESPONSE_TOO_LARGE} when the body is larger, or a
-   *     {@link TransportException} when it cannot be read
+   *     {@link com.calmlens.exception.ConnectionException} when it cannot be read
    */
   public byte[] readAllBytes(long maxBytes) {
     try {
       byte[] bytes = body.readNBytes((int) Math.min(Integer.MAX_VALUE - 8, maxBytes + 1));
       if (bytes.length > maxBytes)
-        throw new ApiException(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "CDN response is larger than " + maxBytes + " bytes", null, status(), headers(), null);
+        throw CalmLensException.of(ErrorCodes.SDK_RESPONSE_TOO_LARGE, "CDN response is larger than " + maxBytes + " bytes", null, status(), headers(), null, null, null);
       return bytes;
     } catch (IOException failure) {
       throw failed(failure);
@@ -84,8 +86,8 @@ public final class CdnResponse implements Closeable {
 
   private static CalmLensException failed(IOException failure) {
     String message = failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage();
-    return failure instanceof HttpTimeoutException ? new RequestTimeoutException(message, failure)
-        : new TransportException(ErrorCodes.SDK_TRANSPORT_ERROR, message, failure);
+    return failure instanceof HttpTimeoutException ? CalmLensException.of(ErrorCodes.SDK_TIMEOUT, message, failure)
+        : CalmLensException.of(ErrorCodes.SDK_TRANSPORT_ERROR, message, failure);
   }
 
   @Override public void close() {

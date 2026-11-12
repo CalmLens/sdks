@@ -2,6 +2,9 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.models.SignedUploadToken;
+import com.calmlens.params.UploadTokenSignParams;
+import com.calmlens.testing.MockCalmLensServerClient;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
@@ -30,10 +33,10 @@ class UploadTokensTest {
 
   @Test void theMockSignsTokensWithoutARequest() throws Exception {
     MockCalmLensServerClient mock = new MockCalmLensServerClient();
-    Models.SignedUploadToken signed = mock.client.uploadTokens.sign(new Models.SignUploadToken("preset-1"));
-    String body = signed.token().substring(5, signed.token().indexOf('.'));
+    SignedUploadToken signed = mock.client().uploadTokens().sign(UploadTokenSignParams.builder().setUploadPresetId("preset-1").build());
+    String body = signed.getToken().substring(5, signed.getToken().indexOf('.'));
     assertEquals(0, mock.requests().size());
-    assertTrue(signed.token().endsWith("." + signature(body, "mock-key")));
+    assertTrue(signed.getToken().endsWith("." + signature(body, "mock-key")));
   }
 
 }

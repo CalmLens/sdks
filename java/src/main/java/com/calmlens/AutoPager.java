@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.calmlens.exception.CalmLensException;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -16,7 +18,7 @@ import java.util.stream.StreamSupport;
  * with the {@code cursor} in its details), so iteration never loops.
  *
  * <pre>{@code
- * for (Asset asset : client.assets.iterate(new ListAssets().filter("classification.moderation.status==blocked"))) { ... }
+ * for (Asset asset : client.assets().iterate(AssetListParams.builder().setFilter("classification.moderation.decision==blocked").build())) { ... }
  * }</pre>
  *
  * @param <T> the item type
@@ -76,8 +78,7 @@ public final class AutoPager<T> implements Iterable<T> {
           // Stop rather than loop: a page with more to follow must not hand back a cursor already sent.
           if (next && !sent.add(chunk.next())) {
             more = false;
-            throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE,
-                "The API returned a cursor it had already returned, with more pages to follow", java.util.Map.of("cursor", chunk.next()), null);
+            throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The API returned a cursor it had already returned, with more pages to follow", java.util.Map.of("cursor", chunk.next()), 0, null, null, null, null);
           }
           token = chunk.next();
           cursor = chunk.next();

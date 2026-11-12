@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.calmlens.exception.CalmLensException;
+
 import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
@@ -19,7 +21,7 @@ import java.util.function.Supplier;
 /**
  * Sends one HTTP request. The default transport uses {@link java.net.http.HttpClient}; supply your
  * own through {@link CalmLensServerClient.Builder#transport(Transport)} to route requests through another
- * HTTP stack, or use {@link MockCalmLensServerClient} in tests. The client adds authentication, retries,
+ * HTTP stack, or use {@link com.calmlens.testing.MockCalmLensServerClient} in tests. The client adds authentication, retries,
  * body limits and error mapping around it.
  *
  * <p>Throw {@link IOException} for network failures ({@link java.net.http.HttpTimeoutException} or
@@ -148,7 +150,7 @@ public interface Transport {
      * upload form around its file. Its length is known when {@code body}'s is, and it can be sent
      * again when {@code body} can.
      */
-    static Body framed(byte[] head, Body body, byte[] tail) {
+    public static Body framed(byte[] head, Body body, byte[] tail) {
       long length = body.length() < 0 ? -1 : head.length + body.length() + tail.length;
       return new Body(length, null, null, () -> {
         try {

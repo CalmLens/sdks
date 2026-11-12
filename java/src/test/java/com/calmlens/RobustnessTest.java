@@ -2,6 +2,34 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.ApiException;
+import com.calmlens.exception.CalmLensException;
+import com.calmlens.exception.CancelledException;
+import com.calmlens.exception.ConnectionException;
+import com.calmlens.exception.InvalidArgumentException;
+import com.calmlens.exception.ServerException;
+import com.calmlens.exception.TimeoutException;
+import com.calmlens.internal.ClientAccess;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.Asset;
+import com.calmlens.models.AssetClassificationStatus;
+import com.calmlens.models.AssetContentStatus;
+import com.calmlens.models.AssetModerationDecision;
+import com.calmlens.models.ContentRemovalReason;
+import com.calmlens.models.EventsPage;
+import com.calmlens.models.ExtractedTextType;
+import com.calmlens.models.SafetyHoldReason;
+import com.calmlens.models.SignedAssetUrl;
+import com.calmlens.models.Visibility;
+import com.calmlens.params.AssetCreateParams;
+import com.calmlens.params.AssetUpdateParams;
+import com.calmlens.params.AssetUploadPartParams;
+import com.calmlens.params.CdnRequestParams;
+import com.calmlens.params.CdnSignAssetUrlParams;
+import com.calmlens.params.Content;
+import com.calmlens.params.EventListParams;
+import com.calmlens.params.HttpOptions;
+import com.calmlens.params.ViewerClaims;
 import com.google.gson.JsonParser;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -27,7 +55,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class RobustnessTest {
-  private static final String ALLOWED = Fixtures.assetJson("asset", "completed", "allowed");
+  private static final String ALLOWED = ClientTest.assetJson("asset", "completed", "allowed");
 
   /** Records requests and answers from {@code replies} in order; retries do not sleep but record delays. */
   private static final class Scripted implements Transport {
@@ -46,20 +74,22 @@ class RobustnessTest {
       return reply;
     }
 
-    CalmLensServerClient client() { return client(CalmLensServerClient.builder("key", "project")); }
+    CalmLensServerClient client() { return client(CalmLensServerClient.builder().apiKey("key").projectId("project")); }
 
-    CalmLensServerClient client(CalmLensServerClient.Builder builder) { return builder.build(this, delays::add); }
+    CalmLensServerClient client(CalmLensServerClient.Builder builder) {
+      return ClientAccess.Holder.get().build(builder, this, delays::add, System::nanoTime, CalmLensServerClient.DEFAULT_MAX_RETRIES, false);
+    }
   }
 
   private static Function<Transport.Request, Transport.Response> reply(int status, String body) { return request -> Fixtures.json(status, body); }
 
-  private static Function<Transport.Request, Transport.Response> reply(int status, String body, String retryAfter) {
-    return request -> Fixtures.json(status, body, Map.of("Retry-After", List.of(retryAfter)));
-  }
-
   private static Map<String, String> query(Transport.Request request) {
     return java.util.Arrays.stream(request.uri().getRawQuery().split("&")).map(pair -> pair.split("=", 2))
         .collect(Collectors.toMap(pair -> java.net.URLDecoder.decode(pair[0], StandardCharsets.UTF_8), pair -> java.net.URLDecoder.decode(pair[1], StandardCharsets.UTF_8)));
+  }
+
+  private static AssetCreateParams text(String text) {
+    return AssetCreateParams.builder().setName("post.txt").setContent(Content.text(text)).build();
   }
 
   @Test void filesAndStreamsAreSentWithoutBuffering(@TempDir Path directory) throws Exception {
@@ -69,7 +99,7 @@ class RobustnessTest {
     Files.write(file, data);
     var transport = new Scripted(reply(200, ALLOWED), reply(503, "{}"));
     CalmLensServerClient client = transport.client();
-    client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.file(file, "image/png")));
+    client.assets().create(AssetCreateParams.builder().setName("photo.png").setContent(Content.file(file, "image/png")).build());
     // The upload form streams the file from disk with a known length, and can be sent again.
     Transport.Request request = transport.requests.get(0);
     Transport.Body sent = request.body();
@@ -81,30 +111,32 @@ class RobustnessTest {
 
     // A stream can be read once, so a request carrying it is not retried.
     InputStream stream = new ByteArrayInputStream(data);
-    assertThrows(ApiException.class, () -> client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.stream(stream, data.length, "image/png"))));
+    assertThrows(ServerException.class, () -> client.assets().create(
+        AssetCreateParams.builder().setName("photo.png").setContent(Content.stream(stream, data.length, "image/png")).build()));
     assertEquals(2, transport.requests.size());
     assertFalse(transport.requests.get(1).body().replayable());
     assertArrayEquals(data, UploadForm.read(transport.bodies.get(1), transport.requests.get(1).headers().get("Content-Type")).file());
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
-        () -> client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.file(directory.resolve("missing.png"), "image/png")))).getCode());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(InvalidArgumentException.class, () -> client.assets().create(
+        AssetCreateParams.builder().setName("photo.png").setContent(Content.file(directory.resolve("missing.png"), "image/png")).build())).getCode());
   }
 
   @Test void unrelatedModerationAndPartsRunConcurrently() throws Exception {
     for (boolean parts : new boolean[] {false, true}) {
       CountDownLatch entered = new CountDownLatch(2);
-      CalmLensServerClient client = CalmLensServerClient.builder("key", "project").transport(request -> {
+      CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project").transport(request -> {
         entered.countDown();
         if (!entered.await(2, TimeUnit.SECONDS)) throw new IOException("Requests were serialized");
         return Fixtures.json(200, ALLOWED);
       }).build();
       ExecutorService executor = Executors.newFixedThreadPool(2);
       try {
-        List<Future<Models.Asset>> futures = new ArrayList<>();
+        List<Future<Asset>> futures = new ArrayList<>();
         for (String id : List.of("one", "two"))
           futures.add(executor.submit(() -> parts
-              ? client.assets.uploadPart(new Models.UploadPart(id, Models.Content.text("final").partNumber(2).isFinal(true)))
-              : client.assets.classify(Models.SubmitAsset.text("hello"))));
-        for (var future : futures) assertEquals(Models.AssetModerationStatus.ALLOWED, future.get(3, TimeUnit.SECONDS).classification().moderation().status());
+              ? client.assets().uploadPart(id, AssetUploadPartParams.builder().setPart(Content.text("final").withPartNumber(2).withIsFinal(true)).build())
+              : client.assets().classify(text("hello"))));
+        for (var future : futures)
+          assertSame(AssetModerationDecision.ALLOWED, future.get(3, TimeUnit.SECONDS).getClassification().getModeration().getDecision().orElseThrow());
       } finally {
         executor.shutdownNow();
       }
@@ -113,7 +145,7 @@ class RobustnessTest {
 
   @Test void clearAndOmitHaveDifferentWireRepresentations() throws Exception {
     var transport = new Scripted(reply(200, ALLOWED));
-    transport.client().assets.update(new Models.UpdateAsset("asset").description(Models.Patch.clear()).tags(Models.Patch.value(List.of())));
+    transport.client().assets().update("asset", AssetUpdateParams.builder().clearDescription().setTags(List.of()).build());
     var patch = JsonParser.parseString(new String(transport.bodies.get(0), StandardCharsets.UTF_8)).getAsJsonObject();
     assertTrue(patch.get("description").isJsonNull());
     assertFalse(patch.has("name"));
@@ -121,39 +153,42 @@ class RobustnessTest {
   }
 
   @Test void unknownValuesAndLargeNumbersSurviveDecoding() {
-    String body = "{\"id\":\"asset\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"paused\",\"moderation\":{\"status\":\"escalated\"}},"
-        + "\"content\":{\"status\":\"archived\",\"removalReason\":\"expired\"},\"visibility\":\"unlisted\",\"futureField\":{\"a\":1},"
-        + "\"metadata\":[{\"id\":\"big\",\"value\":9007199254740993},{\"id\":\"small\",\"value\":5},{\"id\":\"ratio\",\"value\":0.5}],"
-        + "\"createdAt\":1700000000123}";
-    Models.Asset asset = new Scripted(reply(200, body)).client().assets.retrieve(new Models.AssetId("asset"));
-    assertEquals("paused", asset.classification().status().value());
-    assertFalse(asset.classification().status().isKnown());
-    assertEquals("escalated", asset.classification().moderation().status().value());
-    assertFalse(asset.classification().moderation().status().isKnown());
-    assertNotEquals(Models.AssetModerationStatus.ALLOWED, asset.classification().moderation().status());
-    assertEquals("archived", asset.content().status().value());
-    assertFalse(asset.content().status().isKnown());
-    assertEquals("expired", asset.content().removalReason());
-    assertEquals("unlisted", asset.visibility().value());
-    assertEquals(9007199254740993L, asset.metadata().get(0).value());
-    assertEquals(5L, asset.metadata().get(1).value());
-    assertEquals(0.5, asset.metadata().get(2).value());
-    assertEquals(java.time.Instant.ofEpochMilli(1700000000123L), asset.createdAt());
-    assertSame(Models.AssetModerationStatus.AGE_RESTRICTED, Models.AssetModerationStatus.of("age-restricted"));
-    assertSame(Models.AssetModerationStatus.LIMITED, Models.AssetModerationStatus.of("limited"));
-    assertSame(Models.AssetModerationDecision.LIMITED, Models.AssetModerationDecision.of("limited"));
-    assertSame(Models.AssetClassificationStatus.FAILED, Models.AssetClassificationStatus.of("failed"));
-    assertSame(Models.AssetContentStatus.REMOVED, Models.AssetContentStatus.of("removed"));
-    assertThrows(UnsupportedOperationException.class, () -> asset.metadata().add(new Models.MetadataItem("x", 1)));
+    Map<String, Object> fields = ClientTest.asset("asset", "paused", "escalated");
+    fields.put("content", Map.of("status", "archived", "removalReason", "expired"));
+    fields.put("visibility", "unlisted");
+    fields.put("futureField", Map.of("a", 1));
+    fields.put("metadata", List.of(Map.of("id", "big", "value", 9007199254740993L), Map.of("id", "small", "value", 5), Map.of("id", "ratio", "value", 0.5)));
+    fields.put("createdAt", 1700000000123L);
+    Asset asset = new Scripted(reply(200, Fixtures.WITH_NULLS.toJson(fields))).client().assets().retrieve("asset");
+    assertSame(AssetClassificationStatus.UNKNOWN, asset.getClassification().getStatus());
+    assertEquals("paused", asset.getClassification().getRawJsonObject().get("status").getAsString());
+    assertSame(AssetModerationDecision.UNKNOWN, asset.getClassification().getModeration().getDecision().orElseThrow());
+    assertEquals("escalated", asset.getClassification().getModeration().getRawJsonObject().get("decision").getAsString());
+    assertSame(AssetContentStatus.UNKNOWN, asset.getContent().getStatus());
+    assertEquals("archived", asset.getContent().getRawJsonObject().get("status").getAsString());
+    assertSame(ContentRemovalReason.UNKNOWN, asset.getContent().getRemovalReason().orElseThrow());
+    assertEquals("expired", asset.getContent().getRawJsonObject().get("removalReason").getAsString());
+    assertSame(Visibility.UNKNOWN, asset.getVisibility());
+    assertEquals("unlisted", asset.getRawJsonObject().get("visibility").getAsString());
+    assertEquals(JsonParser.parseString("{\"a\":1}"), asset.getAdditionalProperties().get("futureField"));
+    assertEquals(9007199254740993L, asset.getMetadata().get(0).getValue());
+    assertEquals(5L, asset.getMetadata().get(1).getValue());
+    assertEquals(0.5, asset.getMetadata().get(2).getValue());
+    assertEquals(java.time.Instant.ofEpochMilli(1700000000123L), asset.getCreatedAt());
+    assertSame(AssetModerationDecision.AGE_RESTRICTED, AssetModerationDecision.fromValue("age-restricted"));
+    assertSame(AssetModerationDecision.LIMITED, AssetModerationDecision.fromValue("limited"));
+    assertSame(AssetClassificationStatus.FAILED, AssetClassificationStatus.fromValue("failed"));
+    assertSame(AssetContentStatus.REMOVED, AssetContentStatus.fromValue("removed"));
+    assertThrows(UnsupportedOperationException.class, () -> asset.getMetadata().clear());
   }
 
   @Test void secretsNeverAppearInStringForms() {
-    CalmLensServerClient.Builder builder = CalmLensServerClient.builder("sk_live_secret", "project");
+    CalmLensServerClient.Builder builder = CalmLensServerClient.builder().apiKey("sk_live_secret").projectId("project");
     var transport = new Scripted(reply(200, "{\"url\":\"https://cdn.example/v1/assets/project/sig_secret\",\"expiresAt\":1}"));
     CalmLensServerClient client = transport.client(builder);
-    Models.SignedAssetUrl signed = client.cdn.signAssetUrl(new Models.SignAssetUrlOptions("a").resource("rendered")
-        .viewerClaims(new Models.ViewerClaims().ageConfirmed(true)));
-    assertEquals("https://cdn.example/v1/assets/project/sig_secret/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D", signed.url());
+    SignedAssetUrl signed = client.cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId("a").setResource("rendered")
+        .setViewerClaims(ViewerClaims.builder().setAgeConfirmed(true).build()).build());
+    assertEquals("https://cdn.example/v1/assets/project/sig_secret/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D", signed.getUrl());
     for (String text : List.of(client.toString(), builder.toString(), transport.requests.get(0).toString(), signed.toString())) {
       assertFalse(text.contains("sk_live_secret"), text);
       assertFalse(text.contains("sig_secret"), text);
@@ -161,22 +196,31 @@ class RobustnessTest {
     assertEquals("sk_live_secret", transport.requests.get(0).headers().get("X-Api-Key"));
   }
 
+  private static String event(String id, String facts) {
+    return "{\"id\":\"" + id + "\",\"projectId\":\"project\",\"actor\":{\"type\":\"system\"},\"type\":\"asset.classified\",\"severity\":\"low\","
+        + "\"title\":\"Classified\",\"facts\":" + facts + ",\"createdAt\":1700000000000}";
+  }
+
   /** client-cases.json covers the pages and requests; {@code AutoPager.cursor()} is Java's own. */
   @Test void theEventPagerKeepsTheLatestCursor() {
     var events = new Scripted(
-        reply(200, "{\"items\":[{\"id\":\"e1\",\"type\":\"asset.classified\",\"facts\":[]}],\"nextCursor\":\"c1\",\"hasMore\":true}"),
-        reply(200, "{\"items\":[{\"id\":\"e2\",\"type\":\"asset.allowed\"}],\"nextCursor\":\"c2\",\"hasMore\":false}"));
-    AutoPager<Models.EventsPage> feed = events.client().events.pages(new Models.ListEvents().cursor("c0").pageSize(1));
+        reply(200, "{\"items\":[" + event("e1", "[]") + "],\"nextCursor\":\"c1\",\"hasMore\":true,\"excludedTypes\":[]}"),
+        reply(200, "{\"items\":[" + event("e2", "[{\"key\":\"test\",\"value\":true}]") + "],\"nextCursor\":\"c2\",\"hasMore\":false,\"excludedTypes\":[]}"));
+    AutoPager<EventsPage> feed = events.client().events().pages(EventListParams.builder().setCursor("c0").setPageSize(1).build());
     List<String> ids = new ArrayList<>();
     List<String> cursors = new ArrayList<>();
-    for (Models.EventsPage page : feed) {
-      page.items().forEach(event -> ids.add(event.id()));
-      cursors.add(page.nextCursor());
+    for (EventsPage page : feed) {
+      page.getItems().forEach(event -> ids.add(event.getId()));
+      cursors.add(page.getNextCursor());
     }
     assertEquals(List.of("e1", "e2"), ids);
     assertEquals(List.of("c1", "c2"), cursors);
     assertEquals("c2", feed.cursor());
-    assertEquals(List.of(), events.client().events.list(new Models.ListEvents()).items().get(0).facts());
+    assertEquals("c0", query(events.requests.get(0)).get("cursor"));
+    assertEquals("c1", query(events.requests.get(1)).get("cursor"));
+    var fact = events.client().events().list(EventListParams.builder().build()).getItems().get(0).getFacts().get(0);
+    assertEquals("test", fact.getKey());
+    assertEquals(true, fact.getValue());
   }
 
   @Test void closedClientsRefuseRequests() {
@@ -184,7 +228,7 @@ class RobustnessTest {
     CalmLensServerClient client = transport.client();
     client.close();
     client.close();
-    assertEquals(ErrorCodes.SDK_CLIENT_CLOSED, assertThrows(CalmLensException.class, () -> client.assets.retrieve(new Models.AssetId("a"))).getCode());
+    assertEquals(ErrorCodes.SDK_CLIENT_CLOSED, assertThrows(CalmLensException.class, () -> client.assets().retrieve("a")).getCode());
     assertEquals(0, transport.requests.size());
   }
 
@@ -199,11 +243,12 @@ class RobustnessTest {
       }
       @Override public void close() { closed = true; }
     };
-    CalmLensServerClient client = CalmLensServerClient.builder("key", "project").timeout(Duration.ofMillis(200)).maxRetries(0)
+    CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project").timeout(Duration.ofMillis(200)).maxRetries(0)
         .transport(request -> new Transport.Response(200, Map.of(), stalled)).build();
     try {
       long started = System.nanoTime();
-      assertThrows(RequestTimeoutException.class, () -> client.assets.retrieve(new Models.AssetId("a")));
+      TimeoutException timeout = assertThrows(TimeoutException.class, () -> client.assets().retrieve("a"));
+      assertEquals(ErrorCodes.SDK_TIMEOUT, timeout.getCode());
       assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofSeconds(5)) < 0);
     } finally {
       release.countDown();
@@ -224,8 +269,8 @@ class RobustnessTest {
     };
     var transport = new Scripted(request -> new Transport.Response(206, Map.of("Content-Type", List.of("video/mp4")), body));
     CalmLensServerClient client = transport.client();
-    try (CdnResponse response = client.cdn.serve(new Models.CdnRequest("asset").init(new Models.HttpOptions().method("HEAD")
-        .headers(Map.of("Range", "bytes=0-3", "X-Api-Key", "override"))), new RequestOptions().timeout(Duration.ofMillis(200)))) {
+    try (CdnResponse response = client.cdn().serve(CdnRequestParams.builder().setAssetId("asset").setInit(HttpOptions.builder().setMethod("HEAD")
+        .setHeaders(Map.of("Range", "bytes=0-3", "X-Api-Key", "override")).build()).build(), RequestOptions.builder().setTimeout(Duration.ofMillis(200)).build())) {
       assertEquals("HEAD", transport.requests.get(0).method());
       assertEquals("bytes=0-3", transport.requests.get(0).headers().get("Range"));
       assertEquals("key", transport.requests.get(0).headers().get("X-Api-Key"));
@@ -241,13 +286,13 @@ class RobustnessTest {
 
   @Test void transportErrorsPreserveCauseAndInterrupt() {
     IOException cause = new IOException("offline");
-    var error = assertThrows(TransportException.class, () -> CalmLensServerClient.builder("key", "project").maxRetries(0)
-        .transport(request -> { throw cause; }).build().assets.classify(Models.SubmitAsset.text("hello")));
+    var error = assertThrows(ConnectionException.class, () -> CalmLensServerClient.builder().apiKey("key").projectId("project").maxRetries(0)
+        .transport(request -> { throw cause; }).build().assets().classify(text("hello")));
     assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, error.getCode());
     assertSame(cause, error.getCause());
-    var interrupted = CalmLensServerClient.builder("key", "project").transport(request -> { throw new InterruptedException(); }).build();
+    var interrupted = CalmLensServerClient.builder().apiKey("key").projectId("project").transport(request -> { throw new InterruptedException(); }).build();
     try {
-      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CalmLensException.class, () -> interrupted.assets.classify(Models.SubmitAsset.text("hello"))).getCode());
+      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CancelledException.class, () -> interrupted.assets().classify(text("hello"))).getCode());
       assertTrue(Thread.currentThread().isInterrupted());
     } finally {
       Thread.interrupted();
@@ -255,12 +300,12 @@ class RobustnessTest {
   }
 
   @Test void waitForDecisionPollsWithGrowingDelaysUntilTheAssetIsDecided() {
-    String pending = Fixtures.assetJson("asset", "processing", "pending");
+    String pending = ClientTest.assetJson("asset", "processing", "pending");
     var transport = new Scripted(reply(200, pending), reply(200, pending), reply(200, pending), reply(200, pending), reply(200, pending),
-        reply(200, pending), reply(200, pending), reply(200, pending), reply(200, Fixtures.assetJson("asset", "completed", "blocked")));
-    Models.Asset asset = transport.client().assets.waitForDecision(new Models.WaitForDecision("asset"));
-    assertEquals("asset", asset.id());
-    assertEquals(Models.AssetModerationStatus.BLOCKED, asset.classification().moderation().status());
+        reply(200, pending), reply(200, pending), reply(200, pending), reply(200, ClientTest.assetJson("asset", "completed", "blocked")));
+    Asset asset = transport.client().assets().waitForDecision("asset");
+    assertEquals("asset", asset.getId());
+    assertSame(AssetModerationDecision.BLOCKED, asset.getClassification().getModeration().getDecision().orElseThrow());
     assertEquals(9, transport.requests.size());
     for (Transport.Request request : transport.requests) {
       assertEquals("GET", request.method());
@@ -271,16 +316,15 @@ class RobustnessTest {
   }
 
   @Test void waitForDecisionStopsWhenTheThreadIsInterrupted() {
-    var transport = new Scripted(reply(200, Fixtures.assetJson("asset", "processing", "pending")));
-    var client = CalmLensServerClient.builder("key", "project").build(transport, delay -> { throw new InterruptedException(); });
+    var transport = new Scripted(reply(200, ClientTest.assetJson("asset", "processing", "pending")));
+    var client = ClientAccess.Holder.get().build(CalmLensServerClient.builder().apiKey("key").projectId("project"), transport,
+        delay -> { throw new InterruptedException(); }, System::nanoTime, CalmLensServerClient.DEFAULT_MAX_RETRIES, false);
     try {
-      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CalmLensException.class,
-          () -> client.assets.waitForDecision(new Models.WaitForDecision("asset"))).getCode());
+      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CancelledException.class, () -> client.assets().waitForDecision("asset")).getCode());
       assertTrue(Thread.currentThread().isInterrupted());
       assertEquals(1, transport.requests.size());
       // Already interrupted: nothing is sent.
-      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CalmLensException.class,
-          () -> client.assets.waitForDecision(new Models.WaitForDecision("asset"))).getCode());
+      assertEquals(ErrorCodes.SDK_CANCELLED, assertThrows(CancelledException.class, () -> client.assets().waitForDecision("asset")).getCode());
       assertTrue(Thread.currentThread().isInterrupted());
       assertEquals(1, transport.requests.size());
     } finally {
@@ -289,13 +333,16 @@ class RobustnessTest {
   }
 
   @Test void nativeResponseModelsRetainDocumentAndHoldFields() {
-    Map<String, Object> held = Fixtures.asset("asset", "completed", "allowed");
+    Map<String, Object> held = ClientTest.asset("asset", "completed", "allowed");
     held.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", "document text"),
         "safetyHold", Map.of("placedAt", 100, "disposedAt", 200, "reason", "suspected-illegal-content")));
-    Models.Asset asset = new Scripted(reply(200, Fixtures.JSON.toJson(held))).client().assets.retrieve(new Models.AssetId("asset"));
-    assertEquals("document text", asset.content().extractedText().content());
-    assertEquals("suspected-illegal-content", asset.content().safetyHold().reason());
-    assertEquals(java.time.Instant.ofEpochMilli(100), asset.content().safetyHold().placedAt());
-    assertEquals(java.time.Instant.ofEpochMilli(200), asset.content().safetyHold().disposedAt());
+    Asset asset = new Scripted(reply(200, Fixtures.WITH_NULLS.toJson(held))).client().assets().retrieve("asset");
+    var text = asset.getContent().getExtractedText().orElseThrow();
+    assertSame(ExtractedTextType.STRING, text.getType());
+    assertEquals("document text", text.getContent().orElseThrow());
+    var hold = asset.getContent().getSafetyHold().orElseThrow();
+    assertSame(SafetyHoldReason.SUSPECTED_ILLEGAL_CONTENT, hold.getReason());
+    assertEquals(java.time.Instant.ofEpochMilli(100), hold.getPlacedAt());
+    assertEquals(java.time.Instant.ofEpochMilli(200), hold.getDisposedAt().orElseThrow());
   }
 }

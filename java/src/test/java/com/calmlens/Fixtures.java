@@ -21,6 +21,11 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.calmlens.exception.*;
+import com.calmlens.internal.Json;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.*;
+import com.calmlens.testing.MockCalmLensServerClient;
 
 /** Shared contract fixtures (generated from the JavaScript SDK by packages/sdk-contract/generate.ts). */
 final class Fixtures {
@@ -32,83 +37,228 @@ final class Fixtures {
     return JsonParser.parseString(Files.readString(Path.of("testdata", name)));
   }
 
-  /** Calls a public SDK method by its fixture name, decoding the options into its native model. */
+  /** Java's name for a fixture operation: {@code events.iterate} is {@code events.pages}. */
+  static String javaOperation(String operation) { return operation; }
+
+  /**
+   * Calls a public SDK method by its fixture name, on the synchronous client or (with {@code async})
+   * its asynchronous form, mapping the options onto the method's parameters: an option named like
+   * a parameter fills it (path IDs, {@code timeoutMs}), {@code idempotencyKey} goes in the request
+   * options, and the rest decode into the method's params.
+   */
   static Object invoke(CalmLensServerClient client, String operation, JsonObject options) throws Throwable {
-    String[] parts = operation.split("\\.");
-    Object target = parts.length == 1 ? client : CalmLensServerClient.class.getField(parts[0]).get(client);
-    // Methods without options, such as hashLists.list(), take no argument.
-    int arity = Arrays.stream(target.getClass().getMethods())
-        .anyMatch(m -> m.getName().equals(parts[parts.length - 1]) && m.getParameterCount() == 1) ? 1 : 0;
-    Method method = Arrays.stream(target.getClass().getMethods())
-        .filter(m -> m.getName().equals(parts[parts.length - 1]) && m.getParameterCount() == arity
-            && (arity == 0 || m.getParameterTypes()[0] != String.class))
-        .findFirst().orElseThrow();
+    return invoke(client, operation, options, false);
+  }
+
+  static Object invoke(CalmLensServerClient client, String operation, JsonObject options, boolean async) throws Throwable {
+    String[] parts = javaOperation(operation).split("\\.");
+    Object root = async ? client.async() : client;
+    Object target = parts.length == 1 ? root : root.getClass().getMethod(parts[0]).invoke(root);
+    Method method = null;
+    Object[] args = null;
+    JsonObject given = options == null ? new JsonObject() : options;
+    for (Method candidate : target.getClass().getMethods()) {
+      if (!candidate.getName().equals(parts[parts.length - 1])) continue;
+      Object[] built = arguments(candidate, given);
+      if (built != null && (method == null || candidate.getParameterCount() < method.getParameterCount())) { method = candidate; args = built; }
+    }
+    if (method == null) throw new AssertionError("No " + operation + " method takes " + given.keySet());
     try {
-      return method.invoke(target, arity == 0 ? new Object[0] : new Object[] {decode(options, method.getParameterTypes()[0])});
+      Object result = method.invoke(target, args);
+      if (result instanceof java.util.concurrent.CompletableFuture<?> future) {
+        try {
+          return future.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException failed) {
+          throw failed.getCause();
+        }
+      }
+      return result;
     } catch (InvocationTargetException failure) {
       throw failure.getCause();
     }
   }
 
-  /** JSON decoding can set private fields that a caller cannot. Input contracts also require a
-   * public typed builder for each option, and a declared result model rather than Object. */
-  static void assertSignature(CalmLensServerClient client, String operation, JsonObject options) throws Exception {
-    String[] parts = operation.split("\\.");
-    Object target = parts.length == 1 ? client : CalmLensServerClient.class.getField(parts[0]).get(client);
-    Method method = Arrays.stream(target.getClass().getMethods())
-        .filter(m -> m.getName().equals(parts[parts.length - 1]) && m.getParameterCount() == 1
-            && m.getParameterTypes()[0] != String.class).findFirst().orElse(null);
-    if (method == null) {
-      assertEquals(0, options.size(), operation + " has no options parameter");
-      method = target.getClass().getMethod(parts[parts.length - 1]);
-    } else {
-      Class<?> type = method.getParameterTypes()[0];
-      for (String key : options.keySet()) {
-        String builderName = Arrays.stream(type.getDeclaredFields())
-            .filter(field -> field.isAnnotationPresent(com.google.gson.annotations.SerializedName.class)
-                && field.getAnnotation(com.google.gson.annotations.SerializedName.class).value().equals(key))
-            .map(java.lang.reflect.Field::getName).findFirst().orElse(key);
-        List<Method> setters = Arrays.stream(type.getMethods())
-            .filter(m -> m.getName().equals(builderName) && m.getParameterCount() == 1
-                && type.isAssignableFrom(m.getReturnType())).toList();
-        assertFalse(setters.isEmpty(), operation + "." + key + " needs a public typed builder");
-        assertTrue(setters.stream().anyMatch(m -> m.getParameterTypes()[0] != Object.class),
-            operation + "." + key + " must have a typed input");
+  /** The arguments for {@code method} from {@code options}, or null when it can't take every option. */
+  private static Object[] arguments(Method method, JsonObject options) throws ReflectiveOperationException {
+    java.util.Set<String> left = new java.util.LinkedHashSet<>(options.keySet());
+    java.lang.reflect.Parameter[] parameters = method.getParameters();
+    Object[] args = new Object[parameters.length];
+    int paramsIndex = -1, requestIndex = -1;
+    for (int i = 0; i < parameters.length; i++) {
+      java.lang.reflect.Parameter parameter = parameters[i];
+      String name = parameter.getName();
+      if (parameter.getType() == RequestOptions.class) { requestIndex = i; continue; }
+      if (com.calmlens.params.ApiParams.class.isAssignableFrom(parameter.getType())) { paramsIndex = i; continue; }
+      if (name.equals("timeout") && parameter.getType() == java.time.Duration.class && options.has("timeoutMs")) {
+        args[i] = java.time.Duration.ofMillis(options.get("timeoutMs").getAsLong());
+        left.remove("timeoutMs");
+        continue;
       }
+      if (!options.has(name)) {
+        // A path ID the options leave out is passed as null, so the SDK refuses it.
+        if (parameter.getType() == String.class) { left.remove(name); continue; }
+        if (parameter.isAnnotationPresent(org.jspecify.annotations.Nullable.class) || !parameter.getType().isPrimitive()) continue;
+        return null;
+      }
+      args[i] = decodeValue(options.get(name), parameter.getParameterizedType(), parameter.getType());
+      left.remove(name);
+    }
+    if (left.remove("idempotencyKey")) {
+      if (requestIndex < 0) return null;
+      args[requestIndex] = RequestOptions.builder().setIdempotencyKey(options.get("idempotencyKey").getAsString()).build();
+    }
+    if (paramsIndex >= 0) {
+      JsonObject rest = new JsonObject();
+      for (String key : left) rest.add(key, options.get(key));
+      args[paramsIndex] = decode(rest, parameters[paramsIndex].getType());
+      left.clear();
+    }
+    return left.isEmpty() ? args : null;
+  }
+
+  private static Object decodeValue(JsonElement value, java.lang.reflect.Type type, Class<?> raw) {
+    if (value == null || value.isJsonNull()) return null;
+    if (raw == com.calmlens.params.ViewerClaims.class || com.calmlens.params.ApiParams.class.isAssignableFrom(raw) || raw == List.class)
+      return Json.GSON.fromJson(value, type);
+    return Json.GSON.fromJson(value, type);
+  }
+
+  /** Every name a fixture operation has in Java: {@code assets().list} is {@code assets.list}. */
+  static Method signatureMethod(CalmLensServerClient client, String operation) throws Exception {
+    String[] parts = javaOperation(operation).split("\\.");
+    Class<?> target = parts.length == 1 ? CalmLensServerClient.class : CalmLensServerClient.class.getMethod(parts[0]).getReturnType();
+    // The overload with params, else the one with the most parameters, without request options.
+    return Arrays.stream(target.getMethods()).filter(m -> m.getName().equals(parts[parts.length - 1]))
+        .filter(m -> Arrays.stream(m.getParameterTypes()).noneMatch(t -> t == RequestOptions.class))
+        .max(java.util.Comparator.<Method>comparingInt(m -> Arrays.stream(m.getParameterTypes()).anyMatch(com.calmlens.params.ApiParams.class::isAssignableFrom) ? 1 : 0)
+            .thenComparingInt(Method::getParameterCount)).orElseThrow();
+  }
+
+  /**
+   * Input contracts require each option to be a typed parameter of the method or a typed builder
+   * setter of its params, and a declared result model rather than Object.
+   */
+  static void assertSignature(CalmLensServerClient client, String operation, JsonObject options) throws Exception {
+    Method method = signatureMethod(client, operation);
+    Class<?> params = Arrays.stream(method.getParameterTypes()).filter(com.calmlens.params.ApiParams.class::isAssignableFrom).findFirst().orElse(null);
+    java.util.Set<String> named = new java.util.HashSet<>();
+    for (java.lang.reflect.Parameter parameter : method.getParameters()) named.add(parameter.getName());
+    for (String key : options.keySet()) {
+      if (named.contains(key) || key.equals("idempotencyKey") || key.equals("timeoutMs") && named.contains("timeout")) continue;
+      assertNotNull(params, operation + "." + key + " is neither a parameter nor a params option");
+      Class<?> builder = params.getMethod("builder").getReturnType();
+      String setter = "set" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
+      List<Method> setters = Arrays.stream(builder.getMethods()).filter(m -> m.getName().equals(setter) && m.getParameterCount() == 1).toList();
+      assertFalse(setters.isEmpty(), operation + "." + key + " needs a public typed builder setter");
+      assertTrue(setters.stream().anyMatch(m -> m.getParameterTypes()[0] != Object.class), operation + "." + key + " must have a typed input");
     }
     assertNotEquals(Object.class, method.getReturnType(), operation + " must declare its result type");
     assertNotEquals(Map.class, method.getReturnType(), operation + " must declare its result model");
   }
 
-  /** Whether an operation is a list's iterator, which yields every item rather than returning a value. */
-  static boolean isIterator(String operation) { return operation.substring(operation.lastIndexOf('.') + 1).startsWith("iterate"); }
+  /** surface.json's error kinds by id: their Java class name and parent kind. */
+  private static Map<String, JsonObject> errorKinds;
 
-  /**
-   * Decodes fixture options into a native model. A CDN {@code transform} is set through the builder
-   * overload for its shape: a selector string or {@link Models.ImageTransformOptions}. A lens's
-   * {@code transform} is an ordinary field.
-   */
-  static <T> T decode(JsonObject options, Class<T> type) throws ReflectiveOperationException {
-    T model = JSON.fromJson(options, type);
-    JsonElement transform = options.get("transform");
-    if (transform == null || transform.isJsonNull() || type == Models.LensDefinition.class || type == Models.UpdateLens.class) return model;
-    if (transform.isJsonPrimitive()) type.getMethod("transform", String.class).invoke(model, transform.getAsString());
-    else type.getMethod("transform", Models.ImageTransformOptions.class).invoke(model, transformOptions(transform));
-    return model;
+  static synchronized Map<String, JsonObject> errorKinds() throws IOException {
+    if (errorKinds == null) {
+      Map<String, JsonObject> kinds = new LinkedHashMap<>();
+      read("surface.json").getAsJsonObject().getAsJsonArray("errorKinds").forEach(k -> kinds.put(k.getAsJsonObject().get("id").getAsString(), k.getAsJsonObject()));
+      errorKinds = kinds;
+    }
+    return errorKinds;
+  }
+
+  /** The Java class of an error kind, from its name in surface.json. */
+  static Class<?> errorKindClass(String kind) throws Exception {
+    JsonObject entry = errorKinds().get(kind);
+    assertNotNull(entry, "unknown error kind " + kind);
+    return Class.forName("com.calmlens.exception." + entry.getAsJsonObject("names").get("java").getAsString());
+  }
+
+  /** {@code error} is of {@code kind} and of every kind above it. */
+  static void assertKind(Throwable error, String kind, String label) throws Exception {
+    for (String current = kind; current != null; ) {
+      assertTrue(errorKindClass(current).isInstance(error), label + ": " + error.getClass().getSimpleName() + " is not " + current);
+      JsonElement parent = errorKinds().get(current).get("parent");
+      current = parent == null || parent.isJsonNull() ? null : parent.getAsString();
+    }
+  }
+
+  /** Params or a model as the JSON object the SDK sends. */
+  static JsonObject encode(Object value) { return Json.GSON.toJsonTree(value).getAsJsonObject(); }
+
+  /** Whether an operation is a list's iterator, which yields every item rather than returning a value. */
+  static boolean isIterator(String operation) {
+    String name = javaOperation(operation);
+    return name.substring(name.lastIndexOf('.') + 1).startsWith("iterate") || name.equals("events.pages");
   }
 
   /**
-   * Decodes structured transform options. Options that {@link Models.ImageTransformOptions} cannot
-   * hold (not an object, or an array value) fail with {@code sdk/invalid-argument}, the error the
-   * other SDKs return when serializing them.
+   * Decodes fixture options into native params. A CDN {@code transform} is held as a selector
+   * string or {@link ImageTransformOptions}, which the params' builder sets; a lens's {@code
+   * transform} is an ordinary field.
    */
-  private static Models.ImageTransformOptions transformOptions(JsonElement options) {
+  static <T> T decode(JsonObject options, Class<T> type) throws ReflectiveOperationException {
+    T model = JSON_PARAMS.fromJson(options, type);
+    JsonElement transform = options.get("transform");
+    if (transform == null || transform.isJsonNull() || type == com.calmlens.params.LensCreateParams.class || type == com.calmlens.params.LensUpdateParams.class) return model;
+    java.lang.reflect.Field field = type.getDeclaredField("transform");
+    field.setAccessible(true);
+    field.set(model, transform.isJsonPrimitive() ? transform.getAsString() : transformOptions(transform));
+    return model;
+  }
+
+  /** Decodes params as the SDK reads them (its enum and patch adapters), which builders can't bypass but tests may. */
+  private static final Gson JSON_PARAMS = Json.GSON;
+
+  /**
+   * Decodes structured transform options. Options that {@link ImageTransformOptions} cannot hold
+   * (not an object, or an array value) fail with {@code sdk/invalid-argument}, the error the other
+   * SDKs return when serializing them.
+   */
+  private static ImageTransformOptions transformOptions(JsonElement options) {
     try {
       if (!options.isJsonObject()) throw new IllegalStateException("Not an object");
-      return Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
+      return Json.GSON.fromJson(options, ImageTransformOptions.class);
     } catch (com.google.gson.JsonParseException | IllegalStateException unrepresentable) {
-      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options must be image transform options");
+      throw CalmLensException.of(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options must be image transform options");
     }
+  }
+
+  /**
+   * A model as its typed fields read it: each declared field by its API name, enums by value
+   * ({@code UNKNOWN} as its raw value is lost, so null), timestamps in epoch milliseconds. It shows
+   * what the getters return, not the JSON the model kept.
+   */
+  static JsonElement typed(Object value) {
+    if (value == null) return JsonNull.INSTANCE;
+    if (value instanceof CalmLensObject model) {
+      JsonObject object = new JsonObject();
+      for (Class<?> type = model.getClass(); type != CalmLensObject.class; type = type.getSuperclass())
+        for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+          if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || java.lang.reflect.Modifier.isTransient(field.getModifiers())) continue;
+          field.setAccessible(true);
+          try {
+            object.add(Json.wireName(field), typed(field.get(model)));
+          } catch (IllegalAccessException unreachable) {
+            throw new IllegalStateException(unreachable);
+          }
+        }
+      return object;
+    }
+    if (value instanceof List<?> list) {
+      com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+      list.forEach(item -> array.add(typed(item)));
+      return array;
+    }
+    if (value instanceof Map<?, ?> map) {
+      JsonObject object = new JsonObject();
+      map.forEach((key, item) -> object.add(String.valueOf(key), typed(item)));
+      return object;
+    }
+    if (value instanceof ApiEnum constant) return constant.getValue() == null ? JsonNull.INSTANCE : new JsonPrimitive(constant.getValue());
+    if (value instanceof java.time.Instant instant) return new JsonPrimitive(instant.toEpochMilli());
+    return WITH_NULLS.toJsonTree(value);
   }
 
   /** A request in the fixtures' shape: method, path, decoded query and JSON or text body. */
@@ -140,18 +290,33 @@ final class Fixtures {
     try (InputStream in = request.body().open()) { return in.readAllBytes(); }
   }
 
-  /** A minimal asset response: an ID and its processing, moderation and content statuses. */
+  /** A complete asset as the API returns it, from the mock's in-memory API, to change per test. */
+  private static JsonObject assetTemplate;
+
+  private static synchronized JsonObject assetTemplate() {
+    if (assetTemplate == null) {
+      try (MockCalmLensServerClient mock = new MockCalmLensServerClient()) {
+        assetTemplate = mock.client().assets().create(com.calmlens.params.AssetCreateParams.builder().setName("asset")
+            .setContent(com.calmlens.params.Content.text("hello")).build()).getRawJsonObject();
+      }
+    }
+    return assetTemplate.deepCopy();
+  }
+
+  /** An asset response with this ID, classification status and moderation decision ({@code pending} for none). */
   static Map<String, Object> asset(String id, String processing, String moderation) {
-    Map<String, Object> asset = new LinkedHashMap<>();
-    asset.put("id", id);
-    asset.put("upload", Map.of("status", "completed"));
-    asset.put("classification", Map.of("status", processing, "moderation", Map.of("status", moderation)));
-    asset.put("content", Map.of("status", "stored"));
-    return asset;
+    JsonObject asset = assetTemplate();
+    asset.addProperty("id", id);
+    JsonObject classification = asset.getAsJsonObject("classification");
+    classification.addProperty("status", processing);
+    classification.getAsJsonObject("moderation").add("decision", "pending".equals(moderation) ? JsonNull.INSTANCE : new JsonPrimitive(moderation));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> map = (Map<String, Object>) WITH_NULLS.fromJson(asset, Map.class);
+    return map;
   }
 
   /** {@link #asset} as a JSON string. */
-  static String assetJson(String id, String processing, String moderation) { return JSON.toJson(asset(id, processing, moderation)); }
+  static String assetJson(String id, String processing, String moderation) { return WITH_NULLS.toJson(asset(id, processing, moderation)); }
 
   /**
    * The error fields every runner compares, null where there is none: {@code code}, {@code status},
@@ -161,12 +326,12 @@ final class Fixtures {
     JsonObject fields = new JsonObject();
     fields.addProperty("code", error.getCode());
     fields.add("status", error.getStatus() == 0 ? JsonNull.INSTANCE : new JsonPrimitive(error.getStatus()));
-    fields.add("requestId", error.getRequestId() == null ? JsonNull.INSTANCE : new JsonPrimitive(error.getRequestId()));
-    java.util.Optional<java.time.Duration> retryAfter = error instanceof ApiException api ? api.getRetryAfter() : java.util.Optional.empty();
+    fields.add("requestId", error.getRequestId().<JsonElement>map(JsonPrimitive::new).orElse(JsonNull.INSTANCE));
+    java.util.Optional<java.time.Duration> retryAfter = error.getRetryAfter();
     fields.add("retryAfter", retryAfter.<JsonElement>map(delay -> new JsonPrimitive(delay.toSeconds())).orElse(JsonNull.INSTANCE));
     // getDetails() is never null: an API error's empty details are {}, an SDK error without details has none.
-    boolean none = error.getDetails().isEmpty() && (error.getCode().startsWith("sdk/") || !(error instanceof ApiException));
-    fields.add("details", none ? JsonNull.INSTANCE : Json.GSON.toJsonTree(error.getDetails()));
+    boolean none = error.getDetails().isEmpty() && (error.getCode().startsWith("sdk/") || error.getStatus() == 0);
+    fields.add("details", none ? JsonNull.INSTANCE : Json.WRITE.toJsonTree(error.getDetails()));
     return fields;
   }
 

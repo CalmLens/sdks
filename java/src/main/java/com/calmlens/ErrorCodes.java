@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * Stable error codes. API codes match the CalmLens public API (packages/shared/src/PublicErrorCodes.ts,
  * checked against testdata/errors.json); {@code sdk/*} codes are raised by this SDK itself. Compare
- * {@link CalmLensException#getCode()} with these constants instead of matching messages.
+ * {@link com.calmlens.exception.CalmLensException#getCode()} with these constants instead of matching messages.
  */
 public final class ErrorCodes {
   private ErrorCodes() {}

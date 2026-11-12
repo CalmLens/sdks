@@ -2,11 +2,18 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.calmlens.exception.*;
+import com.calmlens.internal.UploadForm;
+import com.calmlens.models.*;
+import com.calmlens.params.*;
+import com.calmlens.testing.MockCalmLensServerClient;
+import com.calmlens.testing.MockCalmLensServerClient.Options;
+import com.calmlens.testing.MockCalmLensServerClient.Outcome;
+import com.calmlens.testing.MockDecision;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.calmlens.MockCalmLensServerClient.Options;
-import com.calmlens.MockCalmLensServerClient.Outcome;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -21,65 +28,111 @@ class StatefulMockTest {
     return new Options().createId(prefix -> prefix + "_" + String.format("%020d", ids.incrementAndGet())).now(() -> clock.addAndGet(1000));
   }
 
-  private static Models.SubmitAsset kept(String name) {
-    return new Models.SubmitAsset(name, Models.Content.bytes(PNG, "image/png"))
-        .processingOptions(new Models.ProcessingOptions().retainContent(true));
+  private static CalmLensServerClient.Builder builder() { return CalmLensServerClient.builder().apiKey("mock-key").projectId("project-1"); }
+
+  private static AssetCreateParams.Builder kept(String name) {
+    return AssetCreateParams.builder().setName(name).setContent(Content.bytes(PNG, "image/png"))
+        .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true).build());
+  }
+
+  private static AssetExplainParams rerun() { return AssetExplainParams.builder().setRerun(true).build(); }
+
+  private static Optional<AssetModerationDecision> decision(Asset asset) { return asset.getClassification().getModeration().getDecision(); }
+
+  /**
+   * The mock's in-memory API, answering requests no SDK method sends. It is package-private in
+   * {@code com.calmlens.testing}, so it is reached reflectively.
+   */
+  private static final class MockApi {
+    static final String MOCK_THUMBHASH;
+    private static final java.lang.reflect.Constructor<?> CREATE;
+    private static final java.lang.reflect.Method ANSWER;
+
+    static {
+      try {
+        Class<?> type = Class.forName("com.calmlens.testing.MockApi");
+        java.lang.reflect.Field thumbhash = type.getDeclaredField("MOCK_THUMBHASH");
+        thumbhash.setAccessible(true);
+        MOCK_THUMBHASH = (String) thumbhash.get(null);
+        CREATE = type.getDeclaredConstructor(String.class, String.class, String.class, Options.class);
+        CREATE.setAccessible(true);
+        ANSWER = type.getDeclaredMethod("answer", MockCalmLensServerClient.Request.class);
+        ANSWER.setAccessible(true);
+      } catch (ReflectiveOperationException e) {
+        throw new ExceptionInInitializerError(e);
+      }
+    }
+
+    private final Object api;
+
+    MockApi(String projectId, String apiBase, String cdnBase, Options options) throws Exception {
+      api = CREATE.newInstance(projectId, apiBase, cdnBase, options);
+    }
+
+    Transport.Response answer(MockCalmLensServerClient.Request request) throws Exception {
+      try {
+        return (Transport.Response) ANSWER.invoke(api, request);
+      } catch (java.lang.reflect.InvocationTargetException e) {
+        if (e.getCause() instanceof Exception cause) throw cause;
+        throw e;
+      }
+    }
   }
 
   @Test void uploadsSendTheirTagsAndTheAssetKeepsThem() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset uploaded = mock.client.assets.classify(kept("photo.png").tags(List.of("catalogue", "backpacks")));
-    assertEquals(List.of("catalogue", "backpacks"), uploaded.tags());
+    Asset uploaded = mock.client().assets().classify(kept("photo.png").setTags(List.of("catalogue", "backpacks")).build());
+    assertEquals(List.of("catalogue", "backpacks"), uploaded.getTags());
     // A file upload carries its tags in the form's options part, like metadata.
     assertEquals(JsonParser.parseString("[\"catalogue\",\"backpacks\"]"), Fixtures.formOptions(mock.requests().get(0)).get("tags"));
-    Models.Asset text = mock.client.text.classify(new Models.ClassifyText("hello").tags(List.of("comments")));
-    assertEquals(List.of("comments"), text.tags());
-    Models.Asset linked = mock.client.assets.create(new Models.SubmitAsset().name("site").url("https://example.com").tags(List.of("links")));
-    assertEquals(List.of("links"), linked.tags());
+    Asset text = mock.client().text().classify(TextClassifyParams.builder().setText("hello").setTags(List.of("comments")).build());
+    assertEquals(List.of("comments"), text.getTags());
+    Asset linked = mock.client().assets().create(AssetCreateParams.builder().setName("site").setUrl("https://example.com").setTags(List.of("links")).build());
+    assertEquals(List.of("links"), linked.getTags());
     JsonObject body = JsonParser.parseString(new String(mock.requests().get(2).body(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
     assertEquals(JsonParser.parseString("[\"links\"]"), body.get("tags"));
-    assertEquals(List.of("catalogue", "backpacks"), mock.client.assets.retrieve(new Models.AssetId(uploaded.id())).tags());
+    assertEquals(List.of("catalogue", "backpacks"), mock.client().assets().retrieve(uploaded.getId()).getTags());
     // Like the API, the processing options an asset was uploaded with are not returned.
-    mock.withStorage(storage -> assertFalse(storage.assets.get(uploaded.id()).has("processingOptions")));
+    mock.withStorage(storage -> assertFalse(storage.assets.get(uploaded.getId()).has("processingOptions")));
   }
 
   @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> MockDecision.of(input.queued() ? "pending" : "blocked")));
-    Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
-    mock.withStorage(storage -> storage.assets.get(asset.id()).getAsJsonObject("classification").getAsJsonObject("moderation")
+    Asset asset = mock.client().assets().classify(kept("photo.png").build());
+    mock.withStorage(storage -> storage.assets.get(asset.getId()).getAsJsonObject("classification").getAsJsonObject("moderation")
         .addProperty("explanationComplete", false));
-    Models.Asset explained = mock.client.assets.explain(new Models.ExplainAsset(asset.id()));
-    assertEquals(true, explained.classification().moderation().explanationComplete());
-    assertEquals(Models.AssetModerationStatus.BLOCKED, explained.classification().moderation().status());
+    Asset explained = mock.client().assets().explain(asset.getId());
+    assertEquals(Optional.of(true), explained.getClassification().getModeration().getExplanationComplete());
+    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), explained.getClassification().getModeration().getDecision());
 
     // A queued re-run keeps the decision until it is decided.
-    Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
-    assertSame(Models.AssetClassificationStatus.COMPLETED, rerun.classification().status());
-    assertEquals(Models.AssetModerationStatus.BLOCKED, rerun.classification().moderation().status());
+    Asset rerun = mock.client().assets().explain(asset.getId(), rerun());
+    assertSame(AssetClassificationStatus.COMPLETED, rerun.getClassification().getStatus());
+    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), rerun.getClassification().getModeration().getDecision());
 
     // A reviewer's decision stands: the queued re-run no longer replaces it.
-    mock.decide(asset.id(), Outcome.ALLOWED);
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.id())).getCode());
-    assertEquals(Models.AssetModerationStatus.ALLOWED, mock.client.assets.retrieve(new Models.AssetId(asset.id())).classification().moderation().status());
+    mock.decide(asset.getId(), Outcome.ALLOWED);
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.getId())).getCode());
+    assertEquals(Optional.of(AssetModerationDecision.ALLOWED), mock.client().assets().retrieve(asset.getId()).getClassification().getModeration().getDecision());
     assertEquals(ErrorCodes.ASSET_REVIEWED, assertThrows(ApiException.class,
-        () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true))).getCode());
+        () -> mock.client().assets().explain(asset.getId(), rerun())).getCode());
   }
 
   @Test void rerunReplacesTheDecisionOnlyWithANewOne() {
     AtomicInteger reruns = new AtomicInteger();
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input ->
         MockDecision.of(input.trigger() != MockCalmLensServerClient.Trigger.RERUN ? "allowed" : reruns.incrementAndGet() == 1 ? "blocked" : "failed")));
-    Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
+    Asset asset = mock.client().assets().classify(kept("photo.png").build());
     // The response is the asset as the re-run found it; the new decision follows.
-    Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
-    assertEquals(Models.AssetModerationStatus.ALLOWED, rerun.classification().moderation().status());
-    assertEquals(Models.AssetModerationStatus.BLOCKED, mock.client.assets.retrieve(new Models.AssetId(asset.id())).classification().moderation().status());
+    Asset rerun = mock.client().assets().explain(asset.getId(), rerun());
+    assertEquals(Optional.of(AssetModerationDecision.ALLOWED), rerun.getClassification().getModeration().getDecision());
+    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), mock.client().assets().retrieve(asset.getId()).getClassification().getModeration().getDecision());
     // A failed re-run keeps the decision.
-    mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
-    Models.Asset stored = mock.client.assets.retrieve(new Models.AssetId(asset.id()));
-    assertSame(Models.AssetClassificationStatus.COMPLETED, stored.classification().status());
-    assertEquals(Models.AssetModerationStatus.BLOCKED, stored.classification().moderation().status());
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.id())).getCode());
+    mock.client().assets().explain(asset.getId(), rerun());
+    Asset stored = mock.client().assets().retrieve(asset.getId());
+    assertSame(AssetClassificationStatus.COMPLETED, stored.getClassification().getStatus());
+    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), stored.getClassification().getModeration().getDecision());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.getId())).getCode());
   }
 
   @Test void moderateGetsAMultipartUploadOnceItsFinalPartArrives() {
@@ -90,15 +143,16 @@ class StatefulMockTest {
     }));
     byte[] first = new byte[5 * 1024 * 1024];
     first[0] = 'a';
-    Models.Asset started = mock.client.assets.create(new Models.SubmitAsset().name("notes.txt").part(Models.Content.bytes(first, "text/plain").partNumber(1).isFinal(false)));
+    Asset started = mock.client().assets().create(AssetCreateParams.builder().setName("notes.txt").setPart(Content.bytes(first, "text/plain").withPartNumber(1).withIsFinal(false)).build());
     assertEquals(List.of(), inputs);
-    Models.Asset finished = mock.client.assets.uploadPart(new Models.UploadPart(started.id(), Models.Content.bytes("bc".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain").partNumber(2).isFinal(true)));
-    assertEquals(Models.AssetModerationStatus.BLOCKED, finished.classification().moderation().status());
+    Asset finished = mock.client().assets().uploadPart(started.getId(), AssetUploadPartParams.builder()
+        .setPart(Content.bytes("bc".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain").withPartNumber(2).withIsFinal(true)).build());
+    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), finished.getClassification().getModeration().getDecision());
     assertEquals(1, inputs.size());
     MockCalmLensServerClient.ModerationInput input = inputs.get(0);
     assertSame(MockCalmLensServerClient.Trigger.UPLOAD, input.trigger());
     assertTrue(input.queued());
-    assertSame(Models.AssetClassificationStatus.PROCESSING, input.asset().classification().status());
+    assertSame(AssetClassificationStatus.PROCESSING, input.asset().getClassification().getStatus());
     byte[] joined = java.util.Arrays.copyOf(first, first.length + 2);
     joined[first.length] = 'b';
     joined[first.length + 1] = 'c';
@@ -107,68 +161,72 @@ class StatefulMockTest {
 
   @Test void textClassifyStoresAPlaintextDocument() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    assertEquals("plaintext-document", mock.client.text.classify("hello").type());
+    assertSame(AssetType.PLAINTEXT_DOCUMENT, mock.client().text().classify("hello").getType());
   }
 
   /** The shared purge scenario covers the statuses and the CDN refusal; this is the stored bytes being dropped. */
   @Test void purgingDropsTheStoredBytes() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset asset = mock.client.assets.create(kept("photo.png"));
-    mock.withStorage(storage -> assertTrue(storage.content.containsKey(asset.id())));
-    mock.decide(asset.id(), Outcome.PURGED);
-    mock.withStorage(storage -> assertFalse(storage.content.containsKey(asset.id())));
+    Asset asset = mock.client().assets().create(kept("photo.png").build());
+    mock.withStorage(storage -> assertTrue(storage.content.containsKey(asset.getId())));
+    mock.decide(asset.getId(), Outcome.PURGED);
+    mock.withStorage(storage -> assertFalse(storage.content.containsKey(asset.getId())));
   }
 
   @Test void listPagesWithinAFolderAndErrorsCarryMockRequestIds() {
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder("mock-key", "project-1").maxRetries(0), deterministic());
-    Models.Folder folder = mock.client.folders.create(new Models.CreateFolder("Uploads"));
-    for (int i = 1; i <= 3; i++) mock.client.assets.create(new Models.SubmitAsset("cat-" + i + ".png", Models.Content.bytes(PNG, "image/png")).folderId(Models.Patch.value(folder.id())));
-    mock.client.assets.create(new Models.SubmitAsset("dog.png", Models.Content.bytes(PNG, "image/png")));
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(builder().maxRetries(0), deterministic());
+    Folder folder = mock.client().folders().create(FolderCreateParams.builder().setName("Uploads").build());
+    for (int i = 1; i <= 3; i++) mock.client().assets().create(AssetCreateParams.builder().setName("cat-" + i + ".png")
+        .setContent(Content.bytes(PNG, "image/png")).setFolderId(folder.getId()).build());
+    mock.client().assets().create("dog.png", PNG, "image/png");
 
-    Models.AssetPage first = mock.client.assets.list(new Models.ListAssets().filter("folderId==" + folder.id()).pageSize(2).sort("createdAt"));
-    assertEquals(List.of("cat-1.png", "cat-2.png"), first.items().stream().map(Models.Asset::name).toList());
-    assertTrue(first.hasMore());
-    Models.AssetPage second = mock.client.assets.list(new Models.ListAssets().filter("folderId==" + folder.id()).pageSize(2).sort("createdAt").cursor(first.nextCursor()));
-    assertEquals(List.of("cat-3.png"), second.items().stream().map(Models.Asset::name).toList());
-    assertFalse(second.hasMore());
+    AssetListParams.Builder inFolder = AssetListParams.builder().setFilter("folderId==" + folder.getId()).setPageSize(2).setSort("createdAt");
+    AssetPage first = mock.client().assets().list(inFolder.build());
+    assertEquals(List.of("cat-1.png", "cat-2.png"), first.getItems().stream().map(Asset::getName).toList());
+    assertTrue(first.getHasMore());
+    AssetPage second = mock.client().assets().list(inFolder.setCursor(first.getNextCursor().orElseThrow()).build());
+    assertEquals(List.of("cat-3.png"), second.getItems().stream().map(Asset::getName).toList());
+    assertFalse(second.getHasMore());
 
-    ApiException missing = assertThrows(ApiException.class, () -> mock.client.assets.retrieve(new Models.AssetId("nope")));
-    assertTrue(missing.getRequestId().startsWith("req_mock_"), missing.getRequestId());
+    ApiException missing = assertThrows(ApiException.class, () -> mock.client().assets().retrieve("nope"));
+    String requestId = missing.getRequestId().orElseThrow();
+    assertTrue(requestId.startsWith("req_mock_"), requestId);
   }
 
   /** The shared scenario covers create, update, listing and deletion; this is adding from an asset and the cascade. */
   @Test void hashListEntriesComeFromAnAssetsHashAndGoWithTheirList() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
     String hash = "ab".repeat(32);
-    Models.Asset hashed = mock.client.assets.classify(kept("hashed.png"));
-    Models.Asset unhashed = mock.client.assets.classify(kept("unhashed.png"));
+    Asset hashed = mock.client().assets().classify(kept("hashed.png").build());
+    Asset unhashed = mock.client().assets().classify(kept("unhashed.png").build());
     mock.withStorage(storage -> {
-      var content = storage.assets.get(hashed.id()).getAsJsonObject("content");
+      var content = storage.assets.get(hashed.getId()).getAsJsonObject("content");
       content.addProperty("perceptualHash", hash);
       content.addProperty("perceptualHashQuality", 80);
     });
-    Models.HashList list = mock.client.hashLists.create(new Models.CreateHashList("Removed", Models.HashListAction.BLOCK));
+    HashList list = mock.client().hashLists().create(HashListCreateParams.builder().setName("Removed").setAction(HashListAction.BLOCK).build());
 
-    Models.HashListEntry entry = mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(hashed.id()).label("Report 1"));
-    assertEquals(hash, entry.hash());
-    assertEquals(80, entry.quality());
-    assertEquals(hashed.id(), entry.assetId());
-    assertEquals(entry.id(), mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).hash(hash.toUpperCase())).id());
+    HashListEntry entry = mock.client().hashLists().addEntry(list.getId(), HashListAddEntryParams.builder().setAssetId(hashed.getId()).setLabel("Report 1").build());
+    assertEquals(hash, entry.getHash());
+    assertEquals(Optional.of(80), entry.getQuality());
+    assertEquals(Optional.of(hashed.getId()), entry.getAssetId());
+    assertEquals(entry.getId(), mock.client().hashLists().addEntry(list.getId(), HashListAddEntryParams.builder().setHash(hash.toUpperCase()).build()).getId());
     assertEquals(ErrorCodes.HASH_LIST_ASSET_NOT_HASHED, assertThrows(ApiException.class,
-        () -> mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(unhashed.id()))).getCode());
+        () -> mock.client().hashLists().addEntry(list.getId(), HashListAddEntryParams.builder().setAssetId(unhashed.getId()).build())).getCode());
 
-    Models.HashListEntry second = mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).hash("cd".repeat(32)));
-    Models.HashListEntryPage first = mock.client.hashLists.listEntries(new Models.ListHashListEntries(list.id()).pageSize(1));
-    assertEquals(List.of(second.id()), first.items().stream().map(Models.HashListEntry::id).toList());
-    assertTrue(first.hasMore());
-    Models.HashListEntryPage next = mock.client.hashLists.listEntries(new Models.ListHashListEntries(list.id()).pageSize(1).cursor(first.nextCursor()));
-    assertEquals(List.of(entry.id()), next.items().stream().map(Models.HashListEntry::id).toList());
-    assertFalse(next.hasMore());
+    HashListEntry second = mock.client().hashLists().addEntry(list.getId(), HashListAddEntryParams.builder().setHash("cd".repeat(32)).build());
+    HashListEntryPage first = mock.client().hashLists().listEntries(list.getId(), HashListListEntriesParams.builder().setPageSize(1).build());
+    assertEquals(List.of(second.getId()), first.getItems().stream().map(HashListEntry::getId).toList());
+    assertTrue(first.getHasMore());
+    HashListEntryPage next = mock.client().hashLists().listEntries(list.getId(),
+        HashListListEntriesParams.builder().setPageSize(1).setCursor(first.getNextCursor().orElseThrow()).build());
+    assertEquals(List.of(entry.getId()), next.getItems().stream().map(HashListEntry::getId).toList());
+    assertFalse(next.getHasMore());
 
-    mock.client.hashLists.delete(new Models.HashListId(list.id()));
+    mock.client().hashLists().delete(list.getId());
     assertEquals(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, assertThrows(ApiException.class,
-        () -> mock.client.hashLists.removeEntry(new Models.HashListEntryId(entry.id()))).getCode());
-    assertEquals(List.of(), mock.client.hashLists.list().items());
+        () -> mock.client().hashLists().removeEntry(entry.getId())).getCode());
+    assertEquals(List.of(), mock.client().hashLists().list().getItems());
   }
 
   /** A schema refusal: {@code validation/invalid-request} whose one issue names the field and its issue code. */
@@ -304,15 +362,15 @@ class StatefulMockTest {
   /** Pages of a filtered feed keep their filters: a cursor sent without them would be refused. */
   @Test void eventPagesKeepTheirFiltersAndMalformedFiltersAreRefused() throws Exception {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.ListEvents uploads = new Models.ListEvents().types(List.of("asset.uploaded", "asset.deleted")).pageSize(1);
-    String start = mock.client.events.list(uploads).nextCursor();
-    Models.Asset first = mock.client.assets.classify(kept("first.png"));
-    Models.Asset second = mock.client.assets.classify(kept("second.png"));
-    mock.client.assets.delete(new Models.AssetId(first.id()));
+    EventListParams.Builder uploads = EventListParams.builder().setTypes(List.of(EventType.ASSET_UPLOADED, EventType.ASSET_DELETED)).setPageSize(1);
+    String start = mock.client().events().list(uploads.build()).getNextCursor();
+    Asset first = mock.client().assets().classify(kept("first.png").build());
+    Asset second = mock.client().assets().classify(kept("second.png").build());
+    mock.client().assets().delete(first.getId());
     List<String> seen = new java.util.ArrayList<>();
-    for (Models.EventsPage page : mock.client.events.pages(uploads.cursor(start)))
-      page.items().forEach(event -> seen.add(event.type() + " " + event.assetId()));
-    assertEquals(List.of("asset.uploaded " + first.id(), "asset.uploaded " + second.id(), "asset.deleted " + first.id()), seen);
+    for (EventsPage page : mock.client().events().pages(uploads.setCursor(start).build()))
+      page.getItems().forEach(event -> seen.add(event.getType().getValue() + " " + event.getAssetId().orElseThrow()));
+    assertEquals(List.of("asset.uploaded " + first.getId(), "asset.uploaded " + second.getId(), "asset.deleted " + first.getId()), seen);
 
     MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
     for (String types : List.of("", "asset.uploaded,", "Asset.Uploaded", "uploaded"))
@@ -324,20 +382,22 @@ class StatefulMockTest {
   /** The client sends the types as one comma-separated value, and none when the list is empty. */
   @Test void eventTypesAreSentAsOneCommaSeparatedValue() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    mock.client.events.list(new Models.ListEvents().types(List.of("asset.blocked", "asset.purged")));
-    mock.client.events.list(new Models.ListEvents().types(List.of()));
+    mock.client().events().list(EventListParams.builder().setTypes(List.of(EventType.ASSET_BLOCKED, EventType.ASSET_PURGED)).build());
+    mock.client().events().list(EventListParams.builder().setTypes(List.of()).build());
     assertEquals("asset.blocked,asset.purged", mock.requests().get(0).query().get("types"));
     assertFalse(mock.requests().get(1).query().containsKey("types"));
   }
 
   @Test void enqueuedEventsAreTheApiKeysUnlessGivenAnActor() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    String start = mock.client.events.list(new Models.ListEvents()).nextCursor();
-    Models.EventActor reviewer = new Models.EventActor("user", "user_5Rt8Xm3Lq9Vk2Wb7Np4C");
+    String start = mock.client().events().list().getNextCursor();
+    EventActor reviewer = EventActor.of(ActorType.USER, "user_5Rt8Xm3Lq9Vk2Wb7Np4C");
     mock.enqueueEvent("asset.allowed", null);
     mock.enqueueEvent("asset.blocked", null, reviewer);
-    assertEquals(List.of(new Models.EventActor("api-key", null), reviewer),
-        mock.client.events.list(new Models.ListEvents().cursor(start)).items().stream().map(Models.Event::actor).toList());
+    // Compared by type and ID: the API sends a null ID, which EventActor.of leaves out of its JSON.
+    assertEquals(List.of(List.of(ActorType.API_KEY, Optional.empty()), List.of(ActorType.USER, reviewer.getId())),
+        mock.client().events().list(EventListParams.builder().setCursor(start).build()).getItems().stream()
+            .map(event -> List.of(event.getActor().getType(), event.getActor().getId())).toList());
   }
 
   /**
@@ -347,21 +407,24 @@ class StatefulMockTest {
    */
   @Test void theMockServesTheEmbedPageOfAnyAssetButNoHlsStream() throws Exception {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset audio = mock.client.assets.classify(new Models.SubmitAsset("song.wav", Models.Content.bytes("wav".getBytes(java.nio.charset.StandardCharsets.UTF_8), "audio/wav"))
-        .processingOptions(new Models.ProcessingOptions(true, null, new Models.ProcessingFeatures().streaming(new Models.FeatureOptions(true))))
-        .visibility(Models.Visibility.PUBLIC));
-    assertSame(Models.AssetRenderedKind.AUDIO, audio.content().rendered().kind());
-    assertNull(audio.content().hls());
-    Models.Asset note = mock.client.assets.classify(new Models.SubmitAsset("note.txt", Models.Content.bytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain"))
-        .processingOptions(new Models.ProcessingOptions(true, null, null)).visibility(Models.Visibility.PUBLIC));
-    for (Models.Asset asset : List.of(audio, note)) {
-      try (CdnResponse embed = mock.client.cdn.serve(new Models.CdnRequest(asset.id()).resource("embed"))) {
-        assertEquals(200, embed.status(), asset.name());
+    Asset audio = mock.client().assets().classify(AssetCreateParams.builder().setName("song.wav")
+        .setContent(Content.bytes("wav".getBytes(java.nio.charset.StandardCharsets.UTF_8), "audio/wav"))
+        .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true)
+            .setFeatures(ProcessingFeaturesParams.builder().setStreaming(FeatureOptionsParams.of(true)).build()).build())
+        .setVisibility(Visibility.PUBLIC).build());
+    assertSame(AssetRenderedKind.AUDIO, audio.getContent().getRendered().orElseThrow().getKind());
+    assertEquals(Optional.empty(), audio.getContent().getHls());
+    Asset note = mock.client().assets().classify(AssetCreateParams.builder().setName("note.txt")
+        .setContent(Content.bytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain"))
+        .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true).build()).setVisibility(Visibility.PUBLIC).build());
+    for (Asset asset : List.of(audio, note)) {
+      try (CdnResponse embed = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(asset.getId()).setResource("embed").build())) {
+        assertEquals(200, embed.status(), asset.getName());
         assertEquals("text/html; charset=utf-8", embed.header("Content-Type"));
         assertTrue(new String(embed.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8).startsWith("<!doctype html>"));
       }
     }
-    try (CdnResponse hls = mock.client.cdn.serve(new Models.CdnRequest(audio.id()).resource("hls"))) {
+    try (CdnResponse hls = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(audio.getId()).setResource("hls").build())) {
       assertEquals(404, hls.status());
       assertEquals(ErrorCodes.NO_RENDERED_VERSION, JsonParser.parseString(new String(hls.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
           .getAsJsonObject().get("code").getAsString());
@@ -372,8 +435,8 @@ class StatefulMockTest {
     assertEquals(400, refused.status());
     assertEquals("transform/invalid", JsonParser.parseString(new String(refused.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
         .getAsJsonObject().get("code").getAsString());
-    mock.decide(note.id(), Outcome.BLOCKED);
-    try (CdnResponse blocked = mock.client.cdn.serve(new Models.CdnRequest(note.id()).resource("embed"))) {
+    mock.decide(note.getId(), Outcome.BLOCKED);
+    try (CdnResponse blocked = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(note.getId()).setResource("embed").build())) {
       assertEquals(403, blocked.status());
     }
   }
@@ -381,14 +444,14 @@ class StatefulMockTest {
   /** The mock's clock moves a second per reading, so a one-second grant has expired by its first use. */
   @Test void anExpiredGrantIsRefusedByEveryResourceAndTheInfo() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset asset = mock.client.assets.classify(kept("private.png").visibility(Models.Visibility.PRIVATE));
-    Models.SignedAssetUrl signed = mock.client.cdn.signAssetUrl(new Models.SignAssetUrlOptions(asset.id()).expiresIn(1L));
-    try (CdnResponse expired = mock.fetchCdn(signed.url() + "/rendered")) {
+    Asset asset = mock.client().assets().classify(kept("private.png").setVisibility(Visibility.PRIVATE).build());
+    SignedAssetUrl signed = mock.client().cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId(asset.getId()).setExpiresIn(1L).build());
+    try (CdnResponse expired = mock.fetchCdn(signed.getUrl() + "/rendered")) {
       assertEquals(403, expired.status());
       assertEquals(ErrorCodes.SIGNED_URL_EXPIRED, JsonParser.parseString(new String(expired.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
           .getAsJsonObject().get("code").getAsString());
     }
-    ApiException info = assertThrows(ApiException.class, () -> mock.client.cdn.getAssetInfo(signed.url()));
+    ApiException info = assertThrows(ApiException.class, () -> mock.client().cdn().getAssetInfo(signed.getUrl()));
     assertEquals(ErrorCodes.SIGNED_URL_EXPIRED, info.getCode());
     assertEquals(403, info.getStatus());
   }
@@ -396,72 +459,75 @@ class StatefulMockTest {
   /** getAssetInfo reads the claims the URL carries, sends no API key, and given claims replace the URL's. */
   @Test void assetInfoUsesTheUrlsViewerClaimsUnlessOthersAreGiven() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset asset = mock.client.assets.classify(kept("public.png").visibility(Models.Visibility.PUBLIC));
-    mock.decide(asset.id(), Outcome.AGE_RESTRICTED);
-    String confirmed = mock.client.cdn.getAssetUrl(new Models.CdnRequest(asset.id()).viewerClaims(new Models.ViewerClaims().ageConfirmed(true)));
+    Asset asset = mock.client().assets().classify(kept("public.png").setVisibility(Visibility.PUBLIC).build());
+    mock.decide(asset.getId(), Outcome.AGE_RESTRICTED);
+    String confirmed = mock.client().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId(asset.getId())
+        .setViewerClaims(ViewerClaims.builder().setAgeConfirmed(true).build()).build());
     mock.clearRequests();
-    assertSame(Models.AssetAvailability.AVAILABLE, mock.client.cdn.getAssetInfo(confirmed).availability());
+    assertSame(AssetAvailability.AVAILABLE, mock.client().cdn().getAssetInfo(confirmed).getAvailability());
     MockCalmLensServerClient.Request sent = mock.requests().get(0);
-    assertEquals("/assets/project-1/" + asset.id() + "/info", sent.path());
+    assertEquals("/assets/project-1/" + asset.getId() + "/info", sent.path());
     assertEquals("{\"ageConfirmed\":true}", sent.query().get("viewerClaims"));
     assertNull(sent.header("X-Api-Key"));
-    assertSame(Models.AssetAvailability.AGE_RESTRICTED, mock.client.cdn.getAssetInfo(confirmed, new Models.ViewerClaims()).availability());
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.client.cdn.getAssetInfo("/assets/project-1/x")).getCode());
+    assertSame(AssetAvailability.AGE_RESTRICTED, mock.client().cdn().getAssetInfo(confirmed, ViewerClaims.builder().build()).getAvailability());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.client().cdn().getAssetInfo("/assets/project-1/x")).getCode());
   }
 
   /** No shared scenario can place a safety hold, so this one is placed in storage. */
   @Test void aSafetyHoldWithholdsTheRenderingAndRefusesEveryResourceAndTheTimeline() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset asset = mock.client.assets.classify(kept("held.png").visibility(Models.Visibility.PUBLIC));
-    assertEquals(MockApi.MOCK_THUMBHASH, asset.content().preview().thumbhash());
+    Asset asset = mock.client().assets().classify(kept("held.png").setVisibility(Visibility.PUBLIC).build());
+    assertEquals(Optional.of(MockApi.MOCK_THUMBHASH), asset.getContent().getPreview().orElseThrow().getThumbhash());
     mock.withStorage(storage -> {
       JsonObject hold = new JsonObject();
       hold.addProperty("reason", "suspected-illegal-content");
       hold.addProperty("placedAt", 1_700_000_000_000L);
-      storage.assets.get(asset.id()).getAsJsonObject("content").add("safetyHold", hold);
+      storage.assets.get(asset.getId()).getAsJsonObject("content").add("safetyHold", hold);
     });
     for (String resource : List.of("original", "rendered", "preview", "hls", "embed", "placeholder")) {
-      try (CdnResponse served = mock.client.cdn.serve(new Models.CdnRequest(asset.id()).resource(resource))) {
+      try (CdnResponse served = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(asset.getId()).setResource(resource).build())) {
         assertEquals(403, served.status(), resource);
         assertEquals("asset/not-available", JsonParser.parseString(new String(served.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
             .getAsJsonObject().get("code").getAsString(), resource);
       }
     }
-    ApiException held = assertThrows(ApiException.class, () -> mock.client.assets.listTimeline(new Models.ListTimeline(asset.id())));
+    ApiException held = assertThrows(ApiException.class, () -> mock.client().assets().listTimeline(asset.getId(), null));
     assertEquals(ErrorCodes.ASSET_HELD, held.getCode());
     assertEquals(java.util.Map.of("hold", "safety"), held.getDetails());
     assertEquals(ErrorCodes.ASSET_HELD, assertThrows(ApiException.class,
-        () -> mock.client.cdn.signAssetUrl(new Models.SignAssetUrlOptions(asset.id()))).getCode());
-    assertSame(Models.AssetAvailability.UNAVAILABLE, mock.client.cdn.getAssetInfo(mock.client.cdn.getAssetUrl(new Models.CdnRequest(asset.id()))).availability());
-    Models.Asset decided = mock.decide(asset.id(), Outcome.LIMITED);
-    assertNull(decided.content().rendered());
-    assertNull(decided.content().preview());
+        () -> mock.client().cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId(asset.getId()).build())).getCode());
+    assertSame(AssetAvailability.UNAVAILABLE, mock.client().cdn().getAssetInfo(
+        mock.client().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId(asset.getId()).build())).getAvailability());
+    Asset decided = mock.decide(asset.getId(), Outcome.LIMITED);
+    assertEquals(Optional.empty(), decided.getContent().getRendered());
+    assertEquals(Optional.empty(), decided.getContent().getPreview());
   }
 
   @Test void aPendingReviewIsRequestedWhenItsDecisionIsApplied() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Asset queued = mock.client.assets.create(kept("queued.png"));
-    Models.Asset decided = mock.completeProcessing(queued.id(), MockDecision.of("allowed").pendingReview("sampled"));
-    assertEquals(decided.classification().completedAt().toEpochMilli(), decided.classification().moderation().pendingReview().requestedAt());
+    Asset queued = mock.client().assets().create(kept("queued.png").build());
+    Asset decided = mock.completeProcessing(queued.getId(), MockDecision.of("allowed").pendingReview("sampled"));
+    assertEquals(decided.getClassification().getCompletedAt().orElseThrow().toEpochMilli(),
+        decided.getClassification().getModeration().getPendingReview().orElseThrow().getRequestedAt());
   }
 
   @Test void aPresetWithoutAFolderKeepsTheUploadsOwn() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
-    Models.Folder folder = mock.client.folders.create(new Models.CreateFolder("Own"));
-    Models.UploadPreset preset = mock.client.uploadPresets.ensure(new Models.EnsureUploadPresets(List.of(
-        new Models.UploadPresetDefinition("plain", "Plain")))).uploadPresets().get(0);
-    Models.Asset asset = mock.client.assets.create(kept("own.png").uploadPresetId(preset.id()).folderId(Models.Patch.value(folder.id())));
-    assertEquals(folder.id(), asset.folderId());
-    assertEquals(Models.Visibility.PRIVATE, asset.visibility());
+    Folder folder = mock.client().folders().create(FolderCreateParams.builder().setName("Own").build());
+    UploadPreset preset = mock.client().uploadPresets().ensure(List.of(
+        UploadPresetParams.builder().setKey("plain").setName("Plain").build())).getUploadPresets().get(0);
+    Asset asset = mock.client().assets().create(kept("own.png").setUploadPresetId(preset.getId()).setFolderId(folder.getId()).build());
+    assertEquals(Optional.of(folder.getId()), asset.getFolderId());
+    assertSame(Visibility.PRIVATE, asset.getVisibility());
   }
 
   @Test void aPresetSizeLimitChecksAMultipartUploadsDeclaredTotal() {
     long mib = 1 << 20;
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder("mock-key", "project-1").partSizeBytes(5 * mib), deterministic());
-    Models.UploadPreset preset = mock.client.uploadPresets.ensure(new Models.EnsureUploadPresets(List.of(
-        new Models.UploadPresetDefinition("small", "Small").maxSizeInBytes(6 * mib)))).uploadPresets().get(0);
-    ApiException refused = assertThrows(ApiException.class, () -> mock.client.assets.create(
-        new Models.SubmitAsset("clip.mp4", Models.Content.bytes(new byte[(int) (11 * mib)], "video/mp4")).uploadPresetId(preset.id())));
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(builder().partSizeBytes(5 * mib), deterministic());
+    UploadPreset preset = mock.client().uploadPresets().ensure(List.of(
+        UploadPresetParams.builder().setKey("small").setName("Small").setMaxSizeInBytes(6 * mib).build())).getUploadPresets().get(0);
+    ApiException refused = assertThrows(ApiException.class, () -> mock.client().assets().create(
+        AssetCreateParams.builder().setName("clip.mp4").setContent(Content.bytes(new byte[(int) (11 * mib)], "video/mp4")).setUploadPresetId(preset.getId()).build()));
     assertEquals(ErrorCodes.UPLOAD_TOO_LARGE, refused.getCode());
     assertEquals("preset", refused.getDetails().get("source"));
   }
