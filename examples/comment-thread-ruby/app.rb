@@ -120,16 +120,19 @@ module Calmthread
 
   def self.external_id(reply_id, field) = "#{reply_id}:#{field}"
 
-  # The asset's `moderation` or `processing` object, or {} when the response has none.
-  def self.section(asset, key) = asset.is_a?(Hash) && asset[key].is_a?(Hash) ? asset[key] : {}
+  # Whether a value is a JSON object: an SDK result, or a Hash.
+  def self.object?(value) = value.is_a?(CalmLens::Model) || value.is_a?(Hash)
 
-  def self.status(asset) = section(section(asset, 'classification'), 'moderation')['status']
+  # The asset's `moderation` or `processing` object, or {} when the response has none.
+  def self.section(asset, key) = object?(asset) && object?(asset[key]) ? asset[key] : {}
+
+  def self.status(asset) = section(section(asset, 'classification'), 'moderation')['decision']
   def self.processing_failed?(asset) = section(asset, 'classification')['status'] == 'failed'
 
   # :clean publishes, :held waits for a reviewer, :failed never publishes.
   # Only an `allowed` or `limited` field is clean; any other decided status holds the reply.
   def self.decision(asset)
-    return :failed unless asset.is_a?(Hash) && asset['id'].is_a?(String) && !asset['id'].empty?
+    return :failed unless object?(asset) && asset['id'].is_a?(String) && !asset['id'].empty?
     return :failed if processing_failed?(asset)
 
     status = status(asset)
@@ -152,7 +155,7 @@ module Calmthread
   # The current status of a retrieved asset, or nil when the response is not that asset of
   # that reply. A returned external ID must name the same reply and field.
   def self.current_status(asset, asset_id, reply = nil)
-    return nil unless asset.is_a?(Hash) && asset['id'] == asset_id
+    return nil unless object?(asset) && asset['id'] == asset_id
 
     if reply && asset.key?('externalId')
       field = reply[:asset_ids].key(asset_id)
@@ -302,7 +305,7 @@ module Calmthread
           return 0
         end
         applied = 0
-        client.events.each_page(cursor: cursor, page_size: EVENT_PAGE_SIZE).first(MAX_EVENT_PAGES).each do |page|
+        client.events.list(cursor: cursor, page_size: EVENT_PAGE_SIZE).each_page.first(MAX_EVENT_PAGES).each do |page|
           page['items'].each { |event| applied += 1 if %i[released removed].include?(apply(event, client, source: @source)) }
           @state_lock.synchronize { @cursor = Calmthread.cursor(page) }
         end
@@ -316,7 +319,7 @@ module Calmthread
     # :ignored, :duplicate or :invalid. An event is claimed before it runs, so the feed and a
     # webhook never apply it twice at once; a failure releases the claim for a retry.
     def apply(event, client, source: :feed)
-      return :invalid unless event.is_a?(Hash) && event['id'].is_a?(String) && event['type'].is_a?(String)
+      return :invalid unless Calmthread.object?(event) && event['id'].is_a?(String) && event['type'].is_a?(String)
       return :duplicate unless claim(event['id'])
 
       begin
@@ -331,20 +334,20 @@ module Calmthread
     private
 
     def run(event, client, source)
-      facts = Array(event['facts']).select { |fact| fact.is_a?(Hash) && fact['key'].is_a?(String) }
+      facts = Array(event['facts']).select { |fact| Calmthread.object?(fact) && fact['key'].is_a?(String) }
       if facts.any? { |fact| fact['key'] == 'test' && fact['value'] == true }
         @discussion.record(:test, "Test event received (#{event['type'][0, 40]}). Nothing changed.")
         return :test
       end
       asset_id = event['assetId']
       actor = event['actor']
-      reviewed = actor.is_a?(Hash) && REVIEWER_ACTORS.include?(actor['type'])
+      reviewed = Calmthread.object?(actor) && REVIEWER_ACTORS.include?(actor['type'])
       reply = EVENT_LABELS.key?(event['type']) && reviewed && asset_id.is_a?(String) && @discussion.find_by_asset(asset_id)
       # A removed reply has no content left to act on, and can never come back.
       return :ignored unless reply && reply[:state] != :removed
 
       # Act on the asset's current status, never on the event's snapshot.
-      status = Calmthread.current_status(client.assets.retrieve(asset_id: asset_id), asset_id, reply)
+      status = Calmthread.current_status(client.assets.retrieve(asset_id), asset_id, reply)
       review = { decision: status, note: note(event), at: Time.now }
       outcome = if HELD_STATUSES.include?(status) && !%w[asset.allowed asset.limited].include?(event['type'])
                   remove(reply, client, review)
@@ -368,14 +371,14 @@ module Calmthread
     # Every other field of the reply must also be allowed or limited right now.
     def allowed_elsewhere?(reply, asset_id, client)
       reply[:asset_ids].values.reject { |id| id == asset_id }.all? do |id|
-        SHOWN_STATUSES.include?(Calmthread.current_status(client.assets.retrieve(asset_id: id), id, reply))
+        SHOWN_STATUSES.include?(Calmthread.current_status(client.assets.retrieve(id), id, reply))
       end
     end
 
     # Deletes the stored content of every field first; the record and report stay in
     # CalmLens. The reply is dropped locally only after that succeeded, so a failure retries.
     def remove(reply, client, review)
-      reply[:asset_ids].each_value { |id| client.assets.remove_content(asset_id: id) }
+      reply[:asset_ids].each_value { |id| client.assets.remove_content(id) }
       @discussion.remove(reply[:id], review)
       :removed
     end
@@ -450,7 +453,7 @@ module Calmthread
   end
 
   def self.cursor(page)
-    cursor = page.is_a?(Hash) ? page['nextCursor'] : nil
+    cursor = Calmthread.object?(page) ? page['nextCursor'] : nil
     unless cursor.is_a?(String) && !cursor.empty?
       raise CalmLens::InvalidResponseError.new(CalmLens::SdkErrorCodes::INVALID_RESPONSE, 'Events page has no cursor')
     end
@@ -676,7 +679,7 @@ module Calmthread
       )
       delivery = env[header_key(CalmLens::WEBHOOK_DELIVERY_HEADER)].to_s
       # A delivery's body is the event in the same shape as the events feed.
-      @webhooks.push(delivery.empty? ? event.id : delivery, event.payload)
+      @webhooks.push(delivery.empty? ? event.id : delivery, event)
       [204, SECURITY_HEADERS.dup, []]
     rescue CalmLens::WebhookVerificationError => e
       e.code == CalmLens::SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? text(401, 'Invalid signature') : text(400, 'Invalid event')

@@ -12,6 +12,20 @@ module ContractFixtures
   # one winning, so a duplicated scenario or detection key cannot pass as one field.
   def fixture(name) = JSON.parse(File.read("#{DIR}/#{name}.json", encoding: 'UTF-8'), allow_duplicate_key: false)
 
+  # The Ruby class of each error kind (surface.json `errorKinds`) with its ancestors' classes,
+  # nearest first: `not-found` → [NotFoundError, APIError, Error].
+  def error_kind_classes
+    kinds = fixture('surface')['errorKinds'].to_h { |kind| [kind['id'], kind] }
+    kinds.transform_values do |kind|
+      chain = []
+      while kind
+        chain << Object.const_get(kind['names']['ruby'])
+        kind = kinds[kind['parent']]
+      end
+      chain
+    end
+  end
+
   # The Ruby method of each list iterator surface.json names, by operation: `hash_lists.each_entry`
   # for `hashLists.iterateEntries`. Events iterate by page (`events.each_page`).
   def iterators

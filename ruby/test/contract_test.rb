@@ -4,6 +4,7 @@ require 'minitest/autorun'
 require 'calmlens'
 require 'calmlens/testing'
 require_relative 'contract_fixtures'
+require_relative 'operation_call'
 require 'pp'
 require 'rbs'
 require 'stringio'
@@ -16,6 +17,7 @@ require 'stringio'
 # ContractFixtures. Each fixture case is its own test.
 class ContractTest < Minitest::Test
   extend ContractFixtures
+  include OperationCall
 
   # Defines one test per fixture case, named after the case and its position.
   def self.each_case(prefix, cases)
@@ -139,14 +141,14 @@ class ContractTest < Minitest::Test
   # The `mock.*` helper steps.
   def run_mock_step(mock, operation, args, moderate_calls)
     case operation
-    when 'mock.decide' then mock.decide(args['assetId'], args['outcome'])
+    when 'mock.decide' then json(mock.decide(args['assetId'], args['outcome']))
     when 'mock.completeProcessing'
       json(mock.complete_processing(args['assetId'], args.key?('decision') ? build_decision(args['decision']) : nil))
     when 'mock.moderateCalls' then moderate_calls
     when 'mock.buildDecision' then build_decision(args) && nil
     when 'mock.requests' then mock.requests.map { |request| request.to_h.slice(:method, :path, :query, :status).transform_keys(&:to_s) }
     when 'mock.clearRequests' then mock.clear_requests && nil
-    when 'mock.enqueueEvent' then mock.enqueue_event(args)
+    when 'mock.enqueueEvent' then json(mock.enqueue_event(args))
     when 'mock.grant' then mock.api_key_grants = args['grants']
     when 'mock.fetchCdn' then served(mock.fetch_cdn(args['url']))
     when 'mock.failNext'
@@ -159,20 +161,13 @@ class ContractTest < Minitest::Test
     return run_mock_step(mock, operation, args, moderate_calls) if operation.start_with?('mock.')
 
     case operation
-    when 'cdn.serve' then served(mock.cdn.serve(args))
+    when 'cdn.serve' then served(call_operation(mock, operation, args))
     when 'cdn.getAssetInfo' then json(mock.cdn.get_asset_info(args['url'], viewer_claims: args['viewerClaims']))
-    when 'events.pages' then json(mock.events.each_page(args).to_a)
-    when *ITERATORS.keys
-      *resources, method = ITERATORS[operation].split('.')
-      json(resources.reduce(mock) { |value, resource| value.public_send(resource) }.public_send(method, args).to_a)
+    when 'events.pages' then json(call_operation(mock, 'events.list', args).each_page.to_a)
+    when *ITERATORS.keys then json(call_operation(mock, list_operation(operation), args).auto_paging_each.to_a)
     when 'assets.waitForDecision'
-      json(mock.assets.wait_for_decision(args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0)))
-    else
-      options = args.except('idempotencyKey')
-      options['request_options'] = { idempotency_key: args['idempotencyKey'] } if args.key?('idempotencyKey')
-      *resources, method = operation.split('.')
-      target = resources.reduce(mock) { |value, resource| value.public_send(snake_name(resource)) }
-      json(target.public_send(snake_name(method), options))
+      json(call_operation(mock, operation, args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0)))
+    else json(call_operation(mock, operation, args))
     end
   end
 
@@ -297,8 +292,6 @@ class ContractTest < Minitest::Test
     CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', max_retries: 0, transport: transport)
   end
 
-  def snake_name(name) = name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
-
   def constant(name)
     Object.const_get(name)
   rescue NameError
@@ -309,8 +302,7 @@ class ContractTest < Minitest::Test
     failing = client(lambda do |_request|
       CalmLens::Response.new(status: spec['status'], headers: spec['headers'], body: JSON.generate(spec['body']))
     end)
-    resource, method = spec['operation'].split('.')
-    failing.public_send(snake_name(resource)).public_send(snake_name(method), spec['options'])
+    call_operation(failing, spec['operation'], spec['options'])
     flunk "#{spec['operation']} did not fail"
   rescue CalmLens::Error => e
     e
@@ -320,7 +312,7 @@ class ContractTest < Minitest::Test
   def mock_outcome(option)
     mock = CalmLens::MockServerClient.new(option.to_sym => ->(_input) { 'blocked' })
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' })
-    asset.dig('classification', 'moderation', 'status')
+    asset.classification.moderation.decision
   end
 
   def present?(capability, surface)
@@ -371,6 +363,8 @@ class ContractTest < Minitest::Test
       assert_equal entry['retryable'], error.retryable?, "#{error.class} #{label}"
       assert_equal entry['local'], error.local?, "#{error.class} #{label}"
     end
+    built = CalmLens::Error.build(entry['code'], status: entry['status'])
+    ERROR_KINDS.fetch(entry['kind']).each { |kind| assert_kind_of kind, built, "#{label} is #{entry['kind']}" }
   end
   each_case('retryable', SURFACE['retryable']) { |entry| "#{entry['code']} #{entry['status']}" }
 
@@ -382,6 +376,17 @@ class ContractTest < Minitest::Test
   end
   each_case('surface', SURFACE['capabilities']) { |capability| capability['id'] }
 
+  ERROR_KINDS = error_kind_classes
+
+  # Every error kind has its class, a subclass of its parent kind's.
+  def test_every_error_kind_has_its_class_under_its_parents
+    SURFACE['errorKinds'].each do |kind|
+      klass, *ancestors = ERROR_KINDS.fetch(kind['id'])
+      assert_operator klass, :<=, CalmLens::Error, kind['id']
+      ancestors.each { |ancestor| assert_operator klass, :<, ancestor, kind['id'] }
+    end
+  end
+
   # The categories and qualifiers the decision builder accepts are the API's.
   def test_mock_classification_matches_the_surface
     assert_equal SURFACE['classification']['categories'], CalmLens::MockClassification::CATEGORIES
@@ -390,11 +395,9 @@ class ContractTest < Minitest::Test
 
   # rejections.json: every request the API would reject is refused before anything is sent.
   def replay_rejection(rejection)
-    resource, method = rejection['operation'].split('.')
-    error = assert_raises(CalmLens::Error, rejection['name']) do
-      client.public_send(snake_name(resource)).public_send(snake_name(method), rejection['options'])
-    end
+    error = assert_raises(CalmLens::Error, rejection['name']) { call_operation(client, rejection['operation'], rejection['options']) }
     assert_equal rejection['error'], error.code, rejection['name']
+    ERROR_KINDS.fetch(rejection['kind']).each { |kind| assert_kind_of kind, error, "#{rejection['name']} is #{rejection['kind']}" }
     assert error.local?, rejection['name']
     assert_nil error.status, rejection['name']
     assert_nil error.request_id, rejection['name']

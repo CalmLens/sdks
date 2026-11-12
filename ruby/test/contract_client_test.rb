@@ -7,12 +7,14 @@ require 'json'
 require 'net/http'
 require 'stringio'
 require_relative 'contract_fixtures'
+require_relative 'operation_call'
 
 # Replays the shared fixtures that check the real client's requests and results, written by
 # packages/sdk-contract (format in its README.md) to testdata: requests.json, paths.json,
 # errors.json, client-cases.json and surface.json's defaults. Each fixture case is its own test.
 class ContractClientTest < Minitest::Test
   extend ContractFixtures
+  include OperationCall
 
   # Defines one test per fixture case, named after the case and its position.
   def self.each_case(prefix, cases)
@@ -43,10 +45,8 @@ class ContractClientTest < Minitest::Test
       @io = StringIO.new(bytes)
     end
 
-    def read(*args) = @io.read(*args)
+    def read(*) = @io.read(*)
   end
-
-  def snake_name(name) = name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
 
   def collect
     items = []
@@ -59,25 +59,19 @@ class ContractClientTest < Minitest::Test
   ITERATORS = iterators
 
   # Calls an operation named like the JavaScript client's method, with JavaScript option names. An
-  # iterator's result is what it yields, in order.
-  def invoke(client, operation, args)
-    if (name = ITERATORS[operation])
-      *resources, method = name.split('.')
-      target = resources.reduce(client) { |value, resource| value.public_send(resource) }
-      return collect { |items| target.public_send(method, args) { |item| items << item } }
-    end
+  # iterator lists and pages with {Page#auto_paging_each}; its result is what it yields, in order.
+  def invoke(client, operation, args, nested: :camel)
+    return call_operation(client, operation, args, nested: nested) unless ITERATORS.key?(operation)
 
-    *resources, method = operation.split('.')
-    target = resources.reduce(client) { |value, resource| value.public_send(snake_name(resource)) }
-    target.public_send(snake_name(method), args)
+    page = call_operation(client, list_operation(operation), args, nested: nested)
+    collect { |items| page.auto_paging_each { |item| items << item } }
   end
 
-  # Translates JavaScript-only options: the Idempotency-Key and waitForDecision's milliseconds.
+  # Translates JavaScript-only options: waitForDecision's milliseconds.
   def ruby_args(operation, args)
     return args unless args.is_a?(Hash)
 
     args = args.dup
-    args['request_options'] = { 'idempotency_key' => args.delete('idempotencyKey') } if args.key?('idempotencyKey')
     args['timeout'] = args.delete('timeoutMs') / 1000.0 if operation == 'assets.waitForDecision' && args.key?('timeoutMs')
     args
   end
@@ -134,17 +128,8 @@ class ContractClientTest < Minitest::Test
     [yield(client), captured]
   end
 
-  # Converts option names to snake_case symbols the way Ruby callers write them; metadata keys stay.
-  def snake(value)
-    case value
-    when Hash
-      value.to_h { |key, item| [snake_name(key).to_sym, key == 'metadata' ? item : snake(item)] }
-    when Array then value.map { |item| snake(item) }
-    else value
-    end
-  end
-
-  # requests.json, in camelCase and snake_case: the request sent and the result returned.
+  # requests.json, with nested options in camelCase and snake_case: the request sent and the result
+  # returned.
   def replay_request(fixture)
     # `result` is what the method returns when it isn't the response body.
     expected = case fixture['operation']
@@ -152,9 +137,9 @@ class ContractClientTest < Minitest::Test
                when 'ensureLenses' then fixture['response']['lenses']
                else fixture.fetch('result', fixture['response'])
                end
-    [fixture['options'], snake(fixture['options'])].each do |options|
-      result, captured = capture(fixture) { |client| invoke(client, fixture['operation'], options) }
-      assert_equal [fixture['request']], captured, "#{fixture['operation']} #{options.inspect}"
+    %i[camel snake].each do |nested|
+      result, captured = capture(fixture) { |client| invoke(client, fixture['operation'], fixture['options'], nested: nested) }
+      assert_equal [fixture['request']], captured, "#{fixture['operation']} #{nested} #{fixture['options'].inspect}"
       assert_json json(expected), json(result), "#{fixture['operation']} result"
     end
   end
@@ -174,11 +159,12 @@ class ContractClientTest < Minitest::Test
 
   def replay_cdn_url(cdn)
     client = refusing_client
-    [cdn['options'], snake(cdn['options'])].each do |options|
+    %i[camel snake].each do |nested|
       if cdn['url']
-        assert_equal cdn['url'], client.cdn.get_asset_url(options)
+        assert_equal cdn['url'], invoke(client, 'cdn.getAssetUrl', cdn['options'], nested: nested)
       else
-        assert_equal cdn['error'], assert_raises(CalmLens::Error) { client.cdn.get_asset_url(options) }.code, options.inspect
+        error = assert_raises(CalmLens::Error) { invoke(client, 'cdn.getAssetUrl', cdn['options'], nested: nested) }
+        assert_equal cdn['error'], error.code, cdn['options'].inspect
       end
     end
   end
@@ -188,19 +174,20 @@ class ContractClientTest < Minitest::Test
 
   def replay_api_error(entry)
     response = entry['response']
+    body = response.key?('bodyText') ? response['bodyText'] : JSON.generate(response['body'])
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', max_retries: 0, transport: lambda do |_|
-      CalmLens::Response.new(status: response['status'], headers: response['headers'], body: JSON.generate(response['body']))
+      CalmLens::Response.new(status: response['status'], headers: response['headers'], body: body)
     end)
     error = failure { invoke(client, entry['operation'], ruby_args(entry['operation'], entry['args'])) }
+    assert_equal 'GET', error.http_method, entry['code'] if entry['operation'] == 'assets.retrieve'
     assert_equal entry['expected'], error_fields(error), entry['code']
-    assert_instance_of ERROR_CLASSES.fetch(entry['status']) { CalmLens::APIError }, error, entry['code']
+    kind, *ancestors = ERROR_KINDS.fetch(entry['kind'])
+    assert_instance_of kind, error, "#{entry['code']} is #{entry['kind']}"
+    ancestors.each { |ancestor| assert_kind_of ancestor, error, entry['code'] }
+    assert_equal response['bodyText'] || JSON.generate(response['body']), error.body, "#{entry['code']} keeps its body"
   end
 
-  # The error class for each HTTP status; other statuses raise APIError itself.
-  ERROR_CLASSES = { 400 => CalmLens::BadRequestError, 401 => CalmLens::AuthenticationError, 403 => CalmLens::PermissionDeniedError,
-                    404 => CalmLens::NotFoundError, 409 => CalmLens::ConflictError, 429 => CalmLens::RateLimitError,
-                    500 => CalmLens::ServerError, 502 => CalmLens::ServerError, 503 => CalmLens::ServerError,
-                    504 => CalmLens::ServerError }.freeze
+  ERROR_KINDS = error_kind_classes
   each_case('api_error', fixture('errors')) { |entry| entry['code'] }
 
   # The mock answers each error code with this status, so a stale generated file would mislead tests.
@@ -432,7 +419,7 @@ class ContractClientTest < Minitest::Test
       'baseUrl' => session.base_url, 'cdnBaseUrl' => session.cdn_base_url,
       'timeoutMs' => setting.call(:@timeout) * 1000, 'uploadTimeoutMs' => setting.call(:@upload_timeout),
       'maxRetries' => setting.call(:@max_retries), 'retryBaseDelayMs' => setting.call(:@retry_base_delay) * 1000,
-      'retryMaxDelayMs' => CalmLens::ServerClient::RETRY_MAX_DELAY * 1000,
+      'retryMaxDelayMs' => setting.call(:@max_retry_delay) * 1000,
       'retryAfterMaxMs' => CalmLens::ServerClient::RETRY_AFTER_MAX * 1000,
       'maxResponseBytes' => setting.call(:@max_response_bytes),
       'signedUrlExpiresIn' => CalmLens::CDN::DEFAULT_SIGNED_URL_EXPIRES_IN,

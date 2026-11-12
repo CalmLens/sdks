@@ -42,7 +42,7 @@ module CalmLens
   # @example
   #   mock = CalmLens::MockServerClient.new(moderate: ->(input) { input.content.text&.include?('spam') ? 'blocked' : 'allowed' })
   #   asset = mock.assets.classify(name: 'note', content: {plain_text: 'hi', type: 'text/plain'})
-  #   mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status') # => "allowed"
+  #   mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'decision') # => "allowed"
   #   mock.enqueue(status: 503, body: {code: 'server/unavailable', message: 'Try again'})
   class MockServerClient < ServerClient
     # A request the mock received.
@@ -125,7 +125,7 @@ module CalmLens
     # @param options [Hash] the options of {UploadTokens#sign}
     # @param now [Integer] the signing time in milliseconds since the Unix epoch
     # @param nonce [String]
-    # @return [Hash] `{'token', 'expiresAt'}`
+    # @return [SignedUploadToken]
     def self.sign_upload_token(api_key, options, now:, nonce:)
       UploadTokens.sign_at(api_key, options, now: now, nonce: nonce)
     rescue KeyError, TypeError, ArgumentError, JSON::GeneratorError, EncodingError => e
@@ -177,7 +177,7 @@ module CalmLens
     #   Retries and decision checks wait no real time.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
-                   create_id: ->(prefix) { MockServerClient.new_id(prefix) }, moderate: nil, max_retries: 0, **options)
+                   create_id: ->(prefix) { MockServerClient.new_id(prefix) }, moderate: nil, max_retries: 0, **)
       raise Internal.invalid('moderate must respond to call') unless moderate.nil? || moderate.respond_to?(:call)
 
       @mock_lock = Mutex.new
@@ -186,7 +186,7 @@ module CalmLens
       @failures = []
       @call_key = :"calmlens_mock_call_#{object_id}"
       super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url, max_retries: max_retries,
-            **options, transport: method(:receive))
+            **, transport: method(:receive))
       @fake = Testing::FakeAPI.new(project_id: project_id, base_url: self.base_url, cdn_base_url: self.cdn_base_url,
                                    now: now, create_id: create_id, moderate: moderate, api_key: api_key,
                                    grants: MockServerClient.grants_of(api_key))
@@ -207,11 +207,11 @@ module CalmLens
     # `pendingReview` is settled ({Assets#decide} leaves it waiting, as with the API).
     # @param asset_id [String]
     # @param decision [String] `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
-    # @return [Hash] the asset
+    # @return [Asset]
     # @raise [APIError] `asset/not-found` for an unknown asset
     # @raise [InvalidArgumentError] for any other decision, such as `pending` or `failed`
     def decide(asset_id, decision)
-      @mock_lock.synchronize { @fake.decide(asset_id, decision) } || raise(not_found)
+      Asset.new(@mock_lock.synchronize { @fake.decide(asset_id, decision) } || raise(not_found))
     end
 
     # Finishes processing an asset as the moderation pipeline would: with `decision`, or else what
@@ -220,12 +220,12 @@ module CalmLens
     # the asset processing. It records no manual review.
     # @param asset_id [String]
     # @param decision [String, MockDecision, nil] a status from {MockDecision::STATUSES} or a {MockDecision}
-    # @return [Hash] the asset
+    # @return [Asset]
     # @raise [APIError] `asset/not-found` for an unknown asset
     # @raise [InvalidArgumentError] when the asset isn't processing or awaiting a queued re-run, or for
     #   an unknown decision
     def complete_processing(asset_id, decision = nil)
-      @mock_lock.synchronize { @fake.complete_processing(asset_id, decision) } || raise(not_found)
+      Asset.new(@mock_lock.synchronize { @fake.complete_processing(asset_id, decision) } || raise(not_found))
     end
 
     # Changes the grants of the mock's API key, as editing the key in the portal would: later
@@ -285,10 +285,10 @@ module CalmLens
     end
 
     # @see ServerClient#ensure_lenses
-    def ensure_lenses(options) = operation('ensureLenses') { super }
+    def ensure_lenses(**) = operation('ensureLenses') { super }
 
     # @see ServerClient#ensure_lens
-    def ensure_lens(options) = operation('ensureLens') { super }
+    def ensure_lens(**) = operation('ensureLens') { super }
 
     # Queues a JSON response for the next request.
     # @param status [Integer]
@@ -324,9 +324,9 @@ module CalmLens
     # with the `asset_id` of a stored asset carries that asset's snapshot as it is now, unless you
     # pass `asset`.
     # @param event [Hash] at least `type:`; snake_case keys are converted.
-    # @return [Hash] the stored event
+    # @return [Event] the stored event
     def enqueue_event(event)
-      @mock_lock.synchronize { JSON.parse(JSON.generate(@fake.enqueue_event(Internal.normalize(event)))) }
+      Event.new(@mock_lock.synchronize { JSON.parse(JSON.generate(@fake.enqueue_event(Internal.normalize(event)))) })
     end
 
     # @return [Array<Request>] copies of every request received since the mock was created or

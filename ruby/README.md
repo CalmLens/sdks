@@ -1,6 +1,6 @@
 # CalmLens Ruby SDK
 
-Ruby 3.1+ server-side client for [CalmLens](https://calmlens.com) content moderation, uploads, events, webhooks and CDN delivery.
+Ruby 3.3+ server-side client for [CalmLens](https://calmlens.com) content moderation, uploads, events, webhooks and CDN delivery.
 
 ## Installation
 
@@ -14,7 +14,7 @@ Or add it to your Gemfile:
 gem "calmlens"
 ```
 
-The gem has no runtime dependencies: it uses only the standard library (Net::HTTP, JSON, OpenSSL). It ships YARD documentation and RBS signatures in `sig/`, so Steep and other RBS tools can check your calls and the response keys you read.
+The gem has no runtime dependencies: it uses only the standard library (Net::HTTP, JSON, OpenSSL). It ships YARD documentation and RBS signatures in `sig/`, so Steep and other RBS tools can check your calls and the fields you read.
 
 Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
 
@@ -25,7 +25,8 @@ Create an API key and copy your project ID in the CalmLens portal, and keep both
 ```ruby
 require 'calmlens'
 
-client = CalmLens::ServerClient.new(api_key: ENV.fetch('CALMLENS_API_KEY'), project_id: ENV.fetch('CALMLENS_PROJECT_ID'))
+# Reads CALMLENS_API_KEY and CALMLENS_PROJECT_ID from the environment.
+client = CalmLens::ServerClient.new
 
 # Classify text and wait for the decision.
 asset = client.text.classify(text: 'Great photo!', external_id: 'comment-42')
@@ -34,22 +35,22 @@ asset = client.text.classify(text: 'Great photo!', external_id: 'comment-42')
 queued = File.open('photo.jpg', 'rb') do |file|
   client.assets.create(name: 'photo.jpg', content: {data: file, type: 'image/jpeg'})
 end
-decided = client.assets.wait_for_decision(asset_id: queued['id'], timeout: 30)
+decided = client.assets.wait_for_decision(queued.id, timeout: 30)
 
-if %w[allowed limited].include?(decided['classification']['moderation']['status'])
-  puts "Show #{decided['id']}"
+if %w[allowed limited].include?(decided.classification.moderation.decision)
+  puts "Show #{decided.id}"
 end
 
 client.close
 ```
 
-Options are keyword arguments in snake_case (camelCase also works, at any depth). Responses are Hashes with the API's camelCase String keys.
+Methods take the ID they act on first and their options as snake_case keywords. Results are read-only objects with snake_case readers; `[]`, `dig`, `to_h` and pattern matching also work, and `last_response.request_id` identifies the request.
 
-`asset['classification']['moderation']['status']` decides what to do with the content:
+`asset.classification.moderation.decision` decides what to do with the content:
 
 | Status           | What to do                                                                           |
 | ---------------- | ------------------------------------------------------------------------------------ |
-| `pending`        | Not decided yet. Wait, poll or listen for a webhook.                                 |
+| `nil`            | Not decided yet. Wait, poll or listen for a webhook.                                 |
 | `allowed`        | Show it to everyone.                                                                 |
 | `limited`        | Show it, but reduce its reach, such as keeping it out of recommendations.            |
 | `age-restricted` | Show it only behind your own age check, with `viewer_claims: {age_confirmed: true}`. |
@@ -67,11 +68,12 @@ New statuses and fields may appear in later API versions. The SDK returns them u
 - [Sign upload tokens for browser uploads](https://calmlens.com/docs/sdk/ruby/reference#upload-tokens) through [upload presets](https://calmlens.com/docs/guides/upload-presets).
 - [Record reviewer decisions](https://calmlens.com/docs/sdk/ruby/reference#reviewer-decisions) and [explain a decision](https://calmlens.com/docs/sdk/ruby#methods).
 - [Serve content from the CDN](https://calmlens.com/docs/sdk/ruby#cdn-methods), with [lenses, transforms and signed URLs](https://calmlens.com/docs/sdk/ruby/reference#cdn-urls) and [age-restricted delivery](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets).
-- [Organise assets in folders](https://calmlens.com/docs/sdk/ruby/reference#folders), [search them](https://calmlens.com/docs/guides/search) and [page through lists](https://calmlens.com/docs/sdk/ruby#pagination).
+- [Organise assets in folders](https://calmlens.com/docs/sdk/ruby/reference#folders), [search them](https://calmlens.com/docs/guides/search) and [page through lists](https://calmlens.com/docs/sdk/ruby#pagination) with `auto_paging_each`.
 - [Match images against hash lists](https://calmlens.com/docs/sdk/ruby/reference#hash-lists).
-- Keep [upload presets](https://calmlens.com/docs/guides/upload-presets), project settings and metadata fields in your code: `upload_presets` (`list`, `each`, `ensure`, `delete`), `project_settings` (`get`, `update`) and `metadata_fields` (`list`, `ensure`, `delete`). `ensure` and `update` create or replace by key or ID, and the `revision` you read refuses a change made since.
+- Keep [upload presets](https://calmlens.com/docs/guides/upload-presets), project settings and metadata fields in your code: `upload_presets` (`list`, `ensure`, `delete`), `project_settings` (`get`, `update`) and `metadata_fields` (`list`, `ensure`, `delete`). `ensure` and `update` create or replace by key or ID, and the `revision` you read refuses a change made since.
 - [Read the events feed](https://calmlens.com/docs/sdk/ruby#pagination) and [verify webhooks in Rails or Rack](https://calmlens.com/docs/sdk/ruby#webhooks).
 - [Handle errors](https://calmlens.com/docs/sdk/ruby/reference#errors) with automatic [retries, timeouts and idempotency keys](https://calmlens.com/docs/sdk/ruby/reference#retries-and-timeouts).
+- [Log requests and record metrics](https://calmlens.com/docs/sdk/ruby/reference#logging-and-metrics), and [call endpoints this version has no method for](https://calmlens.com/docs/sdk/ruby/reference#custom-requests).
 - [Type-check your code with RBS signatures](https://calmlens.com/docs/sdk/ruby/reference#types).
 
 Every method is listed in the [Ruby SDK documentation](https://calmlens.com/docs/sdk/ruby#methods).

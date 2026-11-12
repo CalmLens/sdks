@@ -13,7 +13,7 @@ class MockUploadPresetTest < Minitest::Test
     size = 6 * 1024 * 1024
     [{ data: 'x'.b * size, type: 'video/mp4' }, { plain_text: 'x' * size, type: 'text/plain' }].each do |content|
       asset = mock.assets.create(name: 'big', content: content, upload_preset_id: presets[0]['id'])
-      assert_equal ['public', presets[0]['id']], asset.values_at('visibility', 'uploadPresetId')
+      assert_equal ['public', presets[0]['id']], asset.to_h.values_at('visibility', 'uploadPresetId')
       error = assert_raises(CalmLens::Error) { mock.assets.create(name: 'big', content: content, upload_preset_id: presets[1]['id']) }
       assert_equal ['upload/too-large', { 'limitBytes' => 5_500_000, 'source' => 'preset' }], [error.code, error.details]
     end

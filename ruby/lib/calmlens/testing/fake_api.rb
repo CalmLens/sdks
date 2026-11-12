@@ -24,7 +24,7 @@ module CalmLens
     end
 
     # In-memory records behind {MockServerClient}. Change them to arrange a test, such as setting an
-    # asset's `classification.moderation.status`.
+    # asset's `classification.moderation.decision`.
     #
     # @!attribute assets [Hash{String => Hash}] assets by ID, with API field names.
     # @!attribute folders [Hash{String => Hash}] folders by ID.
@@ -48,7 +48,7 @@ module CalmLens
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
                         'content.format' => %w[content format], 'content.extension' => %w[content extension],
-                        'classification.moderation.status' => %w[classification moderation status] }.freeze
+                        'classification.moderation.decision' => %w[classification moderation decision] }.freeze
       MAX_SEARCH_TOKENS = 8
       MAX_SEARCH_PAGE_SIZE = 20
       MAX_SEARCH_QUERY_LENGTH = 200
@@ -194,7 +194,7 @@ module CalmLens
         if item && !event.key?('asset')
           asset = snapshot(item)
           announced = ANNOUNCED_STATUSES[event['type']]
-          asset['classification']['moderation']['status'] = announced if announced
+          asset['classification']['moderation']['decision'] = announced if announced
           event = event.merge('asset' => asset)
         end
         add_event(event)
@@ -302,8 +302,8 @@ module CalmLens
         invalid!('validation/invalid-value', 'confirmPurge') if decision == 'purged' && json['confirmPurge'] != true
         processing = item['upload']['status'] == 'uploading' || item['classification']['status'] == 'processing'
         fail!(ErrorCodes::ASSET_PROCESSING) if processing
-        status = item['classification']['moderation']['status']
-        fail!(ErrorCodes::ASSET_DECISION_NOT_ALLOWED) if status == 'pending' && !%w[blocked purged].include?(decision)
+        status = item['classification']['moderation']['decision']
+        fail!(ErrorCodes::ASSET_DECISION_NOT_ALLOWED) if status.nil? && !%w[blocked purged].include?(decision)
         fail!(ErrorCodes::ASSET_DECISION_UNCHANGED) if status == decision
         fail!(ErrorCodes::ASSET_CONTENT_PURGED) if status == 'purged' && decision != 'blocked'
 
@@ -316,7 +316,7 @@ module CalmLens
         { 'id' => item['id'], 'externalId' => item['externalId'], 'uploadPresetId' => item['uploadPresetId'],
           'upload' => { 'status' => item['upload']['status'] },
           'classification' => { 'status' => item['classification']['status'], 'testInput' => item['classification']['testInput'],
-                                'moderation' => { 'status' => item['classification']['moderation']['status'] } },
+                                'moderation' => { 'decision' => item['classification']['moderation']['decision'] } },
           'content' => { 'status' => item['content']['status'] } }
       end
 
@@ -882,7 +882,7 @@ module CalmLens
                                 'completedAt' => nil, 'progress' => nil, 'testInput' => false,
                                 # Like the API, moderation's results are null until it decides, and a
                                 # feature's result is null until it has run.
-                                'moderation' => { 'status' => 'pending', 'manualReviews' => [], 'automatedStatus' => nil,
+                                'moderation' => { 'decision' => nil, 'manualReviews' => [], 'automatedStatus' => nil,
                                                   'policy' => nil, 'pendingReview' => nil, 'source' => nil, 'rule' => nil,
                                                   'explanationComplete' => nil,
                                                   'categories' => nil, 'flaggedCategories' => [], 'regions' => [],
@@ -1173,7 +1173,7 @@ module CalmLens
       def update_classification(classification, processing, moderation, now)
         classification.merge!('status' => processing, 'failureReason' => processing == 'failed' ? 'processing-error' : nil,
                               'updatedAt' => now, 'completedAt' => processing == 'completed' ? now : nil)
-        classification['moderation']['status'] = moderation
+        classification['moderation']['decision'] = moderation == 'pending' ? nil : moderation
       end
 
       # Like the API, the earlier posts CalmLens used go with the stored content.
@@ -1286,7 +1286,7 @@ module CalmLens
 
       # Like the API: back to processing, to be moderated again, with an `asset.retried` event.
       def retry_asset(item)
-        unless item['classification']['status'] == 'failed' && item['classification']['moderation']['status'] == 'pending'
+        unless item['classification']['status'] == 'failed' && item['classification']['moderation']['decision'].nil?
           fail!(ErrorCodes::ASSET_NOT_RETRYABLE)
         end
         fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
@@ -1314,7 +1314,7 @@ module CalmLens
         add_event('type' => 'asset.rerun-requested', 'severity' => 'low', 'assetId' => item['id'],
                   'asset' => snapshot(item), 'actor' => deep_copy(API_KEY_ACTOR),
                   'facts' => [asset_name_fact(item), { 'key' => 'asset-type', 'value' => item['type'] },
-                              { 'key' => 'moderation-status', 'value' => moderation['status'] }])
+                              { 'key' => 'moderation-status', 'value' => moderation['decision'] }])
         response = deep_copy(item)
         settle_rerun(item, 'rerun')
         response
@@ -1872,7 +1872,7 @@ module CalmLens
         restricted = item['visibility'] != 'public'
         return asset_not_found if restricted && !authorised
 
-        restricted ||= %w[blocked purged].include?(item['classification']['moderation']['status'])
+        restricted ||= %w[blocked purged].include?(item['classification']['moderation']['decision'])
         return not_available if restricted && !authorised
 
         claims = JSON.parse(params.fetch('viewerClaims', '{}'))
@@ -1888,7 +1888,7 @@ module CalmLens
 
       # Whether a viewer can see an asset's content now, decided as the other resources decide it.
       def availability(item, age_confirmed)
-        moderation = item['classification']['moderation']['status']
+        moderation = item['classification']['moderation']['decision']
         if item['content']['safetyHold'] || item['upload']['status'] == 'uploading' || %w[blocked purged].include?(moderation) ||
            item['classification']['status'] == 'failed' || item['content']['status'] == 'removed'
           'unavailable'
@@ -1933,7 +1933,7 @@ module CalmLens
       # The delivery checks, which refuse everyone, then age and access, as an error response, or nil.
       # Only the original needs the upload still stored.
       def refuse_delivery(item, resource, stored, params, authorised)
-        moderation = item['classification']['moderation']['status']
+        moderation = item['classification']['moderation']['decision']
         if (resource == 'original' && stored.nil?) || item['upload']['status'] == 'uploading' ||
            %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
            item['content']['status'] == 'removed'
@@ -1992,12 +1992,12 @@ module CalmLens
       # A preview requires access for private or blocked assets and disappears with its content.
       def placeholder(method, item, authorised)
         private_asset = item['visibility'] != 'public'
-        blocked = item['classification']['moderation']['status'] == 'blocked'
+        blocked = item['classification']['moderation']['decision'] == 'blocked'
         return asset_not_found if private_asset && !authorised
         return not_available if blocked && !authorised
 
         thumbhash = item.dig('content', 'preview', 'thumbhash')
-        return not_available if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged'
+        return not_available if thumbhash.nil? || item['classification']['moderation']['decision'] == 'purged'
 
         cdn_response(method, Placeholder.png(thumbhash),
                      'content-type' => 'image/png', 'cache-control' => private_asset || blocked ? 'private, no-store' : 'public, no-cache',

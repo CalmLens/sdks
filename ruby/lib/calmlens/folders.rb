@@ -8,71 +8,66 @@ module CalmLens
 
     # Lists one page of child folders, sorted by name unless `sort` says otherwise.
     # @option options [String] :parent_id list this folder's children; omit for the project root
-    # @option options [String] :cursor the previous page's `nextCursor`
+    # @option options [String] :cursor the previous page's `next_cursor`
     # @option options [Integer] :page_size 1 to 100, default 50
     # @option options [String] :sort `name` (the default) or `createdAt`, descending when prefixed with `-`
     # @option options [String] :search only children whose name contains it
-    # @return [Hash] a cursor page (items, nextCursor, hasMore) with ancestors.
-    def list(options = {})
+    # @return [FolderPage] with the folder's `ancestors`; {Page#auto_paging_each} fetches the rest.
+    def list(**options)
       call(options, __method__) do |api, request|
-        cursor_page(request('GET', project('folders'), query: api, request_options: request), 'folder')
+        page(FolderPage, request('GET', project('folders'), query: api, request_options: request), options) { list(**_1) }
       end
-    end
-
-    # Iterates every child folder of `parent_id` (or the project root), fetching pages as needed.
-    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
-    # @yieldparam folder [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each(options = {}, &block)
-      return enum_for(:each, options) unless block
-
-      each_item(options, __method__, method(:list), &block)
     end
 
     # @option options [String] :name
     # @option options [String, nil] :parent_id
-    # @return [Hash] the folder
-    def create(options)
-      call(options, __method__) { |api, request| request('POST', project('folders'), body: api, request_options: request) }
-    end
-
-    # @option options [String] :folder_id
-    # @return [Hash] the folder
-    def retrieve(options)
+    # @return [Folder]
+    def create(**options)
       call(options, __method__) do |api, request|
-        request('GET', "/folders/#{Internal.segment(api['folderId'])}", request_options: request)
+        build(Folder, request('POST', project('folders'), body: api, request_options: request))
       end
     end
 
-    # @option options [String] :folder_id
+    # @param folder_id [String]
+    # @return [Folder]
+    def retrieve(folder_id, **options)
+      call(with_ids(options, folder_id: folder_id), __method__) do |api, request|
+        build(Folder, request('GET', folder_path(api), request_options: request))
+      end
+    end
+
+    # @param folder_id [String]
     # @option options [String] :name
-    # @return [Hash] the folder
-    def update(options)
-      call(options, __method__) do |api, request|
-        request('PATCH', "/folders/#{Internal.segment(api['folderId'])}", body: without(api, 'folderId'),
-                                                                          request_options: request)
+    # @return [Folder]
+    def update(folder_id, **options)
+      call(with_ids(options, folder_id: folder_id), __method__) do |api, request|
+        build(Folder, request('PATCH', folder_path(api), body: without(api, 'folderId'), request_options: request))
       end
     end
 
     # Moves a folder under another, or to the root with `parent_id: nil`.
-    # @option options [String] :folder_id
+    # @param folder_id [String]
     # @option options [String, nil] :parent_id
-    # @return [Hash] the folder
-    def move(options)
-      call(options, __method__) do |api, request|
-        request('POST', "/folders/#{Internal.segment(api['folderId'])}/move",
-                body: { 'parentId' => Internal.required(api, 'parentId') }, request_options: request)
+    # @return [Folder]
+    def move(folder_id, **options)
+      call(with_ids(options, folder_id: folder_id), __method__) do |api, request|
+        build(Folder, request('POST', "#{folder_path(api)}/move", body: { 'parentId' => Internal.required(api, 'parentId') },
+                                                                  request_options: request))
       end
     end
 
     # Deletes an empty folder.
-    # @option options [String] :folder_id
+    # @param folder_id [String]
     # @return [nil]
-    def delete(options)
-      call(options, __method__) do |api, request|
-        request('DELETE', "/folders/#{Internal.segment(api['folderId'])}", request_options: request)
+    def delete(folder_id, **options)
+      call(with_ids(options, folder_id: folder_id), __method__) do |api, request|
+        request('DELETE', folder_path(api), request_options: request)
         nil
       end
     end
+
+    private
+
+    def folder_path(api) = "/folders/#{Internal.segment(api['folderId'])}"
   end
 end

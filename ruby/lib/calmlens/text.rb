@@ -17,16 +17,15 @@ module CalmLens
     # @option options [String] :name defaults to `text`
     # @option options [String] :author_id who wrote the text, as for {Assets#create}
     # @option options [Hash] :context earlier posts in the conversation, as for {Assets#create}
-    # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
+    # @return [Asset] show it to everyone only when `classification.moderation.decision` is
     #   `allowed` or `limited` (reduce the reach of `limited` content).
-    def classify(options)
-      api, request = call(options, __method__) { |*split| split }
-      text = api['text']
+    def classify(**options)
+      call(options, __method__) { nil }
+      text = options[:text]
       raise Internal.invalid('Text to classify must be a non-empty string') unless text.is_a?(String) && !text.strip.empty?
 
-      @assets.classify(without(api, 'text').merge('name' => api.fetch('name', 'text'),
-                                                  'content' => { 'plainText' => text, 'type' => 'text/plain' },
-                                                  'request_options' => request))
+      @assets.classify(**options.except(:text), name: options.fetch(:name, 'text'),
+                                                content: { plain_text: text, type: 'text/plain' })
     end
   end
 end

@@ -35,7 +35,8 @@ module TestHelpers
   # `flagged` lists the categories the report's policy decision flagged.
   def asset(id, status, flagged: nil)
     classification = { 'pending' => 'processing', 'uploading' => 'pending', 'error' => 'failed' }.fetch(status, 'completed')
-    moderation = { 'status' => classification == 'completed' ? status : 'pending', 'raw' => { 'categories' => {} }, 'flaggedCategories' => flagged || [], 'regions' => [] }
+    moderation = { 'decision' => classification == 'completed' ? status : nil, 'raw' => { 'categories' => {} }, 'flaggedCategories' => flagged || [],
+                   'regions' => [] }
     { 'id' => id, 'upload' => { 'status' => status == 'uploading' ? 'uploading' : 'completed' },
       'classification' => { 'status' => classification, 'moderation' => moderation },
       'content' => { 'status' => 'stored' } }
@@ -49,7 +50,7 @@ module TestHelpers
   end
 
   def event_asset(asset_id, moderation)
-    { 'id' => asset_id, 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'status' => moderation } },
+    { 'id' => asset_id, 'upload' => { 'status' => 'completed' }, 'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => moderation } },
       'content' => { 'status' => 'stored' } }
   end
 
@@ -177,7 +178,7 @@ class SubmissionTest < Minitest::Test
     # The SDK refuses a response that is not a well-formed asset, so nothing is kept or published.
     allowed = asset('t', 'allowed')
     [allowed.merge('id' => ''), allowed.reject { |key, _| key == 'id' }, [],
-     asset('t', nil)].each do |text|
+     allowed.merge('classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 7 } })].each do |text|
       [[asset('n', 'allowed'), text], [text]].each do |responses|
         app, mock = live_app(*responses)
         error = assert_raises(CalmLens::InvalidResponseError) { app.discussion.submit('Ada', 'Secret text') }
@@ -215,7 +216,7 @@ class SubmissionTest < Minitest::Test
     held = app.discussion.replies.find { |reply| reply[:text] == 'T-name-held' }
     assert_equal [:name], held[:held_fields]
     stored = app.discussion.moderator.client.state.assets.fetch(held[:asset_ids][:name])
-    assert_equal ["#{held[:id]}:name", 'blocked'], [stored['externalId'], stored.dig('classification', 'moderation', 'status')]
+    assert_equal ["#{held[:id]}:name", 'blocked'], [stored['externalId'], stored.dig('classification', 'moderation', 'decision')]
     assert_equal 'sdk/transport-error', assert_raises(CalmLens::Error) { app.discussion.submit('Ada', 'Hi', 'unavailable') }.code
     capture_io { assert_equal 502, post_reply(app, demo_result: 'unavailable').first }
     page = home(app)

@@ -10,37 +10,29 @@ module CalmLens
     OPERATIONS = 'policies'
 
     # Lists one page of the organisation's policies, oldest first unless `sort` says otherwise.
-    # @option options [String] :cursor the previous page's `nextCursor`
+    # @option options [String] :cursor the previous page's `next_cursor`
     # @option options [Integer] :page_size 1 to 100, default 50
     # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
     #   with `-`; `createdAt` by default
-    # @return [Hash] a cursor page: items, nextCursor and hasMore.
-    def list(options = {})
+    # @return [PolicyPage] {Page#auto_paging_each} fetches the rest.
+    def list(**options)
       call(options, __method__) do |api, request|
-        cursor_page(request('GET', '/policies', query: api, request_options: request), 'policy')
+        page(PolicyPage, request('GET', '/policies', query: api, request_options: request), options) { list(**_1) }
       end
     end
 
-    # Iterates every policy of the organisation, fetching pages as needed.
-    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
-    # @yieldparam policy [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each(options = {}, &block)
-      return enum_for(:each, options) unless block
-
-      each_item(options, __method__, method(:list), &block)
-    end
-
-    # @option options [String] :policy_id
-    # @return [Hash] the policy
-    def retrieve(options)
-      call(options, __method__) { |api, request| request('GET', policy_path(api), request_options: request) }
+    # @param policy_id [String]
+    # @return [Policy]
+    def retrieve(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
+        build(Policy, request('GET', policy_path(api), request_options: request))
+      end
     end
 
     # The policy the project moderates with.
-    # @return [Hash] the policy
-    def retrieve_assigned(options = {})
-      call(options, __method__) { |_api, request| request('GET', project('policy'), request_options: request) }
+    # @return [Policy]
+    def retrieve_assigned(**options)
+      call(options, __method__) { |_api, request| build(Policy, request('GET', project('policy'), request_options: request)) }
     end
 
     # Creates a policy from `settings` (defining every category) with a `name`, or a copy of the
@@ -48,70 +40,70 @@ module CalmLens
     # assigned to a project or named on an upload preset.
     # @option options [String] :name required with `settings`; a preset copy defaults to its name
     # @option options [String] :description
-    # @option options [Hash] :settings `categorySettings` with every category, each with its
-    #   `action`, `allowances` and `restrictions`
+    # @option options [Hash, PolicySettings] :settings `category_settings` with every category, each
+    #   with its `action`, `allowances` and `restrictions`, or another policy's `settings`
     # @option options [String] :preset_id `general-community`, `children-platform`, `education-support`
     #   or `wholesome-community`
-    # @return [Hash] the policy
-    def create(options)
-      call(options, __method__) { |api, request| request('POST', '/policies', body: api, request_options: request) }
+    # @return [Policy]
+    def create(**options)
+      call(options, __method__) { |api, request| build(Policy, request('POST', '/policies', body: api, request_options: request)) }
     end
 
     # Changes the name, description or settings (complete, defining every category); later
     # moderation uses them. Saving a `live` policy pins it.
-    # @option options [String] :policy_id
+    # @param policy_id [String]
     # @option options [Integer] :revision the policy's current revision
     # @option options [String] :name
     # @option options [String] :description
     # @option options [Hash] :settings
-    # @return [Hash] the policy
-    def update(options)
-      call(options, __method__) do |api, request|
-        request('PATCH', policy_path(api), body: without(api, 'policyId'), request_options: request)
+    # @return [Policy]
+    def update(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
+        build(Policy, request('PATCH', policy_path(api), body: without(api, 'policyId'), request_options: request))
       end
     end
 
     # Restores the settings of the preset release a `pinned` or `copy` policy is pinned to.
-    # @option options [String] :policy_id
+    # @param policy_id [String]
     # @option options [Integer] :revision the policy's current revision
     # @option options [Integer] :preset_version the pinned `preset.version` you reviewed
-    # @return [Hash] the policy
-    def reset(options)
-      call(options, __method__) do |api, request|
-        request('POST', "#{policy_path(api)}/reset", body: without(api, 'policyId'), request_options: request)
+    # @return [Policy]
+    def reset(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
+        build(Policy, request('POST', "#{policy_path(api)}/reset", body: without(api, 'policyId'), request_options: request))
       end
     end
 
     # Moves an unchanged `pinned` or `copy` policy to the latest release of its preset.
-    # @option options [String] :policy_id
+    # @param policy_id [String]
     # @option options [Integer] :revision the policy's current revision
     # @option options [Integer] :preset_version the `preset.latestVersion` you reviewed
-    # @return [Hash] the policy
-    def upgrade(options)
-      call(options, __method__) do |api, request|
-        request('POST', "#{policy_path(api)}/upgrade", body: without(api, 'policyId'), request_options: request)
+    # @return [Policy]
+    def upgrade(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
+        build(Policy, request('POST', "#{policy_path(api)}/upgrade", body: without(api, 'policyId'), request_options: request))
       end
     end
 
     # Switches automatic updates on (mode `live`) or off (mode `pinned`) for the organisation's own
     # preset policy. Switching on replaces the saved settings with the latest preset settings under
     # the same ID; switching off pins the current preset version with unchanged settings.
-    # @option options [String] :policy_id
+    # @param policy_id [String]
     # @option options [Boolean] :enabled
     # @option options [Integer] :revision the policy's current revision
     # @option options [Integer] :preset_version the preset's `latestVersion`
-    # @return [Hash] the policy
-    def set_automatic_updates(options) # rubocop:disable Naming/AccessorMethodName -- the shared SDK surface name
-      call(options, __method__) do |api, request|
-        request('PUT', "#{policy_path(api)}/automatic-updates", body: without(api, 'policyId'), request_options: request)
+    # @return [Policy]
+    def set_automatic_updates(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
+        build(Policy, request('PUT', "#{policy_path(api)}/automatic-updates", body: without(api, 'policyId'), request_options: request))
       end
     end
 
     # Deletes a policy that no project or upload preset uses.
-    # @option options [String] :policy_id
+    # @param policy_id [String]
     # @return [nil]
-    def delete(options)
-      call(options, __method__) do |api, request|
+    def delete(policy_id, **options)
+      call(with_ids(options, policy_id: policy_id), __method__) do |api, request|
         request('DELETE', policy_path(api), request_options: request)
         nil
       end
@@ -120,9 +112,9 @@ module CalmLens
     # Chooses the policy the project moderates with. Later uploads use it, except those through an
     # upload preset that names its own policy.
     # @option options [String] :policy_id
-    # @return [Hash] the policy
-    def assign(options)
-      call(options, __method__) { |api, request| request('PUT', project('policy'), body: api, request_options: request) }
+    # @return [Policy]
+    def assign(**options)
+      call(options, __method__) { |api, request| build(Policy, request('PUT', project('policy'), body: api, request_options: request)) }
     end
 
     private

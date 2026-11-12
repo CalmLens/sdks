@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.authors = ['CalmLens']
   spec.homepage = 'https://calmlens.com/docs/sdk/ruby'
   spec.license = 'MIT'
-  spec.required_ruby_version = '>= 3.1'
+  spec.required_ruby_version = '>= 3.3'
   spec.metadata = {
     'homepage_uri' => 'https://calmlens.com',
     'documentation_uri' => 'https://calmlens.com/docs/sdk/ruby',

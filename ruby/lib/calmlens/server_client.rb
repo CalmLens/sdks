@@ -18,9 +18,9 @@ module CalmLens
     DEFAULT_TIMEOUT = 120
     DEFAULT_OPEN_TIMEOUT = 10
     DEFAULT_MAX_RETRIES = 2
-    # Seconds before the first retry; later retries wait twice as long each time, up to RETRY_MAX_DELAY.
+    # Seconds before the first retry; later retries wait twice as long each time, up to `max_retry_delay`.
     DEFAULT_RETRY_BASE_DELAY = 0.5
-    RETRY_MAX_DELAY = 8
+    DEFAULT_MAX_RETRY_DELAY = 8
     # A `Retry-After` longer than this many seconds is returned to the caller instead of waited out.
     RETRY_AFTER_MAX = 60
     # The largest response body read, in bytes (32 MiB).
@@ -58,9 +58,9 @@ module CalmLens
     # @return [MetadataFields]
     attr_reader :metadata_fields
 
-    # @param api_key [String] a project API key. Keep it on your server.
-    # @param project_id [String]
-    # @param base_url [String] the API base URL.
+    # @param api_key [String] a project API key, `CALMLENS_API_KEY` by default. Keep it on your server.
+    # @param project_id [String] `CALMLENS_PROJECT_ID` by default.
+    # @param base_url [String] the API base URL, `CALMLENS_BASE_URL` when set.
     # @param cdn_base_url [String] the CDN base URL.
     # @param timeout [Numeric] seconds allowed for each socket read or write, including waiting for a
     #   moderation decision. It is not a deadline for a whole transfer, so large uploads and downloads
@@ -76,27 +76,49 @@ module CalmLens
     #   `idempotency/request-in-progress` are retried with jittered exponential backoff, honouring
     #   `Retry-After`. Other writes are never retried. 0 disables retries.
     # @param retry_base_delay [Numeric] seconds before the first retry when the API gives no
-    #   `Retry-After`; later retries wait up to twice as long each time, at most 8 seconds.
+    #   `Retry-After`; later retries wait up to twice as long each time, at most `max_retry_delay`.
+    # @param max_retry_delay [Numeric] the longest wait between retries, in seconds, when the API gives
+    #   no `Retry-After`; 8 by default.
     # @param part_size_bytes [Integer] content larger than this many bytes whose size the client knows
     #   and can read again (a binary String, base64, or a File, StringIO or other seekable IO) is
     #   uploaded in parts of this size: each part is retried on its own, and calling again with the
     #   same `idempotency_key` resumes an interrupted upload. From 5 MiB to 64 MiB; default 8 MiB.
     # @param transport [#call, nil] a custom {Transport}; defaults to {Transport::NetHTTP}.
+    # @param app_info [Hash, nil] `{name:, version:, url:}` of your integration, added to the
+    #   `User-Agent` as `name/version (url)`; `version` and `url` are optional.
+    # @param logger [Logger, nil] logs each request attempt: its operation, method, path, status,
+    #   attempt, duration and request ID, never the API key, bodies, upload tokens or CDN URLs. With
+    #   `CALMLENS_LOG` set and no logger, logs to standard error.
+    # @param log_level [String, nil] `info` (each attempt's outcome) or `debug` (also each attempt as
+    #   it starts); `CALMLENS_LOG` by default, else `info` when a logger is given.
+    # @param on_request [#call, nil] called after each attempt with
+    #   `{operation:, method:, path:, attempt:, delay:, status:, request_id:, duration:}`: `delay` is
+    #   the wait before the next attempt (nil when there is none), `duration` the attempt's seconds,
+    #   and `path` nil for a CDN URL, which may be signed. Use it for metrics or tracing.
     # @raise [ConfigurationError] `sdk/invalid-config` for a missing or malformed setting.
-    def initialize(api_key:, project_id:, base_url: DEFAULT_BASE_URL, cdn_base_url: DEFAULT_CDN_BASE_URL,
+    def initialize(api_key: ENV.fetch('CALMLENS_API_KEY', nil), project_id: ENV.fetch('CALMLENS_PROJECT_ID', nil),
+                   base_url: ENV.fetch('CALMLENS_BASE_URL', DEFAULT_BASE_URL), cdn_base_url: DEFAULT_CDN_BASE_URL,
                    timeout: DEFAULT_TIMEOUT, open_timeout: DEFAULT_OPEN_TIMEOUT, upload_timeout: nil,
                    max_retries: DEFAULT_MAX_RETRIES, retry_base_delay: DEFAULT_RETRY_BASE_DELAY,
-                   max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES, part_size_bytes: DEFAULT_PART_SIZE_BYTES, transport: nil)
+                   max_retry_delay: DEFAULT_MAX_RETRY_DELAY, max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
+                   part_size_bytes: DEFAULT_PART_SIZE_BYTES, transport: nil, app_info: nil, logger: nil, log_level: nil,
+                   on_request: nil)
       check_config(api_key, project_id, timeout, open_timeout, max_retries, retry_base_delay, transport)
+      observability = ServerClient.observability(logger, log_level, on_request)
+      unless max_retry_delay.is_a?(Numeric) && max_retry_delay.real? && max_retry_delay.to_f.finite? && max_retry_delay >= 0
+        raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'max_retry_delay must be a non-negative number')
+      end
+
       check_limits(upload_timeout, max_response_bytes, part_size_bytes)
       @project_id = project_id
       @base_url = ServerClient.check_url(base_url, 'base_url')
       @cdn_base_url = ServerClient.check_url(cdn_base_url, 'cdn_base_url')
       @session = Session.new(api_key: api_key, project_id: project_id, base_url: @base_url,
                              cdn_base_url: @cdn_base_url, timeout: timeout, open_timeout: open_timeout,
-                             max_retries: max_retries, retry_base_delay: retry_base_delay,
+                             max_retries: max_retries, retry_base_delay: retry_base_delay, max_retry_delay: max_retry_delay,
                              max_response_bytes: max_response_bytes, upload_timeout: upload_timeout,
-                             part_size_bytes: part_size_bytes, transport: transport || Transport::NetHTTP.new)
+                             part_size_bytes: part_size_bytes, transport: transport || Transport::NetHTTP.new,
+                             user_agent: ServerClient.user_agent(app_info), **observability)
       @assets = Assets.new(@session)
       @folders = Folders.new(@session)
       @hash_lists = HashLists.new(@session)
@@ -135,12 +157,75 @@ module CalmLens
     # definition again returns the lens unchanged. More than 100 new definitions are sent in
     # consecutive requests, in order. {#lenses} manages lenses one by one.
     # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, transform:, ...}]`, each served unless `active: false`
-    # @return [Array<Hash>] the saved lenses, in the given order.
-    def ensure_lenses(options) = @lenses.ensure_lenses(options)
+    # @return [Array<Lens>] the saved lenses, in the given order.
+    def ensure_lenses(**) = @lenses.ensure_lenses(**)
 
-    # Creates or updates one lens. Takes one lens definition; see {#ensure_lenses}.
-    # @return [Hash] the saved lens
-    def ensure_lens(options) = @lenses.ensure_lens(options)
+    # Creates or updates one lens. Takes one lens definition as keywords; see {#ensure_lenses}.
+    # @return [Lens] the saved lens
+    def ensure_lens(**definition) = @lenses.ensure_lens(**definition)
+
+    # Sends a request to any API path with the client's authentication, retries and error mapping,
+    # for endpoints this release has no method for. Reads are retried; writes only with
+    # `request_options: {idempotency_key:}`.
+    # @param method [String] `GET`, `POST`, `PUT`, `PATCH` or `DELETE`
+    # @param path [String] beneath the base URL, such as `/projects/prj_1/assets`
+    # @param query [Hash] query parameters
+    # @param body [Hash, nil] a JSON body
+    # @param headers [Hash{String => String}] extra headers; the API key and user agent are the client's
+    # @return [Model, Object, nil] a {Model} for a JSON object (with `last_response`), else the parsed JSON
+    def request(method, path, query: {}, body: nil, headers: {}, request_options: {})
+      verb = method.to_s.upcase
+      raise Internal.invalid('method must be GET, POST, PUT, PATCH or DELETE') unless %w[GET POST PUT PATCH DELETE].include?(verb)
+      raise Internal.invalid('path must start with / and stay on the API') unless path.is_a?(String) && path.match?(%r{\A/(?!/)})
+      raise Internal.invalid('query must be a Hash') unless query.is_a?(Hash)
+
+      _, options = Internal.options({ request_options: request_options })
+      Thread.current[:calmlens_operation] ||= 'request'
+      json = @session.request(verb, path, query: query.transform_keys(&:to_s), body: body && Internal.normalize(body),
+                                          headers: Internal.headers(headers), request_options: options)
+      json.is_a?(Hash) ? Model.new(json, last_response: @session.last_response) : json
+    ensure
+      Thread.current[:calmlens_operation] = nil if Thread.current[:calmlens_operation] == 'request'
+    end
+
+    # The `User-Agent`, with your integration's name, version and URL.
+    # @api private
+    def self.user_agent(app_info)
+      return Session::USER_AGENT if app_info.nil?
+
+      info = app_info.to_h.transform_keys(&:to_sym)
+      name, version, url = info.values_at(:name, :version, :url)
+      unless name.is_a?(String) && name.match?(%r{\A[^\s/()]+\z}) && [version, url].all? do |part|
+        part.nil? || (part.is_a?(String) && part.match?(Internal::HEADER_VALUE))
+      end
+        raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'app_info needs a name without spaces, and String version and url')
+      end
+
+      "#{Session::USER_AGENT} #{[name, version].compact.join('/')}#{" (#{url})" if url}"
+    end
+
+    # Writes log lines to standard error when `CALMLENS_LOG` is set without a logger; any Ruby
+    # `Logger` works in its place.
+    # @api private
+    class StderrLogger
+      def info(&) = warn(yield)
+      def debug(&) = warn(yield)
+    end
+
+    # The logger, level and hook the session reports attempts to.
+    # @api private
+    def self.observability(logger, log_level, on_request)
+      level = (log_level || ENV.fetch('CALMLENS_LOG', nil))&.to_s&.downcase
+      raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'log_level must be info or debug') unless [nil, 'info',
+                                                                                                             'debug'].include?(level)
+      unless on_request.nil? || on_request.respond_to?(:call)
+        raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG,
+                                     'on_request must respond to call')
+      end
+
+      logger ||= StderrLogger.new if level
+      { logger: logger, log_level: level || (logger && 'info'), on_request: on_request }
+    end
 
     # @api private
     def self.check_url(value, name)

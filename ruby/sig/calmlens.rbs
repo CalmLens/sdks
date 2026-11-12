@@ -16,6 +16,7 @@ module CalmLens
     INVALID_RESPONSE: String
     HTTP_ERROR: String
     RESPONSE_TOO_LARGE: String
+    CANCELLED: String
     INVALID_WEBHOOK_SIGNATURE: String
     INVALID_WEBHOOK_PAYLOAD: String
   end
@@ -27,8 +28,15 @@ module CalmLens
     attr_reader status: Integer?
     attr_reader request_id: String?
     attr_reader headers: Hash[String, String]
+    # The error response's body as received, at most BODY_LIMIT bytes; nil without a response.
+    attr_reader body: String?
+    # The request's HTTP method and URL, for an API error response.
+    attr_reader http_method: String?
+    attr_reader url: String?
+    BODY_LIMIT: Integer
     def initialize: (String code, ?String? message, ?details: Hash[String, json_value]?, ?status: Integer?,
-                     ?headers: Hash[String, String], ?request_id: String?) -> void
+                     ?headers: Hash[String, String], ?request_id: String?, ?body: String?, ?http_method: String?,
+                     ?url: String?) -> void
     # Whole seconds from the `Retry-After` header.
     def retry_after: () -> Integer?
     def local?: () -> bool
@@ -43,14 +51,60 @@ module CalmLens
   class PermissionDeniedError < APIError end
   class NotFoundError < APIError end
   class ConflictError < APIError end
+  class PayloadTooLargeError < APIError end
+  class UnprocessableEntityError < APIError end
   class RateLimitError < APIError end
   class ServerError < APIError end
   class ConnectionError < Error end
-  class TimeoutError < ConnectionError end
+  class TimeoutError < Error end
+  class CancelledError < Error end
   class InvalidResponseError < Error end
   class InvalidArgumentError < Error end
   class ConfigurationError < InvalidArgumentError end
   class WebhookVerificationError < Error end
+
+  # A read-only API object. Fields have snake_case readers and can be read with `[]` by reader name
+  # or API key; to_h is the API's JSON form.
+  # What the API answered to the request that returned a result.
+  class LastResponse
+    attr_reader status: Integer
+    attr_reader headers: Hash[String, String]
+    attr_reader request_id: String?
+    def initialize: (status: Integer, headers: Hash[String, String], request_id: String?) -> void
+  end
+
+  class Model
+    def initialize: (Hash[String, untyped] values, ?last_response: LastResponse?) -> void
+    # The response that returned this result; nil for an object inside one.
+    attr_reader last_response: LastResponse?
+    def []: (Symbol | String key) -> untyped
+    def key?: (Symbol | String key) -> bool
+    def dig: (Symbol | String key, *untyped rest) -> untyped
+    def values_at: (*(Symbol | String) keys) -> Array[untyped]
+    def keys: () -> Array[Symbol]
+    def to_h: () -> Hash[String, json_value]
+    def deconstruct_keys: (Array[Symbol]? keys) -> Hash[Symbol, untyped]
+    def to_json: (*untyped) -> String
+    def ==: (untyped other) -> bool
+    def eql?: (untyped other) -> bool
+    def hash: () -> Integer
+  end
+
+  # One page of a list; enumerating it yields this page's items.
+  class Page[T] < Model
+    include Enumerable[T]
+    def initialize: (Hash[String, untyped] values, ?fetch: (^(String cursor) -> Page[T])?, ?cursor: String?,
+                     ?last_response: LastResponse?) -> void
+    def each: () { (T) -> void } -> self
+            | () -> Enumerator[T, self]
+    def empty?: () -> bool
+    def next_page?: () -> bool
+    def next_page: () -> self
+    def each_page: () { (self) -> void } -> nil
+                 | () -> Enumerator[self, nil]
+    def auto_paging_each: () { (T) -> void } -> nil
+                        | () -> Enumerator[T, nil]
+  end
 
   class Response
     attr_reader status: Integer
@@ -107,7 +161,7 @@ module CalmLens
     DEFAULT_OPEN_TIMEOUT: Integer
     DEFAULT_MAX_RETRIES: Integer
     DEFAULT_RETRY_BASE_DELAY: Float
-    RETRY_MAX_DELAY: Integer
+    DEFAULT_MAX_RETRY_DELAY: Integer
     RETRY_AFTER_MAX: Integer
     DEFAULT_MAX_RESPONSE_BYTES: Integer
     DEFAULT_PART_SIZE_BYTES: Integer
@@ -129,12 +183,29 @@ module CalmLens
     attr_reader project_id: String
     attr_reader base_url: String
     attr_reader cdn_base_url: String
-    def initialize: (api_key: String, project_id: String, ?base_url: String, ?cdn_base_url: String, ?timeout: number,
+    def initialize: (?api_key: String?, ?project_id: String?, ?base_url: String, ?cdn_base_url: String, ?timeout: number,
                      ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number,
-                     ?max_response_bytes: Integer, ?part_size_bytes: Integer, ?transport: Transport::_Transport?) -> void
+                     ?max_retry_delay: number, ?max_response_bytes: Integer, ?part_size_bytes: Integer,
+                     ?transport: Transport::_Transport?, ?app_info: app_info?, ?logger: _Logger?, ?log_level: ("info" | "debug")?,
+                     ?on_request: (^(request_event event) -> void)?) -> void
     def close: () -> nil
-    def ensure_lenses: (ensure_lenses_options options) -> Array[lens]
-    def ensure_lens: (ensure_lens_options options) -> lens
+    # Sends a request to any API path with the client's authentication, retries and error mapping.
+    def request: (String method, String path, ?query: Hash[String | Symbol, untyped], ?body: Hash[String | Symbol, untyped]?,
+                  ?headers: Hash[String, String], ?request_options: request_options) -> (Model | json_value)
+    def ensure_lenses: (lenses: Array[lens_definition], ?request_options: request_options) -> Array[Lens]
+    def ensure_lens: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
+  end
+
+  # Your integration's name, version and URL, added to the User-Agent.
+  type app_info = { name: String, ?version: String, ?url: String }
+  # One request attempt, as ServerClient's `on_request:` hook receives it.
+  type request_event = { operation: String?, method: String, path: String?, attempt: Integer, delay: number?,
+                         status: Integer?, request_id: String?, duration: Float }
+
+  # A Ruby Logger, or anything with `info` and `debug` taking a block.
+  interface _Logger
+    def info: () { () -> String } -> untyped
+    def debug: () { () -> String } -> untyped
   end
 
   class Resource
@@ -162,102 +233,91 @@ module CalmLens
     BATCH_OPERATIONS: Array[asset_batch_operation]
     MAX_BATCH_ASSETS: Integer
 
-    def search: (asset_search_options options) -> asset_search_response
-    def list: (?list_assets_options options) -> asset_page
-    def each: (?list_assets_options options) { (asset) -> void } -> nil
-            | (?list_assets_options options) -> Enumerator[asset, nil]
-    def list_children: (list_asset_children_options options) -> asset_page
-    def each_child: (list_asset_children_options options) { (asset) -> void } -> nil
-                  | (list_asset_children_options options) -> Enumerator[asset, nil]
-    def list_timeline: (list_asset_timeline_options options) -> asset_timeline_page
-    def each_timeline_segment: (list_asset_timeline_options options) { (media_segment) -> void } -> nil
-                             | (list_asset_timeline_options options) -> Enumerator[media_segment, nil]
-    def retrieve: (asset_id_options options) -> asset
-    def wait_for_decision: (wait_for_decision_options options) -> asset
-    def update: (update_asset_options options) -> asset
-    def retry: (asset_id_options options) -> asset
-    def decide: (decide_asset_options options) -> asset
-    def explain: (explain_asset_options options) -> asset
-    def remove_content: (asset_id_options options) -> asset
-    def delete: (asset_id_options options) -> nil
-    def batch: (batch_assets_options options) -> batch_assets_response
-    def move: (move_asset_options options) -> asset
-    def create: (upload_options options) -> asset
-    def classify: (upload_options options) -> asset
-    def upload_part: (upload_part_options options) -> asset
+    def search: (query: String, ?mode: asset_search_mode, ?page_size: Integer, ?request_options: request_options) -> AssetSearchResult
+    def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?filter: String?, ?request_options: request_options) -> AssetPage
+    def list_children: (String asset_id, ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> AssetPage
+    def list_timeline: (String asset_id, ?cursor: String, ?page_size: Integer, ?request_options: request_options) -> AssetTimelinePage
+    def retrieve: (String asset_id, ?request_options: request_options) -> Asset
+    def wait_for_decision: (String asset_id, ?timeout: number, ?request_options: request_options) -> Asset
+    def update: (String asset_id, ?name: String, ?description: String?, ?external_id: String?, ?external_url: String?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?visibility: asset_visibility?, ?request_options: request_options) -> Asset
+    def retry: (String asset_id, ?request_options: request_options) -> Asset
+    def decide: (String asset_id, decision: "allowed" | "limited" | "age-restricted" | "blocked" | "purged", note: String, ?confirm_purge: true, ?request_options: request_options) -> Asset
+    def explain: (String asset_id, ?rerun: bool, ?request_options: request_options) -> Asset
+    def remove_content: (String asset_id, ?request_options: request_options) -> Asset
+    def delete: (String asset_id, ?request_options: request_options) -> nil
+    def batch: (asset_ids: Array[String], operation: asset_batch_operation, ?request_options: request_options) -> AssetBatch
+    def move: (String asset_id, folder_id: String?, ?request_options: request_options) -> Asset
+    def create: (name: String, content: upload_content, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+               | (name: String, part: upload_first_part, ?total_size_in_bytes: Integer, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+               | (name: String, url: String, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+    def classify: (name: String, content: upload_content, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+                 | (name: String, part: upload_first_part, ?total_size_in_bytes: Integer, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+                 | (name: String, url: String, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
+    def upload_part: (String asset_id, part: upload_part, ?wait: bool, ?request_options: request_options) -> Asset
     # Waits between decision checks; a mock client's waits take no real time.
     private def sleep: (Numeric seconds) -> void
   end
 
   class Folders < Resource
-    def list: (?list_folders_options options) -> folder_page
-    def each: (?list_folders_options options) { (folder) -> void } -> nil
-            | (?list_folders_options options) -> Enumerator[folder, nil]
-    def create: (create_folder_options options) -> folder
-    def retrieve: (folder_id_options options) -> folder
-    def update: (update_folder_options options) -> folder
-    def move: (move_folder_options options) -> folder
-    def delete: (folder_id_options options) -> nil
+    def list: (?parent_id: String, ?cursor: String, ?page_size: Integer, ?sort: sort, ?search: String, ?request_options: request_options) -> FolderPage
+    def create: (name: String, ?parent_id: String?, ?request_options: request_options) -> Folder
+    def retrieve: (String folder_id, ?request_options: request_options) -> Folder
+    def update: (String folder_id, ?name: String, ?request_options: request_options) -> Folder
+    def move: (String folder_id, parent_id: String?, ?request_options: request_options) -> Folder
+    def delete: (String folder_id, ?request_options: request_options) -> nil
   end
 
   class HashLists < Resource
-    def list: (?list_hash_lists_options options) -> hash_list_page
-    def each: (?list_hash_lists_options options) { (hash_list) -> void } -> nil
-            | (?list_hash_lists_options options) -> Enumerator[hash_list, nil]
-    def retrieve: (hash_list_id_options options) -> hash_list
-    def create: (create_hash_list_options options) -> hash_list
-    def update: (update_hash_list_options options) -> hash_list
-    def delete: (hash_list_id_options options) -> nil
-    def list_entries: (list_hash_list_entries_options options) -> hash_list_entry_page
-    def each_entry: (list_hash_list_entries_options options) { (hash_list_entry) -> void } -> nil
-                  | (list_hash_list_entries_options options) -> Enumerator[hash_list_entry, nil]
-    def add_entry: (add_hash_list_entry_options options) -> hash_list_entry
-    def remove_entry: (hash_list_entry_id_options options) -> nil
+    def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> HashListPage
+    def retrieve: (String hash_list_id, ?request_options: request_options) -> HashList
+    def create: (name: String, action: hash_list_action, ?description: String?, ?request_options: request_options) -> HashList
+    def update: (String hash_list_id, ?name: String, ?description: String?, ?action: hash_list_action, ?request_options: request_options) -> HashList
+    def delete: (String hash_list_id, ?request_options: request_options) -> nil
+    def list_entries: (String hash_list_id, ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> HashListEntryPage
+    def add_entry: (String hash_list_id, ?hash: String, ?quality: number, ?asset_id: String, ?label: String, ?request_options: request_options) -> HashListEntry
+    def remove_entry: (String entry_id, ?request_options: request_options) -> nil
   end
 
   class Policies < Resource
-    def list: (?list_policies_options options) -> policy_page
-    def each: (?list_policies_options options) { (policy) -> void } -> nil
-            | (?list_policies_options options) -> Enumerator[policy, nil]
-    def retrieve: (policy_id_options options) -> policy
+    def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> PolicyPage
+    def retrieve: (String policy_id, ?request_options: request_options) -> Policy
     # The policy the project moderates with.
-    def retrieve_assigned: (?request_only_options options) -> policy
-    def create: (create_policy_options options) -> policy
-    def update: (update_policy_options options) -> policy
-    def reset: (restore_policy_options options) -> policy
-    def upgrade: (restore_policy_options options) -> policy
-    def set_automatic_updates: (set_policy_automatic_updates_options options) -> policy
-    def delete: (policy_id_options options) -> nil
-    def assign: (assign_policy_options options) -> policy
+    def retrieve_assigned: (?request_options: request_options) -> Policy
+    def create: (?name: String, ?description: String, ?settings: policy_settings_input, ?preset_id: policy_preset_id, ?request_options: request_options) -> Policy
+    def update: (String policy_id, revision: Integer, ?name: String, ?description: String, ?settings: policy_settings_input, ?request_options: request_options) -> Policy
+    def reset: (String policy_id, revision: Integer, preset_version: Integer, ?request_options: request_options) -> Policy
+    def upgrade: (String policy_id, revision: Integer, preset_version: Integer, ?request_options: request_options) -> Policy
+    def set_automatic_updates: (String policy_id, enabled: bool, revision: Integer, preset_version: Integer, ?request_options: request_options) -> Policy
+    def delete: (String policy_id, ?request_options: request_options) -> nil
+    def assign: (policy_id: String, ?request_options: request_options) -> Policy
   end
 
   class Lenses < Resource
-    def list: (?list_lenses_options options) -> lens_page
-    def each: (?list_lenses_options options) { (lens) -> void } -> nil
-            | (?list_lenses_options options) -> Enumerator[lens, nil]
-    def create: (create_lens_options options) -> lens
-    def retrieve: (lens_id_options options) -> lens
-    def update: (update_lens_options options) -> lens
-    def delete: (lens_id_options options) -> nil
+    # ServerClient#ensure_lenses and #ensure_lens call these.
+    def ensure_lenses: (lenses: Array[lens_definition], ?request_options: request_options) -> Array[Lens]
+    def ensure_lens: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
+    def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> LensPage
+    def create: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
+    def retrieve: (String lens_id, ?request_options: request_options) -> Lens
+    def update: (String lens_id, ?name: String, ?description: String?, ?type: lens_type, ?active: bool, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
+    def delete: (String lens_id, ?request_options: request_options) -> nil
   end
 
   class UploadPresets < Resource
-    def list: (?list_upload_presets_options options) -> upload_preset_page
-    def each: (?list_upload_presets_options options) { (upload_preset) -> void } -> nil
-            | (?list_upload_presets_options options) -> Enumerator[upload_preset, nil]
-    def ensure: (ensure_upload_presets_options options) -> ensure_upload_presets_response
-    def delete: (upload_preset_id_options options) -> nil
+    def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> UploadPresetPage
+    def ensure: (upload_presets: Array[upload_preset_definition], ?request_options: request_options) -> UploadPresetsEnsured
+    def delete: (String upload_preset_id, ?request_options: request_options) -> nil
   end
 
   class ProjectSettings < Resource
-    def get: (?request_only_options options) -> project_settings_resource
-    def update: (update_project_settings_options options) -> project_settings_resource
+    def get: (?request_options: request_options) -> ProjectSettingsResource
+    def update: (?revision: Integer, settings: project_settings_input, ?search_indexing_budget_units: number, ?request_options: request_options) -> ProjectSettingsResource
   end
 
   class MetadataFields < Resource
-    def list: (?request_only_options options) -> metadata_fields_resource
-    def ensure: (ensure_metadata_fields_options options) -> metadata_fields_resource
-    def delete: (delete_metadata_field_options options) -> nil
+    def list: (?request_options: request_options) -> MetadataFieldsResource
+    def ensure: (?revision: Integer, fields: Array[metadata_field_input], ?request_options: request_options) -> MetadataFieldsResource
+    def delete: (String field_id, ?revision: Integer, ?request_options: request_options) -> nil
   end
 
   class UploadTokens < Resource
@@ -266,20 +326,16 @@ module CalmLens
     DEFAULT_TTL_SECONDS: Integer
     MAX_TTL_SECONDS: Integer
     private def initialize: (untyped session, String api_key) -> void
-    def sign: (sign_upload_token_options options) -> signed_upload_token
+    def sign: (upload_preset_id: String, ?external_id: String, ?expires_in: Integer, ?request_options: request_options) -> SignedUploadToken
   end
 
   class Text < Resource
     private def initialize: (untyped session, Assets assets) -> void
-    def classify: (moderate_text_options options) -> asset
+    def classify: (text: String, ?name: String, ?description: String?, ?visibility: asset_visibility?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?author_id: String, ?context: moderation_context_input, ?external_id: String?, ?external_url: String?, ?folder_id: String?, ?upload_preset_id: String, ?processing_options: processing_options_input?, ?request_options: request_options) -> Asset
   end
 
   class Events < Resource
-    def list: (?list_events_options options) -> events_page
-    def each_page: (?list_events_options options) { (events_page) -> void } -> nil
-                 | (?list_events_options options) -> Enumerator[events_page, nil]
-    def each: (?list_events_options options) { (event) -> void } -> nil
-            | (?list_events_options options) -> Enumerator[event, nil]
+    def list: (?cursor: String, ?page_size: Integer, ?types: Array[event_type], ?asset_id: String, ?request_options: request_options) -> EventPage
   end
 
   class CDN < Resource
@@ -293,40 +349,46 @@ module CalmLens
     EXTERNAL_ID_PREFIX: String
     # The ISO 3166-1 alpha-2 countries a viewer's `region` can be.
     VIEWER_COUNTRIES: Array[String]
-    def get_asset_url: (asset_url_options options) -> String
-    def sign_asset_url: (sign_asset_url_options options) -> signed_asset_url
-    def get_asset_info: (String url, ?viewer_claims: viewer_claims?) -> asset_info
-    def serve: (serve_options options) -> Response
-             | [T] (serve_options options) { (Response) -> T } -> T
+    def get_asset_url: (?asset_id: String, ?external_id: String, ?project_id: String, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?viewer_claims: viewer_claims, ?request_options: request_options) -> String
+    def sign_asset_url: (?asset_id: String, ?external_id: String, ?project_id: String, ?expires_in: Integer, ?original: bool, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?viewer_claims: viewer_claims, ?request_options: request_options) -> SignedAssetUrl
+    def get_asset_info: (String url, ?viewer_claims: viewer_claims?) -> AssetInfo
+    def serve: (?asset_id: String, ?external_id: String, ?project_id: String, ?viewer_claims: viewer_claims, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] }, ?request_options: request_options) -> Response
+             | [T] (?asset_id: String, ?external_id: String, ?project_id: String, ?viewer_claims: viewer_claims, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] }, ?request_options: request_options) { (Response) -> T } -> T
   end
 
-  # A verified webhook delivery, with the fields of an `events.list` item.
-  class WebhookEvent < Struct[untyped]
-    attr_accessor id: String
-    attr_accessor project_id: String
-    # nil for a delivery without one.
-    attr_accessor actor: actor?
-    # New types may appear: ignore unknown ones.
-    attr_accessor type: event_type | String
-    attr_accessor severity: event_severity?
-    attr_accessor title: String?
-    attr_accessor description: String?
-    attr_accessor asset_id: String?
-    # Increases with each event about the same asset; nil for events not about an asset.
-    attr_accessor asset_sequence: Integer?
-    attr_accessor asset: event_asset?
-    attr_accessor facts: Array[event_fact]
-    # Milliseconds since the Unix epoch.
-    attr_accessor created_at: Integer
-    # The delivery body as received, with every field.
-    attr_accessor payload: Hash[String, json_value]
-    def initialize: (?id: String, ?project_id: String, ?type: event_type | String, ?severity: event_severity?, ?title: String?,
-                     ?description: String?, ?asset_id: String?, ?asset_sequence: Integer?, ?asset: event_asset?, ?facts: Array[event_fact],
-                     ?created_at: Integer, ?payload: Hash[String, json_value]) -> void
+  class Event
+    # Whether the event is a test send from the portal or CLI.
     def test?: () -> bool
+    # Whether to apply this event after `last_sequence`, the highest `asset_sequence` applied for its asset.
     def newer_than?: (Integer? last_sequence) -> bool
-    # The delivery body as received, with every field.
-    def to_payload: () -> Hash[String, json_value]
+  end
+
+  # The display info of an asset URL, from CDN#get_asset_info.
+  class AssetInfo < Model
+    class Content < Model
+      def format: () -> String?
+      def width: () -> Integer?
+      def height: () -> Integer?
+      def duration_seconds: () -> Float?
+      def page_count: () -> Integer?
+      def rendered: () -> Asset::Content::Rendered?
+      def preview: () -> Asset::Content::Preview?
+      def hls: () -> Asset::Content::Hls?
+    end
+
+    def id: () -> String
+    def project_id: () -> String
+    def type: () -> asset_type
+    def external_url: () -> String?
+    def content: () -> Content
+    def availability: () -> asset_availability
+  end
+
+  # A signed upload token from UploadTokens#sign.
+  class SignedUploadToken < Model
+    def token: () -> String
+    # Milliseconds since the Unix epoch.
+    def expires_at: () -> Integer
   end
 
   # Request headers to read webhook headers from: names in any case, repeated values as an Array
@@ -340,54 +402,55 @@ module CalmLens
   module Webhooks
     def self.signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
     def self.headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
-    def self.to_payload: (event event) -> event
+    def self.to_payload: (Event | Hash[String, untyped] event) -> Hash[String, json_value]
     def self.verify: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
                       ?tolerance_seconds: Integer, ?now: number) -> bool
     def self.verify_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,
                               ?now: number) -> bool
     def self.parse_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
-                           ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
-    def self.test_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
-    def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
+                           ?tolerance_seconds: Integer, ?now: number) -> Event
+    def self.test_event?: (Event | Hash[String, untyped] event) -> bool
+    def self.newer_asset_event?: (Event | Hash[String, untyped] event, Integer? last_sequence) -> bool
   # The value of an event's fact by key (the first, when the event repeats it), or nil without one.
-  def self.get_event_fact: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
+  def self.get_event_fact: (Event | Hash[String, untyped] event, String key) -> event_fact_value
   # An event's facts as values by key; a repeated key keeps its first value.
-  def self.get_event_facts: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
+  def self.get_event_facts: (Event | Hash[String, untyped] event) -> Hash[String, event_fact_value]
   end
 
   module EventFacts
-    def self.value: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
-    def self.values: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
+    def self.value: (Event | Hash[String, untyped] event, String key) -> event_fact_value
+    def self.values: (Event | Hash[String, untyped] event) -> Hash[String, event_fact_value]
   end
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
   def self.create_webhook_headers: (payload: String, delivery_id: String, secret: String, ?timestamp: Integer) -> Hash[String, String]
-  def self.to_webhook_event_payload: (event event) -> event
+  def self.to_webhook_event_payload: (Event | Hash[String, untyped] event) -> Hash[String, json_value]
   def self.verify_webhook_signature: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
                                       ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> bool
   def self.verify_webhook_request: (payload: String, headers: webhook_headers, secret: String, ?tolerance_seconds: Integer,
                                     ?now: number) -> bool
   def self.parse_webhook_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
-                                 ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
-  def self.test_webhook_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
-  def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
+                                 ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> Event
+  def self.test_webhook_event?: (Event | Hash[String, untyped] event) -> bool
+  def self.newer_asset_event?: (Event | Hash[String, untyped] event, Integer? last_sequence) -> bool
   # The value of an event's fact by key (the first, when the event repeats it), or nil without one.
-  def self.get_event_fact: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
+  def self.get_event_fact: (Event | Hash[String, untyped] event, String key) -> event_fact_value
   # An event's facts as values by key; a repeated key keeps its first value.
-  def self.get_event_facts: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
+  def self.get_event_facts: (Event | Hash[String, untyped] event) -> Hash[String, event_fact_value]
 
   # require 'calmlens/testing'
   module Testing
-    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `classification.moderation.status`.
+    # The mock's in-memory records. Change them to arrange a test, such as setting an asset's `classification.moderation.decision`.
     class State < Struct[untyped]
-      attr_accessor assets: Hash[String, asset]
-      attr_accessor folders: Hash[String, folder]
+      # The records as the API sends them, with camelCase String keys.
+      attr_accessor assets: Hash[String, Hash[String, untyped]]
+      attr_accessor folders: Hash[String, Hash[String, untyped]]
       # Stored bytes by asset ID, with each part's bytes by part number.
       attr_accessor content: Hash[String, { "type" => String, "parts" => Hash[Integer, String] }]
-      attr_accessor events: Array[event]
-      attr_accessor lenses: Hash[String, lens]
-      attr_accessor hash_lists: Hash[String, hash_list]
-      attr_accessor hash_list_entries: Hash[String, hash_list_entry]
+      attr_accessor events: Array[Hash[String, untyped]]
+      attr_accessor lenses: Hash[String, Hash[String, untyped]]
+      attr_accessor hash_lists: Hash[String, Hash[String, untyped]]
+      attr_accessor hash_list_entries: Hash[String, Hash[String, untyped]]
     end
   end
 
@@ -425,14 +488,15 @@ module CalmLens
     # A mock API key carrying permission grants, such as `assets:download` for CDN reads.
     def self.create_api_key: (?Array[Hash[Symbol | String, untyped]] grants) -> String
     # Signs an upload token like UploadTokens#sign at `now` (epoch milliseconds) with `nonce`.
-    def self.sign_upload_token: (String api_key, sign_upload_token_options options, now: Integer, nonce: String) -> signed_upload_token
+    def self.sign_upload_token: (String api_key, sign_upload_token_options options, now: Integer, nonce: String) -> SignedUploadToken
 
     REQUEST_FAILURES: Array[String]
 
     def initialize: (?project_id: String, ?api_key: String, ?base_url: String, ?cdn_base_url: String, ?now: _Clock, ?create_id: _IdFactory,
                      ?moderate: _Moderate?, ?timeout: number,
-                     ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number,
-                     ?max_response_bytes: Integer, ?part_size_bytes: Integer) -> void
+                     ?open_timeout: number, ?upload_timeout: number?, ?max_retries: Integer, ?retry_base_delay: number, ?max_retry_delay: number,
+                     ?max_response_bytes: Integer, ?part_size_bytes: Integer, ?app_info: app_info?, ?logger: _Logger?,
+                     ?log_level: ("info" | "debug")?, ?on_request: (^(request_event event) -> void)?) -> void
     # Replaces the mock API key's grants for later requests; the key stays the same.
     def api_key_grants=: (Array[Hash[Symbol | String, untyped]] grants) -> Array[Hash[Symbol | String, untyped]]
     # Fails the next request (or the next one `operation` sends) with `transport-error`, `timeout`, an
@@ -447,11 +511,11 @@ module CalmLens
     def enqueue_error: (Exception error) -> self
     # Fetches a mock CDN URL with a GET and without the API key, as a browser would.
     def fetch_cdn: (String url) -> Response
-    def enqueue_event: (mock_event_input event) -> event
+    def enqueue_event: (mock_event_input event) -> Event
     # Applies a reviewer's decision and adds the matching `asset.<decision>` event.
-    def decide: (String asset_id, asset_moderation_decision decision) -> asset
+    def decide: (String asset_id, asset_moderation_decision decision) -> Asset
     # Finishes processing an asset as the moderation pipeline would, with `decision` or else `moderate`'s answer.
-    def complete_processing: (String asset_id, ?(MockDecision::status | MockDecision)? decision) -> asset
+    def complete_processing: (String asset_id, ?(MockDecision::status | MockDecision)? decision) -> Asset
     def requests: () -> Array[Request]
     def clear_requests: () -> self
     def remaining_responses: () -> Integer
@@ -487,7 +551,8 @@ module CalmLens
     end
 
     # The stored asset, still processing.
-    attr_accessor asset: asset
+    # The stored asset as the API sends it, still processing.
+    attr_accessor asset: Hash[String, untyped]
     attr_accessor content: Content
     attr_accessor trigger: "upload" | "retry" | "rerun" | "complete"
     attr_accessor queued: bool

@@ -20,7 +20,7 @@ class AutomaticMultipartTest < Minitest::Test
 
   def asset(status, parts_received)
     JSON.generate('id' => 'asset-1', 'upload' => { 'status' => status, 'partsReceived' => parts_received },
-                  'classification' => { 'status' => 'pending', 'moderation' => { 'status' => 'pending' } })
+                  'classification' => { 'status' => 'pending', 'moderation' => { 'decision' => nil } })
   end
 
   def api_error(code, status, details = {}) = [status, JSON.generate('code' => code, 'message' => code, 'details' => details)]
@@ -32,7 +32,7 @@ class AutomaticMultipartTest < Minitest::Test
   end
 
   # A transport that records each request and answers with `respond.call(sent, index)`.
-  def scripted(respond = method(:upload_response).to_proc, **options)
+  def scripted(respond = method(:upload_response).to_proc, **)
     sent = []
     transport = lambda do |request|
       uri = URI(request.url)
@@ -54,7 +54,7 @@ class AutomaticMultipartTest < Minitest::Test
 
       CalmLens::Response.new(status: answer[0], body: answer[1], headers: {})
     end
-    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: transport, retry_base_delay: 0, **options), sent]
+    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: transport, retry_base_delay: 0, **), sent]
   end
 
   def test_content_larger_than_a_part_is_sent_in_parts_with_derived_keys
@@ -63,7 +63,7 @@ class AutomaticMultipartTest < Minitest::Test
     result = client.assets.classify(name: 'clip.mp4', content: { data: file, type: 'video/mp4' }, author_id: 'pupil-7',
                                     request_options: { idempotency_key: 'upload-1' })
 
-    assert_equal 'completed', result.dig('upload', 'status')
+    assert_equal 'completed', result.to_h.dig('upload', 'status')
     assert_equal ['/v1/projects/project-1/assets', '/v1/assets/asset-1/part', '/v1/assets/asset-1/part'], sent.map(&:path)
     assert_equal %w[upload-1 upload-1:part-2 upload-1:part-3], sent.map(&:key)
     assert_equal(%w[1 2 3], sent.map { |request| request.query['partNumber'] })
@@ -120,7 +120,7 @@ class AutomaticMultipartTest < Minitest::Test
     result = client.assets.create(name: 'report.pdf', content: { data: file_of(16 * MIB), type: 'application/pdf' },
                                   request_options: { idempotency_key: 'upload-2' })
 
-    assert_equal 'completed', result.dig('upload', 'status')
+    assert_equal 'completed', result.to_h.dig('upload', 'status')
     assert_equal %w[upload-2 upload-2:part-2 upload-2:part-2 upload-2:part-3 upload-2:part-4], sent.map(&:key)
     assert_equal sent[1].body, sent[2].body
     assert_equal file_of(16 * MIB).byteslice(15 * MIB, MIB), sent[4].body
@@ -135,7 +135,7 @@ class AutomaticMultipartTest < Minitest::Test
     end)
     result = client.assets.create(name: 'clip.mp4', content: { base64: [file_of(9 * MIB)].pack('m0'), type: 'video/mp4' })
 
-    assert_equal 'completed', result.dig('upload', 'status')
+    assert_equal 'completed', result.to_h.dig('upload', 'status')
     assert_equal ['/v1/projects/project-1/assets', '/v1/assets/asset-1/part', '/v1/assets/asset-1'], sent.map(&:path)
     assert_nil sent[2].key
   end
@@ -168,12 +168,12 @@ class AutomaticMultipartTest < Minitest::Test
     options = { name: 'report.pdf', content: { data: file, type: 'application/pdf' },
                 processing_options: { retain_content: true }, request_options: { idempotency_key: 'upload-3' } }
     client.fail_next_request('transport-error', operation: 'assets.upload_part')
-    error = assert_raises(CalmLens::ConnectionError) { client.assets.classify(options) }
+    error = assert_raises(CalmLens::ConnectionError) { client.assets.classify(**options) }
     assert_equal CalmLens::SdkErrorCodes::TRANSPORT_ERROR, error.code
 
-    finished = client.assets.classify(options)
-    assert_equal 'completed', finished.dig('upload', 'status')
-    assert_equal 12 * MIB, finished.dig('content', 'sizeInBytes')
+    finished = client.assets.classify(**options)
+    assert_equal 'completed', finished.to_h.dig('upload', 'status')
+    assert_equal 12 * MIB, finished.to_h.dig('content', 'sizeInBytes')
     assert_equal([finished['id']], client.assets.list['items'].map { |item| item['id'] })
     assert_equal file, client.state.content[finished['id']]['parts'].sort.map(&:last).join
     assert_equal [12 * MIB], moderated
@@ -185,7 +185,7 @@ class AutomaticMultipartTest < Minitest::Test
     asset = client.assets.create(name: 'photo.png', content: { data: image, type: 'image/png' },
                                  processing_options: { retain_content: true })
     assert_equal 'image', asset['type']
-    assert_equal 'completed', asset.dig('upload', 'status')
+    assert_equal 'completed', asset.to_h.dig('upload', 'status')
     assert_equal image, client.state.content[asset['id']]['parts'].sort.map(&:last).join
     assert_equal(%w[1 2], client.requests.map { |request| request.query['partNumber'] })
   end

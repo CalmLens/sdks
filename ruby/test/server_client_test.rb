@@ -7,10 +7,10 @@ require 'net/http'
 require 'stringio'
 
 class ServerClientTest < Minitest::Test
-  OK = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"status":"allowed"}}}'
+  OK = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"decision":"allowed"}}}'
 
   # A transport that answers with a scripted sequence and records each request.
-  def scripted(*answers, **options)
+  def scripted(*answers, **)
     sent = []
     transport = lambda do |request|
       sent << request
@@ -20,7 +20,7 @@ class ServerClientTest < Minitest::Test
       status, body, headers = answer
       CalmLens::Response.new(status: status, body: body, headers: headers || {})
     end
-    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport, retry_base_delay: 0, **options), sent]
+    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport, retry_base_delay: 0, **), sent]
   end
 
   # A sent request's body, with a stream read.
@@ -50,17 +50,17 @@ class ServerClientTest < Minitest::Test
 
   def test_not_found_is_known_by_status_or_code
     client, = scripted([404, '{"code":"asset/not-found"}'], [410, '{"code":"folder/not-found"}'], [429, '{"code":"rate/limited"}'])
-    assert assert_raises(CalmLens::NotFoundError) { client.assets.retrieve(asset_id: 'x') }.not_found?
-    assert assert_raises(CalmLens::APIError) { client.folders.retrieve(folder_id: 'x') }.not_found?
-    refute assert_raises(CalmLens::RateLimitError) { client.assets.retrieve(asset_id: 'x', request_options: { max_retries: 0 }) }.not_found?
+    assert assert_raises(CalmLens::NotFoundError) { client.assets.retrieve('x') }.not_found?
+    assert assert_raises(CalmLens::APIError) { client.folders.retrieve('x') }.not_found?
+    refute assert_raises(CalmLens::RateLimitError) { client.assets.retrieve('x', request_options: { max_retries: 0 }) }.not_found?
   end
 
   def test_the_request_id_comes_from_the_header_or_else_the_error_body
     body = '{"code":"asset/not-found","message":"Not found","requestId":"body-id","details":{"path":"assetId"}}'
     client, = scripted([404, body, { 'x-request-id' => 'header-id' }], [404, body])
-    from_header = assert_raises(CalmLens::NotFoundError) { client.assets.retrieve(asset_id: 'x') }
+    from_header = assert_raises(CalmLens::NotFoundError) { client.assets.retrieve('x') }
     assert_equal ['header-id', { 'path' => 'assetId' }], [from_header.request_id, from_header.details]
-    assert_equal 'body-id', assert_raises(CalmLens::NotFoundError) { client.assets.retrieve(asset_id: 'x') }.request_id
+    assert_equal 'body-id', assert_raises(CalmLens::NotFoundError) { client.assets.retrieve('x') }.request_id
   end
 
   def test_upload_timeout_limits_each_attempt_of_a_binary_upload_only
@@ -86,8 +86,8 @@ class ServerClientTest < Minitest::Test
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
     lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true, transform: { width: 1, fit: 'cover' } }
     reordered = lens.merge(transform: { fit: 'cover', width: 1 })
-    results = [lens, reordered].map { |definition| Thread.new { client.ensure_lens(definition) } }.map(&:value)
-    assert_equal([%w[lens-1 thumb]] * 2, results.map { |saved| saved.values_at('id', 'identifier') })
+    results = [lens, reordered].map { |definition| Thread.new { client.ensure_lens(**definition) } }.map(&:value)
+    assert_equal([%w[lens-1 thumb]] * 2, results.map { |saved| saved.to_h.values_at('id', 'identifier') })
     assert_equal 1, sent.size
   end
 
@@ -99,10 +99,10 @@ class ServerClientTest < Minitest::Test
     end
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
     lens = { identifier: 'thumb', name: 'Thumb', type: 'image' }
-    client.ensure_lens(lens)
-    client.ensure_lens(lens.merge(active: true))
+    client.ensure_lens(**lens)
+    client.ensure_lens(**lens, active: true)
     assert_equal 1, sent.size
-    client.ensure_lens(lens.merge(active: false))
+    client.ensure_lens(**lens, active: false)
     assert_equal 2, sent.size
   end
 
@@ -116,10 +116,10 @@ class ServerClientTest < Minitest::Test
     end
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
     lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true }
-    2.times { client.ensure_lens(lens) }
+    2.times { client.ensure_lens(**lens) }
     assert_equal %w[PUT], methods
-    client.lenses.update(lens_id: 'lens-thumb', name: 'Renamed')
-    client.ensure_lens(lens)
+    client.lenses.update('lens-thumb', name: 'Renamed')
+    client.ensure_lens(**lens)
     assert_equal %w[PUT PATCH PUT], methods
   end
 
@@ -144,16 +144,16 @@ class ServerClientTest < Minitest::Test
   def test_invalid_arguments_raise_sdk_errors_without_sending
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
     [
-      -> { client.assets.retrieve('not options') },
+      -> { client.assets.retrieve('') },
       -> { client.cdn.serve(asset_id: 'a', init: { headers: { 'X-Test' => "a\r\nb" } }) },
       -> { client.cdn.serve(asset_id: 'a', init: { method: 'POST' }) },
       lambda {
         client.assets.create(name: 'n', content: { plain_text: 'x', type: 'text/plain' }, request_options: { idempotency_key: "bad key\n" })
       },
       -> { client.assets.list(request_options: { unknown: 1 }) },
-      -> { client.assets.update(asset_id: 'a', name: "\xFF".b.force_encoding('UTF-8')) },
-      -> { client.assets.wait_for_decision(asset_id: 'a', timeout: -1) },
-      -> { client.assets.wait_for_decision(asset_id: '') },
+      -> { client.assets.update('a', name: "\xFF".b.force_encoding('UTF-8')) },
+      -> { client.assets.wait_for_decision('a', timeout: -1) },
+      -> { client.assets.wait_for_decision('') },
       -> { client.text.classify(text: 'Same to you', context: { items: 'Earlier post' }) },
       -> { client.text.classify(text: 'Same to you', context: { items: [{ author_id: 'user-1' }] }) }
     ].each_with_index do |action, index|
@@ -252,7 +252,7 @@ class ServerClientTest < Minitest::Test
 
   def test_snake_case_options_are_converted_but_metadata_keys_are_not
     client, sent = scripted([200, OK])
-    client.assets.update(asset_id: 'a', external_url: 'https://example.com/a', metadata: { 'my_key' => { 'inner_key' => 2 } })
+    client.assets.update('a', external_url: 'https://example.com/a', metadata: { 'my_key' => { 'inner_key' => 2 } })
     assert_equal({ 'externalUrl' => 'https://example.com/a', 'metadata' => { 'my_key' => { 'inner_key' => 2 } } },
                  JSON.parse(sent.first.body))
   end
@@ -286,8 +286,8 @@ class ServerClientTest < Minitest::Test
     calls = {
       'text.classify' => -> { client.text.classify(text: 'hi', extrenal_id: 'post-1') },
       'assets.create' => -> { client.assets.create(name: 'a.txt', content: { plain_text: 'a', type: 'text/plain' }, visiblity: 'private') },
-      'assets.retrieve' => -> { client.assets.retrieve(asset_id: 'a', 'assetID' => 'b') },
-      'assets.waitForDecision' => -> { client.assets.wait_for_decision(asset_id: 'a', timeout_seconds: 5) },
+      'assets.retrieve' => -> { client.assets.retrieve('a', 'assetID' => 'b') },
+      'assets.waitForDecision' => -> { client.assets.wait_for_decision('a', timeout_seconds: 5) },
       'cdn.getAssetUrl' => -> { client.cdn.get_asset_url(asset_id: 'a', lenz: 'thumbnail') },
       'uploadTokens.sign' => -> { client.upload_tokens.sign(upload_preset_id: 'preset_1', external: 'x') }
     }
@@ -302,43 +302,43 @@ class ServerClientTest < Minitest::Test
   def test_unknown_response_values_are_returned_unchanged
     client, = scripted([200,
                         '{"id": "a", "visibility": "team", "newField": {"x": 1}, ' \
-                        '"classification": {"moderation": {"status": "quarantined"}}}'])
-    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'status' => 'quarantined' } },
+                        '"classification": {"moderation": {"decision": "quarantined"}}}'])
+    assert_equal({ 'id' => 'a', 'classification' => { 'moderation' => { 'decision' => 'quarantined' } },
                    'visibility' => 'team', 'newField' => { 'x' => 1 } },
-                 client.assets.retrieve(asset_id: 'a'))
+                 client.assets.retrieve('a').to_h)
   end
 
   def test_wait_for_decision_checks_until_decided_backing_off_up_to_two_seconds
     asset = lambda { |processing, moderation|
       [200,
        '{"id": "asset-1", "upload": {"status": "completed"}, ' \
-       "\"classification\": {\"status\": \"#{processing}\", \"moderation\": {\"status\": \"#{moderation}\"}}}"]
+       "\"classification\": {\"status\": \"#{processing}\", \"moderation\": {\"decision\": \"#{moderation}\"}}}"]
     }
     client, sent = scripted(*Array.new(8) { asset.call('processing', 'pending') }, asset.call('completed', 'blocked'))
     delays = []
     client.assets.define_singleton_method(:sleep) { |seconds| delays << seconds }
     assert_equal({ 'id' => 'asset-1', 'upload' => { 'status' => 'completed' },
-                   'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'blocked' } } },
-                 client.assets.wait_for_decision(asset_id: 'asset-1'))
+                   'classification' => { 'status' => 'completed', 'moderation' => { 'decision' => 'blocked' } } },
+                 client.assets.wait_for_decision('asset-1').to_h)
     assert_equal(['/v1/assets/asset-1'] * 9, sent.map { |request| URI(request.url).path })
     assert_equal [0.5, 0.75, 1.125, 1.6875, 2.0, 2.0, 2.0, 2.0], delays
   end
 
   def test_wait_for_decision_keeps_waiting_while_queued_or_processing_even_once_a_reviewer_decided
     asset = lambda { |processing, moderation|
-      [200, JSON.generate('id' => 'asset-1', 'classification' => { 'status' => processing, 'moderation' => { 'status' => moderation } })]
+      [200, JSON.generate('id' => 'asset-1', 'classification' => { 'status' => processing, 'moderation' => { 'decision' => moderation } })]
     }
     client, sent = scripted(asset.call('queued', 'pending'), asset.call('processing', 'blocked'), asset.call('completed', 'blocked'))
     client.assets.define_singleton_method(:sleep) { |_seconds| nil }
-    settled = client.assets.wait_for_decision(asset_id: 'asset-1')
-    assert_equal %w[completed blocked], [settled.dig('classification', 'status'), settled.dig('classification', 'moderation', 'status')]
+    settled = client.assets.wait_for_decision('asset-1')
+    assert_equal %w[completed blocked], [settled.classification.status, settled.classification.moderation.decision]
     assert_equal 3, sent.size
   end
 
   def test_asset_pages_are_fetched_only_as_items_are_needed
     page = [200, JSON.generate('items' => [{ 'id' => 'a' }, { 'id' => 'b' }], 'hasMore' => true, 'nextCursor' => 'next-token')]
     client, sent = scripted(page)
-    assert_equal(['a'], client.assets.each.first(1).map { |asset| asset['id'] })
+    assert_equal(['a'], client.assets.list.auto_paging_each.first(1).map { |asset| asset['id'] })
     assert_equal 1, sent.size
   end
 end

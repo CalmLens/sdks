@@ -72,7 +72,7 @@ class TransportTest < Minitest::Test
     end
   end
 
-  ASSET = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"status":"allowed"}}}'
+  ASSET = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"decision":"allowed"}}}'
 
   def with_server(respond = ->(*) { [200, {}, ASSET] })
     server = Server.new(&respond)
@@ -92,17 +92,17 @@ class TransportTest < Minitest::Test
 
   def test_connections_are_reused_and_closed
     with_server do |client, server|
-      2.times { client.assets.retrieve(asset_id: 'asset') }
+      2.times { client.assets.retrieve('asset') }
       assert_equal 1, server.accepted
       client.close
-      error = assert_raises(CalmLens::ConnectionError) { client.assets.retrieve(asset_id: 'asset') }
+      error = assert_raises(CalmLens::ConnectionError) { client.assets.retrieve('asset') }
       assert_equal 'sdk/transport-error', error.code
     end
   end
 
   def test_requests_identify_the_sdk_and_runtime
     with_server do |client, server|
-      client.assets.retrieve(asset_id: 'asset')
+      client.assets.retrieve('asset')
       assert_equal "calmlens-ruby/#{CalmLens::VERSION} (ruby/#{RUBY_VERSION})", server.requests.pop[:headers]['user-agent']
     end
   end
@@ -140,7 +140,7 @@ class TransportTest < Minitest::Test
 
   def test_redirects_are_not_followed
     with_server(->(*) { [302, { 'Location' => 'https://elsewhere.example/steal' }, ''] }) do |client, server|
-      error = assert_raises(CalmLens::APIError) { client.assets.retrieve(asset_id: 'asset') }
+      error = assert_raises(CalmLens::APIError) { client.assets.retrieve('asset') }
       assert_equal ['sdk/http-error', 302, 1], [error.code, error.status, server.requests.size]
     end
   end
@@ -191,9 +191,9 @@ class TransportTest < Minitest::Test
     skip 'fork is unavailable' unless Process.respond_to?(:fork)
 
     with_server do |client, server|
-      client.assets.retrieve(asset_id: 'asset')
+      client.assets.retrieve('asset')
       pid = fork do
-        client.assets.retrieve(asset_id: 'asset')
+        client.assets.retrieve('asset')
         exit!(0)
       rescue StandardError
         exit!(1)
@@ -202,7 +202,7 @@ class TransportTest < Minitest::Test
       assert status.success?
       # Without the PID check the child would reuse the parent's pooled socket.
       assert_equal [2, 2], [server.accepted, server.requests.size]
-      client.assets.retrieve(asset_id: 'asset')
+      client.assets.retrieve('asset')
       assert_equal 3, server.requests.size
     end
   end

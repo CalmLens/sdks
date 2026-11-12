@@ -6,12 +6,14 @@ require 'calmlens/testing'
 require 'net/http'
 require 'openssl'
 require_relative 'contract_fixtures'
+require_relative 'operation_call'
 
 # Replays the shared webhook and upload token fixtures (testdata/webhooks.json and
 # upload-tokens.json, format in packages/sdk-contract/README.md): signing, verification, header
 # extraction, parsing, test sends and round trips, and exact and real-clock upload tokens.
 class ContractWebhooksTest < Minitest::Test
   extend ContractFixtures
+  include OperationCall
 
   # Defines one test per fixture case, named after the case and its position.
   def self.each_case(prefix, cases)
@@ -27,7 +29,7 @@ class ContractWebhooksTest < Minitest::Test
   def replay_webhook_parsing(entry)
     parsed = CalmLens.parse_webhook_event(payload: entry['body'], signature: entry['signature'],
                                           timestamp: entry['timestamp'], secret: entry['secret'], now: entry['now'])
-    assert_equal JSON.parse(entry['body']), parsed.to_payload
+    assert_equal JSON.parse(entry['body']), parsed.to_h
     assert_equal entry['expectedType'], parsed.type
     assert_equal entry['expectedFactKey'], parsed.facts[0]['key']
   end
@@ -86,7 +88,7 @@ class ContractWebhooksTest < Minitest::Test
   def replay_webhook_parsed(entry)
     event = CalmLens.parse_webhook_event(payload: entry['body'], signature: entry['signature'], timestamp: entry['timestamp'],
                                          secret: entry['secret'], now: entry['now'])
-    assert_equal entry['expected'], event.to_payload
+    assert_equal entry['expected'], event.to_h
     assert_equal entry['isTest'], event.test?
   end
   each_case('webhook_parsed', WEBHOOKS['parsed']) { |entry| entry['name'] }
@@ -103,7 +105,7 @@ class ContractWebhooksTest < Minitest::Test
 
   # Each lookup reads the event as received (a Hash) and as a parsed delivery's facts.
   def replay_event_fact(entry)
-    [entry['event'], CalmLens::WebhookEvent.new(facts: entry['event']['facts'])].each do |event|
+    [entry['event'], CalmLens::Event.new(entry['event'])].each do |event|
       value = CalmLens.get_event_fact(event, entry['key'])
       entry['value'].nil? ? assert_nil(value, entry['name']) : assert_equal(entry['value'], value, entry['name'])
     end
@@ -111,7 +113,7 @@ class ContractWebhooksTest < Minitest::Test
   each_case('event_fact', WEBHOOKS['factLookups']) { |entry| entry['name'] }
 
   def replay_event_facts(entry)
-    [entry['event'], CalmLens::WebhookEvent.new(facts: entry['event']['facts'])].each do |event|
+    [entry['event'], CalmLens::Event.new(entry['event'])].each do |event|
       assert_equal entry['facts'], CalmLens.get_event_facts(event), entry['name']
     end
   end
@@ -125,7 +127,7 @@ class ContractWebhooksTest < Minitest::Test
     assert_equal entry['headers'], headers
     received = CalmLens.parse_webhook_event(payload: entry['body'], headers: headers, secret: entry['secret'],
                                             now: entry['timestampSeconds'])
-    assert_equal entry['payload'], received.to_payload
+    assert_equal entry['payload'], received.to_h
     assert_equal entry['isTest'], received.test?
   end
   each_case('webhook_round_trip', WEBHOOKS['roundTrips']) { |entry| entry['name'] }
@@ -141,11 +143,11 @@ class ContractWebhooksTest < Minitest::Test
 
   def replay_token_signing(entry)
     signed = CalmLens::MockServerClient.sign_upload_token(entry['apiKey'], entry['options'], now: entry['now'], nonce: entry['nonce'])
-    assert_equal entry['expected'].slice('token', 'expiresAt'), signed
+    assert_equal entry['expected'].slice('token', 'expiresAt'), signed.to_h
 
     client = CalmLens::ServerClient.new(api_key: entry['apiKey'], project_id: 'project-1')
     before = (Time.now.to_f * 1000).to_i
-    signed = client.upload_tokens.sign(entry['options'])
+    signed = call_operation(client, 'uploadTokens.sign', entry['options'])
     lifetime = entry['expected']['expiresAt'] - entry['now']
     claims, body, signature = decode_token(signed['token'])
     assert_equal entry['expected']['claims'].merge('e' => signed['expiresAt'], 'n' => claims['n']), claims
@@ -159,7 +161,7 @@ class ContractWebhooksTest < Minitest::Test
 
   def replay_token_rejection(entry)
     client = CalmLens::ServerClient.new(api_key: entry['apiKey'], project_id: 'project-1')
-    [-> { client.upload_tokens.sign(entry['options']) },
+    [-> { call_operation(client, 'uploadTokens.sign', entry['options']) },
      -> { CalmLens::MockServerClient.sign_upload_token(entry['apiKey'], entry['options'], now: 0, nonce: 'n') }].each do |sign|
       assert_equal entry['error'], assert_raises(CalmLens::Error) { sign.call }.code, entry['name']
     end

@@ -38,23 +38,39 @@ module CalmLens
       api, request = Internal.options(options)
       nullable = Internal::NULLABLE_OPTION_KEYS.fetch(operation, [])
       api = api.reject { |key, value| value.nil? && !nullable.include?(key) } unless keep_nil
-      yield api, request
+      outer = Thread.current[:calmlens_operation]
+      Thread.current[:calmlens_operation] ||= operation
+      begin
+        yield api, request
+      ensure
+        Thread.current[:calmlens_operation] = outer
+      end
     rescue Error
       raise
     rescue KeyError, TypeError, ArgumentError, JSON::GeneratorError, EncodingError, URI::Error, FloatDomainError => e
       raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, e.message), cause: e
     end
 
+    # Options are the snake_case keywords a method declares, plus `request_options:`. Ruby passes
+    # them as Symbols; camelCase or String names are refused like misspelt ones.
     def check_option_keys(options, operation)
       return unless options.is_a?(Hash)
 
       allowed = LOCAL_OPTION_KEYS.fetch(operation) { Internal::OPTION_KEYS.fetch(operation) }
       unknown = options.keys.reject do |key|
-        %w[request_options requestOptions].include?(key.to_s) || allowed.include?(Internal.camelize(key))
+        key == :request_options || (key.is_a?(Symbol) && Internal.snake(key) == key.to_s && allowed.include?(Internal.camelize(key)))
       end
       return if unknown.empty?
 
-      raise Internal.invalid("Unknown option#{'s' if unknown.size > 1} for #{operation}: #{unknown.join(', ')}")
+      raise Internal.invalid("Unknown option#{'s' if unknown.size > 1} for #{operation}: #{unknown.map(&:inspect).join(', ')}")
+    end
+
+    # A method's options with the IDs it takes as arguments, such as `asset_id`.
+    def with_ids(options, **ids)
+      given = ids.keys & options.keys
+      raise Internal.invalid("Pass #{given.join(', ')} as an argument, not an option") unless given.empty?
+
+      options.merge(ids)
     end
 
     def request(...) = @session.request(...)
@@ -62,56 +78,17 @@ module CalmLens
 
     def without(options, *keys) = options.except(*keys)
 
-    # Fetches cursor pages lazily, from `start`, until a page has no next cursor, says there is no
-    # more or is empty. A page with more to follow that hands back a cursor this iteration already
-    # sent raises `sdk/invalid-response` rather than repeating pages forever.
-    def pages(start, &fetch)
-      Enumerator.new do |out|
-        cursor = start
-        sent = []
-        loop do
-          page = fetch.call(cursor)
-          items = page.is_a?(Hash) ? page['items'] : nil
-          raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Page has no items') unless items.is_a?(Array)
+    # The `klass` model of a response, with the response as its `last_response`.
+    def build(klass, json, **) = klass.new(json, last_response: @session.last_response, **)
 
-          following = page['nextCursor']
-          more = following.is_a?(String) && !following.empty? && page['hasMore'] == true && !items.empty?
-          new_cursor!(sent, following) if more
-          out << page
-          break unless more
-
-          cursor = following
-        end
-      end
-    end
-
-    # A list's response, once it is a cursor page: a Hash with an `items` Array. `what` names the
-    # items in the `sdk/invalid-response` error otherwise.
-    def cursor_page(response, what)
-      return response if response.is_a?(Hash) && response['items'].is_a?(Array)
-
-      raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, "Invalid #{what} page")
-    end
-
-    # Iterates the items of every page `list` returns for `options`, from its `cursor`, yielding each
-    # to `block`. `method` names the public iterator, whose options are checked like the list's.
-    def each_item(options, method, list, &block)
-      api, request = call(options, method) { |*split| split }
-      listing = pages(api['cursor']) { |cursor| list.call(api.merge('cursor' => cursor, 'request_options' => request)) }
-      listing.each { |page| page['items'].each(&block) }
-      nil
-    end
-
-    # Records a cursor an iteration sends, raising `sdk/invalid-response` (with `details['cursor']`)
-    # when a page with more to follow hands back one it already sent, which would repeat pages forever.
-    def new_cursor!(sent, cursor)
-      if sent.include?(cursor)
-        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE,
-                                       'The API returned a cursor it had already returned, with more pages to follow',
-                                       details: { 'cursor' => cursor })
+    # A list's response as a `klass` page, which fetches the page after a cursor with `options`
+    # through `list`.
+    def page(klass, response, options, &list)
+      unless response.is_a?(Hash) && response['items'].is_a?(Array)
+        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, "Invalid #{klass} response")
       end
 
-      sent << cursor
+      build(klass, response, fetch: ->(cursor) { list.call(options.merge(cursor: cursor)) }, cursor: options[:cursor])
     end
   end
 end

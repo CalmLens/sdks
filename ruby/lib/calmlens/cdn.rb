@@ -71,7 +71,7 @@ module CalmLens
     #   already decided the viewer may see age-restricted content. Your platform confirms the viewer's
     #   age; viewer claims are assertions from your app, and CalmLens doesn't verify them.
     # @return [String]
-    def get_asset_url(options)
+    def get_asset_url(**options)
       call(options, __method__) { |api, _request| asset_url(api) }
     end
 
@@ -89,8 +89,8 @@ module CalmLens
     # @option options [String] :lens
     # @option options [String, Hash] :transform
     # @option options [Hash] :viewer_claims
-    # @return [Hash] `{'url', 'expiresAt'}`, `expiresAt` in milliseconds since the Unix epoch
-    def sign_asset_url(options)
+    # @return [SignedAssetUrl] `url` and `expires_at`, in milliseconds since the Unix epoch
+    def sign_asset_url(**options)
       call(options, __method__) do |api, request|
         check_signing(api)
         project = Internal.segment(api.fetch('projectId', @session.project_id))
@@ -102,7 +102,7 @@ module CalmLens
           raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'The API returned no signed asset URL')
         end
 
-        { 'url' => append_location(signed['url'], api), 'expiresAt' => signed['expiresAt'] }
+        build(SignedAssetUrl, signed.merge('url' => append_location(signed['url'], api)))
       end
     end
 
@@ -113,13 +113,13 @@ module CalmLens
     # @param url [String] an asset URL from {#get_asset_url} or {#sign_asset_url}, without a resource
     # @param viewer_claims [Hash, nil] the viewer's claims, as for {#get_asset_url}; the URL's own
     #   `viewerClaims` when omitted
-    # @return [Hash] the asset info
+    # @return [AssetInfo]
     # @raise [APIError] with the CDN's code, such as `signed-url/expired` or `asset/not-available`
     def get_asset_info(url, viewer_claims: nil)
       base, claims = split_asset_url(url)
       claims = Internal.normalize(viewer_claims) unless viewer_claims.nil?
       info = @session.cdn_json("#{base}/info#{viewer_claims_query(claims)}")
-      return info if asset_info?(info)
+      return AssetInfo.new(info) if asset_info?(info)
 
       raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'The CDN returned no asset info')
     rescue TypeError, ArgumentError, JSON::GeneratorError, EncodingError, URI::Error => e
@@ -150,7 +150,7 @@ module CalmLens
     #       response.each_chunk { |chunk| file.write(chunk) }
     #     end
     #   end
-    def serve(options, &)
+    def serve(**options, &)
       method, url, headers, request = call(options, __method__) do |api, request_options|
         init = api.fetch('init', {})
         raise Internal.invalid('init must be a Hash') unless init.is_a?(Hash)
@@ -250,5 +250,22 @@ module CalmLens
       info.is_a?(Hash) && info['id'].is_a?(String) && info['projectId'].is_a?(String) && info['type'].is_a?(String) &&
         info['content'].is_a?(Hash) && %w[available age-restricted unavailable].include?(info['availability'])
     end
+  end
+
+  # The display info of an asset URL, from {CDN#get_asset_info}: the asset's type, its content's
+  # size and files, and whether the viewer its claims describe can see it now (`availability`:
+  # `available`, `age-restricted` or `unavailable`).
+  class AssetInfo < Model
+    # The content's format, size, page count and files.
+    class Content < Model
+      declare(format: ['format', nil], width: ['width', nil], height: ['height', nil],
+              duration_seconds: ['durationSeconds', nil], page_count: ['pageCount', nil],
+              rendered: ['rendered', [:model, 'CalmLens::Asset::Content::Rendered']],
+              preview: ['preview', [:model, 'CalmLens::Asset::Content::Preview']],
+              hls: ['hls', [:model, 'CalmLens::Asset::Content::Hls']])
+    end
+
+    declare(id: ['id', nil], project_id: ['projectId', nil], type: ['type', nil], external_url: ['externalUrl', nil],
+            content: ['content', [:model, 'CalmLens::AssetInfo::Content']], availability: ['availability', nil])
   end
 end

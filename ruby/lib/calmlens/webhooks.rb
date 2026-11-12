@@ -14,37 +14,18 @@ module CalmLens
   # Deliveries whose timestamp is further than this from the receiver's clock are rejected.
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300
 
-  # A verified webhook delivery. The body has the shape of an {Events#list} item:
-  # `{id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt}`.
-  # Fields CalmLens adds later are kept in {#payload}, as are unknown asset and fact fields.
-  #
-  # @!attribute id [String] the event ID.
-  # @!attribute project_id [String]
-  # @!attribute actor [Hash, nil] who caused the event: `{'type', 'id'}`, with `type` `user`, `api-key`,
-  #   `automated` or `system`, and `id` the user's or API key's ID, or nil when it was not recorded.
-  # @!attribute type [String] such as `asset.allowed`. New types may appear: ignore unknown ones.
-  # @!attribute severity [String, nil] `low` or `high`.
-  # @!attribute title [String, nil]
-  # @!attribute description [String, nil]
-  # @!attribute asset_id [String, nil]
-  # @!attribute asset_sequence [Integer, nil] increases with each event about the same asset; nil for
-  #   events not about an asset. Deliveries can arrive out of order: see {#newer_than?}.
-  # @!attribute asset [Hash, nil] the asset's status when the event was created.
-  # @!attribute facts [Array<Hash>] `{'key', 'value', 'url'?}` entries registered for the event type.
-  # @!attribute created_at [Integer] milliseconds since the epoch.
-  # @!attribute payload [Hash{String => Object}] the delivery body as received, with every field.
-  WebhookEvent = Struct.new(:id, :project_id, :actor, :type, :severity, :title, :description, :asset_id, :asset_sequence, :asset,
-                            :facts, :created_at, :payload, keyword_init: true) do
+  # An event from {Events#list} or a verified webhook delivery ({Webhooks.parse_event}). `type` is
+  # such as `asset.allowed`; new types may appear, so ignore unknown ones. `asset_sequence`
+  # increases with each event about the same asset and is nil for events not about an asset;
+  # deliveries can arrive out of order, see {#newer_than?}. {#to_h} is the body as received.
+  class Event
     # @return [Boolean] true for a test send from the portal or CLI.
     def test? = Webhooks.test_event?(self)
 
-    # @param last_sequence [Integer, nil] the highest `assetSequence` applied for this event's asset
+    # @param last_sequence [Integer, nil] the highest `asset_sequence` applied for this event's asset
     # @return [Boolean] whether to apply this event after it.
     # @see Webhooks.newer_asset_event?
     def newer_than?(last_sequence) = Webhooks.newer_asset_event?(self, last_sequence)
-
-    # @return [Hash{String => Object}] the delivery body as received, with every field.
-    def to_payload = payload
   end
 
   # Webhook signing and verification. Always verify the exact bytes received: read the raw body
@@ -81,11 +62,11 @@ module CalmLens
 
     # Whether an event is a test send from the portal or the CLI rather than a real event: its
     # `facts` hold the registered `{ key: "test", value: true }` fact.
-    # @param event [WebhookEvent, Hash] a parsed delivery, or a delivery body with string keys
+    # @param event [Event, Hash] a parsed delivery, or a delivery body with string keys
     # @return [Boolean]
     def test_event?(event)
-      facts = event.is_a?(Hash) ? event['facts'] : event.facts
-      facts.is_a?(Array) && facts.any? { |fact| fact.is_a?(Hash) && fact['key'] == 'test' && fact['value'] == true }
+      facts = event['facts']
+      facts.is_a?(Array) && facts.any? { |fact| (fact.is_a?(Hash) || fact.is_a?(Model)) && fact['key'] == 'test' && fact['value'] == true }
     end
 
     # Whether to apply `event` after `last_sequence`, the highest `assetSequence` you have applied
@@ -93,22 +74,23 @@ module CalmLens
     # newer only with a higher `assetSequence`, so a retried or repeated delivery of an earlier one
     # returns false. Events that aren't about an asset have no sequence and are always new. Store
     # the highest `assetSequence` applied per `assetId` and ignore lower ones.
-    # @param event [WebhookEvent, Hash] a parsed delivery, or a delivery body with string keys
+    # @param event [Event, Hash] a parsed delivery, or a delivery body with string keys
     # @param last_sequence [Integer, nil]
     # @return [Boolean]
     def newer_asset_event?(event, last_sequence)
-      sequence = event.is_a?(Hash) ? event['assetSequence'] : event.asset_sequence
+      sequence = event['assetSequence']
       sequence.nil? || last_sequence.nil? || sequence > last_sequence
     end
 
     # Converts an event from {Events#list} to the JSON body of its webhook delivery, which has the
     # same fields: `description`, `assetId`, `assetSequence` and `asset` are nil when absent, and
     # `actor` is left out when the event has none.
-    # @param event [Hash] an event with string keys, as {Events#list} returns it
+    # @param event [Event, Hash] an {Events#list} item, or an event with string keys
     # @return [Hash] `{ 'id', 'projectId', 'actor', 'type', 'severity', 'title', 'description', 'assetId',
     #   'assetSequence', 'asset', 'facts', 'createdAt' }`
     def to_payload(event)
-      raise Internal.invalid('event must be a Hash') unless event.is_a?(Hash)
+      event = event.to_h if event.is_a?(Model)
+      raise Internal.invalid('event must be an Event or a Hash') unless event.is_a?(Hash)
 
       payload = { 'id' => event['id'], 'projectId' => event['projectId'] }
       payload['actor'] = event['actor'] if event.key?('actor')
@@ -158,7 +140,7 @@ module CalmLens
     end
 
     # Verifies a delivery, then parses it. Takes the options of {verify}.
-    # @return [WebhookEvent]
+    # @return [Event]
     # @raise [WebhookVerificationError] `sdk/invalid-webhook-signature` when verification fails, or
     #   `sdk/invalid-webhook-payload` when the verified body is not an event.
     def parse_event(payload:, secret:, signature: nil, timestamp: nil, headers: nil,
@@ -176,10 +158,7 @@ module CalmLens
       body = JSON.parse(payload.dup.force_encoding(Encoding::UTF_8))
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not a CalmLens event') unless event?(body)
 
-      WebhookEvent.new(id: body['id'], project_id: body['projectId'], actor: body['actor'], type: body['type'], severity: body['severity'],
-                       title: body['title'], description: body['description'], asset_id: body['assetId'],
-                       asset_sequence: body['assetSequence'], asset: body['asset'], facts: body.fetch('facts', []),
-                       created_at: body['createdAt'], payload: body)
+      Event.new(body)
     rescue JSON::ParserError, EncodingError => e
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not JSON'), cause: e
     end

@@ -5,12 +5,12 @@ require 'securerandom'
 module CalmLens
   # Uploads, moderation and management of assets. Reach it through {ServerClient#assets}.
   #
-  # Every method takes an options Hash (or keyword arguments) whose names may be snake_case
-  # (`asset_id:`) or the API's camelCase (`'assetId'`); keys inside `metadata` are sent unchanged.
-  # Any method also accepts `request_options: { idempotency_key:, timeout:, open_timeout:, max_retries: }`.
-  # Results are Hashes with the API's camelCase string keys. Fields and enum values added to the API
-  # later appear as they are, so compare `classification.moderation.status` and similar values with known strings
-  # and treat anything else as not ready.
+  # Methods take an asset's ID as their first argument and options as snake_case keywords; keys
+  # inside `metadata` are sent unchanged. Any method also accepts
+  # `request_options: { idempotency_key:, timeout:, open_timeout:, max_retries: }`.
+  # Results are {Asset} models. Enum values added to the API later appear as they are, so compare
+  # `classification.moderation.decision` and similar values with known strings and treat anything
+  # else as not ready.
   class Assets < Resource
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'assets'
@@ -32,7 +32,7 @@ module CalmLens
     # The longest `idempotency_key` of an upload sent in parts: each part's key adds `:part-<n>`.
     MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240
     # The classification statuses of a settled asset: `completed` (with its decision in
-    # `classification.moderation.status`) or `failed`. {#wait_for_decision} returns at the first.
+    # `classification.moderation.decision`) or `failed`. {#wait_for_decision} returns at the first.
     SETTLED_STATUSES = %w[completed failed].freeze
     DECISION_POLL_FIRST_DELAY = 0.5
     # Each wait between decision checks is this many times the one before, up to DECISION_POLL_MAX_DELAY.
@@ -49,92 +49,64 @@ module CalmLens
     # @option options [String] :query
     # @option options [String] :mode `hybrid`, `semantic` or `keyword`
     # @option options [Integer] :page_size how many results, 1 to 20 (default 10)
-    # @return [Hash] `{'query', 'items' => [{'asset', 'score', 'matchedFields'}], 'semanticStatus'}`
-    def search(options = {})
-      call(options, __method__) { |api, request| request('GET', project('assets/search'), query: api, request_options: request) }
+    # @return [AssetSearchResult] `query`, `items` (each with `asset`, `score` and `matched_fields`) and
+    #   `semantic_status`
+    def search(**options)
+      call(options, __method__) do |api, request|
+        build(AssetSearchResult, request('GET', project('assets/search'), query: api, request_options: request))
+      end
     end
 
     # Lists one page of assets, newest first unless `sort` says otherwise.
     # @option options [String] :cursor from the previous page
     # @option options [Integer] :page_size 1 to 100, default 50
-    # @option options [String, nil] :filter an RSQL filter such as `classification.moderation.status==allowed`;
+    # @option options [String, nil] :filter an RSQL filter such as `classification.moderation.decision==allowed`;
     #   `folderId==fldr_…` lists one folder's assets and `folderId==null` the project root's
     # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
     #   with `-`, such as `-createdAt,id`; `-createdAt` by default
-    # @return [Hash] a cursor page: items, nextCursor and hasMore.
-    def list(options = {})
+    # @return [AssetPage] {Page#auto_paging_each} fetches the rest.
+    def list(**options)
       call(options, __method__) do |api, request|
-        request('GET', project('assets'), query: api, request_options: request)
+        page(AssetPage, request('GET', project('assets'), query: api, request_options: request), options) { list(**_1) }
       end
     end
 
-    # Iterates every asset matching the options, fetching pages as needed.
-    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
-    # @yieldparam asset [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each(options = {}, &block)
-      return enum_for(:each, options) unless block
-
-      each_item(options, __method__, method(:list), &block)
-    end
-
     # Lists one page of an asset's children, such as frames extracted from a video.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [String] :cursor
     # @option options [Integer] :page_size
     # @option options [String] :sort as for {#list}
-    # @return [Hash] a page like {#list}
-    def list_children(options)
-      call(options, __method__) do |api, request|
-        query = without(api, 'assetId')
-        request('GET', "/assets/#{Internal.segment(api['assetId'])}/children", query: query, request_options: request)
+    # @return [AssetPage] {Page#auto_paging_each} fetches the rest.
+    def list_children(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        response = request('GET', "#{asset_path(api)}/children", query: without(api, 'assetId'), request_options: request)
+        page(AssetPage, response, options) { list_children(asset_id, **_1) }
       end
     end
 
     # Lists one page of an audio or video asset's findings timeline, in time order.
     # `classification.moderation.timeline.segmentCount` says how many segments there are. Pass each
-    # page's `nextCursor` back unchanged; cursors are opaque.
-    # @option options [String] :asset_id
+    # page's `next_cursor` back unchanged; cursors are opaque.
+    # @param asset_id [String]
     # @option options [String] :cursor
     # @option options [Integer] :page_size
-    # @return [Hash] a cursor page of timeline segments: items, nextCursor and hasMore.
-    def list_timeline(options)
-      call(options, __method__) do |api, request|
-        query = without(api, 'assetId')
-        request('GET', project("assets/#{Internal.segment(api['assetId'])}/timeline"), query: query, request_options: request)
+    # @return [AssetTimelinePage] {Page#auto_paging_each} fetches the rest.
+    def list_timeline(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        response = request('GET', project("assets/#{Internal.segment(api['assetId'])}/timeline"), query: without(api, 'assetId'),
+                                                                                                  request_options: request)
+        page(AssetTimelinePage, response, options) { list_timeline(asset_id, **_1) }
       end
     end
 
-    # Iterates every segment of an audio or video asset's findings timeline, in time order.
-    # @param options [Hash] the options of {#list_timeline}
-    # @yieldparam segment [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each_timeline_segment(options, &block)
-      return enum_for(:each_timeline_segment, options) unless block
-
-      each_item(options, __method__, method(:list_timeline), &block)
-    end
-
-    # Iterates every child of an asset, fetching pages as needed.
-    # @param options [Hash] the options of {#list_children}
-    # @yieldparam asset [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each_child(options, &block)
-      return enum_for(:each_child, options) unless block
-
-      each_item(options, __method__, method(:list_children), &block)
-    end
-
-    # @option options [String] :asset_id
-    # @return [Hash] the asset
-    def retrieve(options)
-      call(options, __method__) do |api, request|
-        request('GET', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
-      end
+    # @param asset_id [String]
+    # @return [Asset]
+    def retrieve(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) { |api, request| get_asset(api['assetId'], request) }
     end
 
     # Waits until an asset is settled, its `classification.status` `completed` (with its decision in
-    # `classification.moderation.status`) or `failed`, and returns the asset. A `queued` or `processing`
+    # `classification.moderation.decision`) or `failed`, and returns the asset. A `queued` or `processing`
     # asset is still waiting, even when a reviewer has already decided it. It retrieves the asset,
     # waiting 0.5 seconds before the second check and 1.5 times longer each time after that, up to 2
     # seconds.
@@ -142,13 +114,13 @@ module CalmLens
     #
     # `timeout:` is the whole wait in seconds; `request_options: {timeout:}` still limits each request.
     # To stop waiting early, run the call in a thread you can stop: it only sleeps and sends requests.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [Numeric] :timeout seconds to wait for a decision (default 60)
-    # @return [Hash] the settled asset
+    # @return [Asset] the settled asset
     # @raise [TimeoutError] `sdk/timeout` when the asset isn't settled in time; `details` holds
-    #   `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`.
-    def wait_for_decision(options)
-      call(options, __method__) do |api, request|
+    #   `'assetId'` and the last `'classificationStatus'` and `'moderationDecision'`.
+    def wait_for_decision(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
         timeout = api.fetch('timeout', DEFAULT_DECISION_TIMEOUT)
         unless timeout.is_a?(Numeric) && timeout.real? && timeout.to_f.finite? && !timeout.negative?
           raise Internal.invalid('timeout must be a non-negative number of seconds')
@@ -159,39 +131,37 @@ module CalmLens
     end
 
     # Updates an asset's name, description, tags, visibility, metadata and similar fields.
-    # @option options [String] :asset_id
-    # @return [Hash] the updated asset
-    def update(options)
-      call(options, __method__) do |api, request|
-        request('PATCH', "/assets/#{Internal.segment(api['assetId'])}", body: without(api, 'assetId'),
-                                                                        request_options: request)
+    # @param asset_id [String]
+    # @return [Asset] the updated asset
+    def update(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('PATCH', asset_path(api), body: without(api, 'assetId'), request_options: request))
       end
     end
 
     # Processes an asset whose `classification.status` is `failed` again.
-    # @option options [String] :asset_id
-    # @return [Hash] the asset
-    def retry(options)
-      call(options, __method__) do |api, request|
-        request('POST', "/assets/#{Internal.segment(api['assetId'])}/retry", request_options: request)
+    # @param asset_id [String]
+    # @return [Asset]
+    def retry(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('POST', "#{asset_path(api)}/retry", request_options: request))
       end
     end
 
-    # Records a reviewer's decision, replacing the policy's: `classification.moderation.status`
+    # Records a reviewer's decision, replacing the policy's: `classification.moderation.decision`
     # becomes the decision, the decision and note join `classification.moderation.manualReviews` and
     # the matching `asset.<status>` event is sent with the API key as its `actor`. An asset still pending
     # moderation can only be blocked or purged. Purging needs `confirm_purge: true` and the
     # `assets:delete` permission, and permanently deletes the stored content. Not retried: it carries
     # no `Idempotency-Key`.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [String] :decision `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
     # @option options [String] :note why, 1 to 1499 characters
     # @option options [Boolean] :confirm_purge must be true to purge
-    # @return [Hash] the asset
-    def decide(options)
-      call(options, __method__) do |api, request|
-        request('POST', "/assets/#{Internal.segment(api['assetId'])}/decision", body: without(api, 'assetId'),
-                                                                                request_options: request)
+    # @return [Asset]
+    def decide(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('POST', "#{asset_path(api)}/decision", body: without(api, 'assetId'), request_options: request))
       end
     end
 
@@ -203,33 +173,33 @@ module CalmLens
     # is stored, reported by `asset.classified` and `asset.<status>` events, and a failed re-run keeps
     # it. A reviewed asset raises `asset/reviewed`, and one whose content is gone
     # `asset/content-unavailable`.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [Boolean] :rerun
-    # @return [Hash] the asset
-    def explain(options)
-      call(options, __method__) do |api, request|
-        request('POST', "/assets/#{Internal.segment(api['assetId'])}/explain",
-                body: api['rerun'] ? { 'rerun' => true } : {}, request_options: request)
+    # @return [Asset]
+    def explain(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('POST', "#{asset_path(api)}/explain", body: api['rerun'] ? { 'rerun' => true } : {},
+                                                                   request_options: request))
       end
     end
 
     # Removes the stored content and returns the asset with `content.status` `removed` (reason
     # `requested`); the record and classification results are kept.
-    # @option options [String] :asset_id
-    # @return [Hash] the asset
-    def remove_content(options)
-      call(options, __method__) do |api, request|
-        request('DELETE', "/assets/#{Internal.segment(api['assetId'])}/content", request_options: request)
+    # @param asset_id [String]
+    # @return [Asset]
+    def remove_content(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('DELETE', "#{asset_path(api)}/content", request_options: request))
       end
     end
 
     # Deletes the asset record and its stored content. An asset extracted from another (one with a
     # `parentId`) raises `asset/child-not-deletable`: delete its parent instead.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @return [nil]
-    def delete(options)
-      call(options, __method__) do |api, request|
-        request('DELETE', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
+    def delete(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        request('DELETE', asset_path(api), request_options: request)
         nil
       end
     end
@@ -243,8 +213,8 @@ module CalmLens
     # retried: it carries no `Idempotency-Key`.
     # @option options [Array<String>] :asset_ids 1 to 500 asset IDs
     # @option options [String] :operation one of {BATCH_OPERATIONS}
-    # @return [Hash] `{'batchId', 'status' => 'queued', 'assetCount'}`
-    def batch(options)
+    # @return [AssetBatch] `batch_id`, `status` (`queued`) and `asset_count`
+    def batch(**options)
       call(options, __method__) do |api, request|
         ids = api['assetIds']
         unless ids.is_a?(Array) && ids.size.between?(1, MAX_BATCH_ASSETS)
@@ -253,19 +223,19 @@ module CalmLens
         raise Internal.invalid('Every asset ID must be a non-empty string') unless ids.all? { |id| id.is_a?(String) && !id.empty? }
         raise Internal.invalid("operation must be one of #{BATCH_OPERATIONS.join(', ')}") unless BATCH_OPERATIONS.include?(api['operation'])
 
-        request('POST', project('assets/batch'), body: { 'assetIds' => ids, 'operation' => api['operation'] },
-                                                 request_options: request)
+        build(AssetBatch, request('POST', project('assets/batch'), body: { 'assetIds' => ids, 'operation' => api['operation'] },
+                                                                   request_options: request))
       end
     end
 
     # Moves an asset into a folder, or to the project root with `folder_id: nil`.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [String, nil] :folder_id
-    # @return [Hash] the asset
-    def move(options)
-      call(options, __method__) do |api, request|
-        request('POST', "/assets/#{Internal.segment(api['assetId'])}/move",
-                body: { 'folderId' => Internal.required(api, 'folderId') }, request_options: request)
+    # @return [Asset]
+    def move(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
+        build(Asset, request('POST', "#{asset_path(api)}/move", body: { 'folderId' => Internal.required(api, 'folderId') },
+                                                                request_options: request))
       end
     end
 
@@ -304,18 +274,18 @@ module CalmLens
     # @option options [Hash] :context `{items: [{text:, author_id:}]}`, earlier posts in the
     #   conversation, oldest first. Only the posts CalmLens uses are sent: the most recent
     #   {ModerationContext::USED_ITEMS} that fit in {ModerationContext::USED_CHARACTERS} characters.
-    # @return [Hash] the asset
-    def create(options)
+    # @return [Asset]
+    def create(**options)
       call(options, __method__) { |api, request| submit(api, request, false) }
     end
 
     # Uploads content and waits for the moderation decision where the content type supports it.
     # Documents, websites, audio, video and files over 20 MiB sent in parts always finish in the
     # background and return `pending`. Takes the options of {#create}.
-    # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
+    # @return [Asset] show it to everyone only when `classification.moderation.decision` is
     #   `allowed` or `limited` (reduce the reach of `limited` assets). Serve `age-restricted` assets
     #   only behind your own age check, through signed URLs.
-    def classify(options)
+    def classify(**options)
       call(options, __method__) do |api, request|
         content = api['content']
         if content.is_a?(Hash) && content.key?('plainText') && (!content['plainText'].is_a?(String) || content['plainText'].strip.empty?)
@@ -329,13 +299,13 @@ module CalmLens
     # Uploads a later part of a multipart upload started with {#create} or {#classify} and `part:`.
     # Whether the final part waits for the decision was chosen when the upload started; pass `wait:`
     # only to override it.
-    # @option options [String] :asset_id
+    # @param asset_id [String]
     # @option options [Hash] :part `{data:, part_number:, is_final:}`; part numbers start at 2.
     # @option options [Boolean] :wait `true` to wait for the decision, `false` to return with the
     #   asset `queued`
-    # @return [Hash] the asset; `classification.status` stays `uploading` until the final part.
-    def upload_part(options)
-      call(options, __method__) do |api, request|
+    # @return [Asset] `classification.status` stays `uploading` until the final part.
+    def upload_part(asset_id, **options)
+      call(with_ids(options, asset_id: asset_id), __method__) do |api, request|
         Internal.segment(api['assetId'])
         part = api['part']
         raise Internal.invalid('part is required') unless part.is_a?(Hash)
@@ -356,6 +326,12 @@ module CalmLens
     # Waits between decision checks; a mock client's waits take no real time.
     def sleep(seconds) = @session.pause(seconds)
 
+    def asset_path(api) = "/assets/#{Internal.segment(api['assetId'])}"
+
+    def get_asset(asset_id, request_options)
+      build(Asset, request('GET', "/assets/#{Internal.segment(asset_id)}", request_options: request_options))
+    end
+
     def poll_for_decision(asset_id, request_options, timeout)
       deadline = @session.monotonic + timeout
       delay = DECISION_POLL_FIRST_DELAY
@@ -366,13 +342,13 @@ module CalmLens
 
         # The outer deadline covers transport retries and the entire response read.
         asset = ::Timeout.timeout(timeout.zero? ? nil : remaining) do
-          retrieve('assetId' => asset_id, 'request_options' => request_options)
+          get_asset(asset_id, request_options)
         end
         remaining = deadline - @session.monotonic
         break if timeout.positive? && !remaining.positive?
 
-        processing = asset.dig('classification', 'status')
-        moderation = asset.dig('classification', 'moderation', 'status')
+        processing = asset.classification&.status
+        moderation = asset.classification&.moderation&.decision
         return asset if SETTLED_STATUSES.include?(processing)
         break unless remaining.positive?
 
@@ -383,7 +359,7 @@ module CalmLens
     rescue ::Timeout::Error
       raise TimeoutError.new(SdkErrorCodes::TIMEOUT, "Asset #{asset_id} was not settled after #{timeout}s",
                              details: { 'assetId' => asset_id, 'classificationStatus' => processing,
-                                        'moderationStatus' => moderation })
+                                        'moderationDecision' => moderation })
     end
 
     def submit(options, request_options, wait)
@@ -477,7 +453,7 @@ module CalmLens
     # Sends parts 2 to `count`. A part the API already has (its response was lost) is skipped, and a
     # final part that finds the upload completed reads the asset back.
     def send_remaining_parts(asset, count, piece, key, request_options)
-      id = asset['id']
+      id = asset.id
       number = 2
       while number <= count
         final = number == count
@@ -490,9 +466,7 @@ module CalmLens
             number = expected
             next
           end
-          if final && e.code == ErrorCodes::UPLOAD_NOT_OPEN
-            return retrieve('assetId' => id, 'request_options' => request_options.except(:idempotency_key))
-          end
+          return get_asset(id, request_options.except(:idempotency_key)) if final && e.code == ErrorCodes::UPLOAD_NOT_OPEN
 
           raise
         end
@@ -536,14 +510,16 @@ module CalmLens
       { 'partNumber' => 1, 'isFinal' => final, 'totalSizeInBytes' => total }
     end
 
-    # Like the API's asset responses: an ID and string statuses for the upload, classification and moderation.
+    # Like the API's asset responses: an ID, string statuses for the upload and classification, and a
+    # moderation decision, null until moderation decides.
     def expect_asset(data)
       valid = data.is_a?(Hash) && data['id'].is_a?(String) && !data['id'].empty? &&
               data['upload'].is_a?(Hash) && data['upload']['status'].is_a?(String) &&
               data['classification'].is_a?(Hash) && data['classification']['status'].is_a?(String) &&
               data.dig('classification', 'moderation').is_a?(Hash) &&
-              data.dig('classification', 'moderation', 'status').is_a?(String)
-      return data if valid
+              data.dig('classification', 'moderation').key?('decision') &&
+              [String, NilClass].include?(data.dig('classification', 'moderation', 'decision').class)
+      return build(Asset, data) if valid
 
       raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Expected an asset response', status: 200)
     end

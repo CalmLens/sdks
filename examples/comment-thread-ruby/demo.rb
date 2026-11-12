@@ -75,7 +75,7 @@ module Calmthread
         targets.each do |field|
           id = ids.fetch(field)
           moderation = client.state.assets.fetch(id)['classification']['moderation']
-          moderation['status'] = status
+          moderation['decision'] = status
           moderation['manualReviews'] << { 'id' => "rev_#{SecureRandom.alphanumeric(20)}", 'decision' => status, 'note' => note,
                                            'decidedBy' => { 'type' => 'user', 'id' => nil },
                                            'reviewedAt' => (Time.now.to_f * 1000).to_i, 'applied' => true }

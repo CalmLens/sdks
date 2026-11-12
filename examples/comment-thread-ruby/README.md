@@ -5,7 +5,7 @@ Calmthread is a **pre-moderated** thread: anything the moderation policy does no
 held for a person to review before anyone sees it.
 
 - Each reply has a display name and a message. Both are moderated as separate text assets.
-- A clean reply publishes immediately: every field's `classification.moderation.status` is `allowed`
+- A clean reply publishes immediately: every field's `classification.moderation.decision` is `allowed`
   or `limited`. CalmLens delivers a limited field like an allowed one, and this thread has no
   recommendations or ranking to keep it out of, so it shows as usual.
 - A reply with any field `blocked`, `age-restricted` or `purged` is **held**. The thread has no
@@ -25,7 +25,7 @@ held for a person to review before anyone sees it.
 
 ## Run locally
 
-Ruby 3.1+ with Bundler 2.6 or newer. The `Gemfile` loads the sibling SDK by path. WEBrick is
+Ruby 3.3+ with Bundler 2.6 or newer. The `Gemfile` loads the sibling SDK by path. WEBrick is
 the only runtime dependency.
 
 ```sh
@@ -111,7 +111,7 @@ already acted on the automated result when the reply was posted. Other events, s
 `asset.classified`, are skipped.
 
 For each decision about a local reply, the app retrieves the asset with
-`client.assets.retrieve` and acts on its **current** `classification.moderation.status`, not on
+`client.assets.retrieve` and acts on its **current** `classification.moderation.decision`, not on
 the event's snapshot:
 
 - Status `allowed` or `limited`: the app also retrieves the reply's other field. The reply is

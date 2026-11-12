@@ -12,7 +12,7 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new(moderate: ->(_input) { 'blocked' })
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
     assert_equal %w[completed blocked stored],
-                 [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'status'),
+                 [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'decision'),
                   asset.dig('content', 'status')]
     assert_equal 403, mock.cdn.serve(asset_id: asset['id']).status
     assert mock.state.content.key?(asset['id'])
@@ -23,14 +23,14 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new(moderate: ->(input) { input.trigger == 'rerun' ? outcome : 'allowed' })
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
     # The response is the asset as the re-run found it; the new decision follows.
-    rerun = mock.assets.explain(asset_id: asset['id'], rerun: true)
-    assert_equal 'allowed', rerun.dig('classification', 'moderation', 'status')
-    assert_equal 'blocked', mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status')
+    rerun = mock.assets.explain(asset['id'], rerun: true)
+    assert_equal 'allowed', rerun.dig('classification', 'moderation', 'decision')
+    assert_equal 'blocked', mock.assets.retrieve(asset['id']).dig('classification', 'moderation', 'decision')
     # A failed re-run keeps the decision and records no processing events.
     outcome = 'failed'
-    mock.assets.explain(asset_id: asset['id'], rerun: true)
-    stored = mock.assets.retrieve(asset_id: asset['id'])
-    assert_equal %w[completed blocked], [stored.dig('classification', 'status'), stored.dig('classification', 'moderation', 'status')]
+    mock.assets.explain(asset['id'], rerun: true)
+    stored = mock.assets.retrieve(asset['id'])
+    assert_equal %w[completed blocked], [stored.dig('classification', 'status'), stored.dig('classification', 'moderation', 'decision')]
     assert_equal 'asset.rerun-requested', mock.state.events.last['type']
     error = assert_raises(CalmLens::InvalidArgumentError) { mock.complete_processing(asset['id']) }
     assert_equal 'sdk/invalid-argument', error.code
@@ -87,14 +87,14 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'take.wav', content: { data: 'hello', type: 'audio/wav' }, processing_options: KEEP)
     assert_equal({ 'kind' => 'audio', 'format' => 'audio/mp4', 'width' => nil, 'height' => nil, 'peaks' => [] },
-                 asset.dig('content', 'rendered'))
+                 asset.dig('content', 'rendered').to_h)
     assert_equal [1200, 300, '#7f7f7f'], asset.dig('content', 'preview').values_at('width', 'height', 'averageColor')
     rendered = mock.cdn.serve(asset_id: asset['id'])
     assert_equal [200, 'hello', 'audio/mp4'], [rendered.status, rendered.body, rendered.headers['content-type']]
     preview = mock.cdn.serve(asset_id: asset['id'], resource: 'preview')
     assert_equal [200, 'image/png'], [preview.status, preview.headers['content-type']]
 
-    removed = mock.assets.remove_content(asset_id: asset['id'])
+    removed = mock.assets.remove_content(asset['id'])
     assert_equal [nil, nil], removed['content'].values_at('rendered', 'preview')
     assert_equal 'asset/not-available', JSON.parse(mock.cdn.serve(asset_id: asset['id'], resource: 'placeholder').body)['code']
   end
@@ -109,7 +109,7 @@ class MockTest < Minitest::Test
       served = mock.cdn.serve(asset_id: asset['id'], resource: resource)
       assert_equal [403, 'asset/not-available'], [served.status, JSON.parse(served.body)['code']], resource
     end
-    error = assert_raises(CalmLens::APIError) { mock.assets.list_timeline(asset_id: asset['id']) }
+    error = assert_raises(CalmLens::APIError) { mock.assets.list_timeline(asset['id']) }
     assert_equal ['asset/held', 423, { 'hold' => 'safety' }], [error.code, error.status, error.details]
   end
 
@@ -141,20 +141,20 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new
     list = mock.hash_lists.create(name: 'Removed images', action: 'flag')
     asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' })
-    error = assert_raises(CalmLens::APIError) { mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id']) }
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.add_entry(list['id'], asset_id: asset['id']) }
     assert_equal ['hash-list/asset-not-hashed', 409], [error.code, error.status]
 
     mock.state.assets[asset['id']]['content'].merge!('perceptualHash' => 'ab' * 32, 'perceptualHashQuality' => 80)
-    entry = mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id'], label: 'Report 1042')
+    entry = mock.hash_lists.add_entry(list['id'], asset_id: asset['id'], label: 'Report 1042')
     assert_equal ['ab' * 32, 80, asset['id'], 'Report 1042'], entry.values_at('hash', 'quality', 'assetId', 'label')
-    again = mock.hash_lists.add_entry(hash_list_id: list['id'], hash: 'AB' * 32)
+    again = mock.hash_lists.add_entry(list['id'], hash: 'AB' * 32)
     assert_equal [entry['id'], 1], [again['id'], mock.state.hash_list_entries.size]
 
-    mock.hash_lists.delete(hash_list_id: list['id'])
+    mock.hash_lists.delete(list['id'])
     assert_empty mock.state.hash_list_entries
-    error = assert_raises(CalmLens::APIError) { mock.hash_lists.remove_entry(entry_id: entry['id']) }
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.remove_entry(entry['id']) }
     assert_equal ['hash-list-entry/not-found', 404], [error.code, error.status]
-    error = assert_raises(CalmLens::APIError) { mock.hash_lists.list_entries(hash_list_id: list['id']) }
+    error = assert_raises(CalmLens::APIError) { mock.hash_lists.list_entries(list['id']) }
     assert_equal 'hash-list/not-found', error.code
   end
 
@@ -163,16 +163,16 @@ class MockTest < Minitest::Test
     uploaded = mock.assets.create(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, tags: %w[catalogue backpacks])
     site = mock.assets.create(name: 'site', url: 'https://example.com', tags: ['landing'])
     assert_equal %w[catalogue backpacks], uploaded['tags']
-    assert_equal ['landing'], mock.assets.retrieve(asset_id: site['id'])['tags']
+    assert_equal ['landing'], mock.assets.retrieve(site['id'])['tags']
   end
 
   def test_a_decision_through_the_api_is_recorded_as_the_api_keys_without_a_name_or_email
     mock = CalmLens::MockServerClient.new
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' })
-    blocked = mock.assets.decide(asset_id: asset['id'], decision: 'blocked', note: '  Spam  ')
+    blocked = mock.assets.decide(asset['id'], decision: 'blocked', note: '  Spam  ')
     reviews = blocked.dig('classification', 'moderation', 'manualReviews')
     assert_equal([{ 'decision' => 'blocked', 'note' => 'Spam', 'decidedBy' => { 'type' => 'api-key', 'id' => nil }, 'applied' => true }],
-                 reviews.map { |review| review.except('id', 'reviewedAt') })
+                 reviews.map { |review| review.to_h.except('id', 'reviewedAt') })
     assert_match(/\Arev/, reviews.first['id'])
     assert_kind_of Integer, reviews.first['reviewedAt']
   end
@@ -180,29 +180,29 @@ class MockTest < Minitest::Test
   def test_wait_for_decision_checks_the_mock_storage
     mock = CalmLens::MockServerClient.new
     asset = mock.assets.create(name: 'later.txt', content: { plain_text: 'x', type: 'text/plain' })
-    error = assert_raises(CalmLens::TimeoutError) { mock.assets.wait_for_decision(asset_id: asset['id'], timeout: 0) }
-    assert_equal ['sdk/timeout', { 'assetId' => asset['id'], 'classificationStatus' => 'processing', 'moderationStatus' => 'pending' }],
+    error = assert_raises(CalmLens::TimeoutError) { mock.assets.wait_for_decision(asset['id'], timeout: 0) }
+    assert_equal ['sdk/timeout', { 'assetId' => asset['id'], 'classificationStatus' => 'processing', 'moderationDecision' => nil }],
                  [error.code, error.details]
 
     on_pause = -> { mock.state.assets[asset['id']]['classification']['status'] = 'failed' }
     mock.assets.define_singleton_method(:sleep) { |_| on_pause.call }
     before = mock.requests.size
-    failed = mock.assets.wait_for_decision(asset_id: asset['id'])
+    failed = mock.assets.wait_for_decision(asset['id'])
     assert_equal [asset['id'], 'failed'], [failed['id'], failed.dig('classification', 'status')]
     assert_equal([['GET', "/assets/#{asset['id']}"]] * 2, mock.requests.drop(before).map { |request| [request.method, request.path] })
 
     other = mock.assets.create(name: 'other.txt', content: { plain_text: 'x', type: 'text/plain' })
     # A decision on an asset still processing keeps it waiting until processing completes.
     stored = mock.state.assets[other['id']]['classification']
-    steps = [-> { stored['moderation']['status'] = 'age-restricted' }, -> { stored['status'] = 'completed' }]
+    steps = [-> { stored['moderation']['decision'] = 'age-restricted' }, -> { stored['status'] = 'completed' }]
     on_pause = -> { steps.shift.call }
     before = mock.requests.size
-    decided = mock.assets.wait_for_decision(asset_id: other['id'])
+    decided = mock.assets.wait_for_decision(other['id'])
     assert_equal [other['id'], 'completed', 'age-restricted'],
-                 [decided['id'], decided.dig('classification', 'status'), decided.dig('classification', 'moderation', 'status')]
+                 [decided['id'], decided.dig('classification', 'status'), decided.dig('classification', 'moderation', 'decision')]
     assert_equal([['GET', "/assets/#{other['id']}"]] * 3, mock.requests.drop(before).map { |request| [request.method, request.path] })
 
-    error = assert_raises(CalmLens::NotFoundError) { mock.assets.wait_for_decision(asset_id: 'missing') }
+    error = assert_raises(CalmLens::NotFoundError) { mock.assets.wait_for_decision('missing') }
     assert_equal CalmLens::ErrorCodes::ASSET_NOT_FOUND, error.code
   end
 
@@ -213,24 +213,24 @@ class MockTest < Minitest::Test
     })
     %w[good-b bad-a good-a good-c].each { |name| mock.assets.classify(name: name, content: { plain_text: name, type: 'text/plain' }) }
 
-    page = mock.assets.list(filter: 'classification.moderation.status==allowed', sort: 'createdAt', page_size: 2)
+    page = mock.assets.list(filter: 'classification.moderation.decision==allowed', sort: 'createdAt', page_size: 2)
     assert_equal [%w[good-b good-a], true], [page['items'].map { |asset| asset['name'] }, page['hasMore']]
-    assert_equal(%w[good-c good-a bad-a good-b], mock.assets.each.map { |asset| asset['name'] })
-    either = mock.assets.list(filter: 'classification.moderation.status==blocked,name==good-c', sort: 'createdAt')
+    assert_equal(%w[good-c good-a bad-a good-b], mock.assets.list.auto_paging_each.map { |asset| asset['name'] })
+    either = mock.assets.list(filter: 'classification.moderation.decision==blocked,name==good-c', sort: 'createdAt')
     assert_equal(%w[bad-a good-c], either['items'].map { |asset| asset['name'] })
-    ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.status!=blocked', page_size: 1, sort: 'createdAt')
-    assert_equal(%w[good-b good-a good-c], ascending.map { |asset| asset['name'] })
+    ascending = mock.assets.list(filter: 'name==good-*;classification.moderation.decision!=blocked', page_size: 1, sort: 'createdAt')
+    assert_equal(%w[good-b good-a good-c], ascending.auto_paging_each.map { |asset| asset['name'] })
     by_name = lambda do |filter|
-      mock.assets.each(filter: filter, sort: 'createdAt').map { |asset| asset['name'] }
+      mock.assets.list(filter: filter, sort: 'createdAt').map { |asset| asset['name'] }
     end
-    created = mock.assets.each.to_h { |asset| [asset['name'], asset['createdAt']] }
+    created = mock.assets.list.auto_paging_each.to_h { |asset| [asset['name'], asset['createdAt']] }
     assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt>#{created['good-b']}")
     assert_equal %w[good-b good-a], by_name.call('name=out=(bad-a,good-c)')
     assert_equal %w[good-b bad-a], by_name.call("createdAt<=#{created['bad-a']}")
   end
 
   def test_mock_errors_always_carry_a_details_object_and_request_id
-    error = assert_raises(CalmLens::NotFoundError) { CalmLens::MockServerClient.new.assets.retrieve(asset_id: 'missing') }
+    error = assert_raises(CalmLens::NotFoundError) { CalmLens::MockServerClient.new.assets.retrieve('missing') }
     assert_equal [{}, 'mock-request-1'], [error.details, error.request_id]
   end
 
@@ -239,17 +239,17 @@ class MockTest < Minitest::Test
     cursor = mock.events.list['nextCursor']
     mock.enqueue_event(type: 'api-key.created')
     event = mock.events.list(cursor: cursor)['items'].first
-    assert_equal %w[actor asset assetId assetSequence createdAt description facts id projectId severity title type], event.keys.sort
-    assert_equal({ 'type' => 'api-key', 'id' => nil }, event['actor'])
+    assert_equal %w[actor asset assetId assetSequence createdAt description facts id projectId severity title type], event.to_h.keys.sort
+    assert_equal({ 'type' => 'api-key', 'id' => nil }, event['actor'].to_h)
     assert_equal [nil, nil, nil, nil], event.values_at('description', 'assetId', 'assetSequence', 'asset')
-    assert_equal event, CalmLens.to_webhook_event_payload(event)
+    assert_equal event.to_h, CalmLens.to_webhook_event_payload(event)
   end
 
   def test_each_mock_event_names_who_caused_it
     mock = CalmLens::MockServerClient.new
     cursor = mock.events.list['nextCursor']
     asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
-    mock.assets.decide(asset_id: asset['id'], decision: 'blocked', note: 'Spam')
+    mock.assets.decide(asset['id'], decision: 'blocked', note: 'Spam')
     mock.decide(asset['id'], 'allowed')
     mock.enqueue_event(type: 'api-key.created', actor: { type: 'user', id: 'user_8fK2mQx7Lp4NvB3tRz9Y' })
     events = mock.events.list(cursor: cursor)['items']
@@ -265,7 +265,7 @@ class MockTest < Minitest::Test
   def test_the_events_feed_refuses_an_unknown_type_and_a_malformed_asset_id
     mock = CalmLens::MockServerClient.new
     { { types: ['not a type'] } => 'types', { asset_id: 'fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P' } => 'assetId' }.each do |options, path|
-      error = assert_raises(CalmLens::BadRequestError, path) { mock.events.list(options) }
+      error = assert_raises(CalmLens::BadRequestError, path) { mock.events.list(**options) }
       assert_equal 'validation/invalid-request', error.code
       assert_equal([path], error.details['issues'].map { |issue| issue['path'] })
     end
@@ -275,7 +275,7 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new
     mock.enqueue(status: 503, body: { code: 'server/unavailable', message: 'Busy' }, headers: { 'x-request-id' => 'req-1' })
     error = assert_raises(CalmLens::ServerError) { mock.assets.list }
-    assert_equal ['server/unavailable', 503, 'req-1', '[calmlens] Busy'], [error.code, error.status, error.request_id, error.message]
+    assert_equal ['server/unavailable', 503, 'req-1', 'Busy'], [error.code, error.status, error.request_id, error.message]
     assert_equal 0, mock.assets.list['items'].length
   end
 

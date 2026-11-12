@@ -32,7 +32,8 @@ module CalmLens
     attr_accessor :defer_upload_checks
 
     def initialize(api_key:, project_id:, base_url:, cdn_base_url:, timeout:, open_timeout:, max_retries:,
-                   retry_base_delay:, max_response_bytes:, upload_timeout:, part_size_bytes:, transport:)
+                   retry_base_delay:, max_retry_delay:, max_response_bytes:, upload_timeout:, part_size_bytes:, transport:,
+                   user_agent: USER_AGENT, logger: nil, log_level: nil, on_request: nil)
       @api_key = api_key
       @part_size_bytes = part_size_bytes
       @project_id = project_id
@@ -42,9 +43,15 @@ module CalmLens
       @open_timeout = open_timeout
       @max_retries = max_retries
       @retry_base_delay = retry_base_delay
+      @max_retry_delay = max_retry_delay
       @max_response_bytes = max_response_bytes
       @upload_timeout = upload_timeout
       @transport = transport
+      @user_agent = user_agent
+      @logger = logger
+      @log_level = log_level
+      @on_request = on_request
+      @last_response_key = :"calmlens_last_response_#{object_id}"
       @lenses = {}
       @lens_lock = Mutex.new
     end
@@ -70,6 +77,9 @@ module CalmLens
 
     def project(path) = "/projects/#{Internal.segment(@project_id)}/#{path}"
 
+    # What the API answered to this thread's latest request, for the result's `last_response`.
+    def last_response = Thread.current[@last_response_key]
+
     # Sends an API request and returns the parsed JSON body (nil for an empty 204 or DELETE response).
     #
     # @param idempotent [Boolean] send an `Idempotency-Key` (generated unless the caller gave one),
@@ -78,9 +88,10 @@ module CalmLens
     def request(method, path, request_options:, query: {}, body: nil, raw: nil, headers: {}, idempotent: false,
                 upload: false)
       url = @base_url + path
-      params = Internal.query(query)
+      params = Internal.query(query.merge(request_options.fetch(:extra_query, {}).transform_keys(&:to_s)))
       url += "?#{URI.encode_www_form(params)}" unless params.empty?
-      headers = headers.merge('Accept' => 'application/json')
+      headers = Internal.headers(request_options.fetch(:headers, {})).merge(headers).merge('Accept' => 'application/json')
+      body = with_extra_body(body, request_options[:extra_body]) if raw.nil?
       unless body.nil?
         raw = JSON.generate(body)
         headers['Content-Type'] = 'application/json'
@@ -95,6 +106,13 @@ module CalmLens
       limit = request_options.fetch(:max_response_bytes, @max_response_bytes)
       deadline = request_options.fetch(:upload_timeout, @upload_timeout) if upload
       execute(method, url, headers, raw, request_options, deadline: deadline) { |response| parse(method, response, limit) }
+    end
+
+    # A JSON body with the caller's `extra_body` fields added.
+    def with_extra_body(body, extra)
+      return body if extra.nil? || extra.empty? || !(body.nil? || body.is_a?(Hash))
+
+      (body || {}).merge(extra.transform_keys(&:to_s))
     end
 
     # Sends a CDN request, retrying like an API read, and returns the last response rather than
@@ -173,7 +191,7 @@ module CalmLens
 
     def headers_for(extra, authenticate: true)
       headers = extra.reject { |name, _| %w[x-api-key user-agent authorization].include?(name.downcase) }
-                     .merge('User-Agent' => USER_AGENT)
+                     .merge('User-Agent' => @user_agent)
       authenticate ? headers.merge('X-Api-Key' => @api_key) : headers
     end
 
@@ -217,20 +235,77 @@ module CalmLens
       loop do
         body&.rewind if attempt.positive?
         context = { again: retryable && attempt < retries, attempt: attempt, limit: limit, deadline: deadline,
-                    allow_http_errors: allow_http_errors }
-        outcome, value = send_attempt(request, context, &handler)
-        if outcome == :error
-          delay = http_delay(value.retry_after, attempt)
-          raise value unless context[:again] && delay <= ServerClient::RETRY_AFTER_MAX && value.retryable?
-
-          outcome = :retry
-          value = delay
-        end
+                    allow_http_errors: allow_http_errors, started: Process.clock_gettime(Process::CLOCK_MONOTONIC),
+                    authenticate: authenticate }
+        outcome, value = observed_attempt(request, context, &handler)
         return value if outcome == :ok
 
         pause(value)
         attempt += 1
       end
+    end
+
+    # One attempt, reported to the hook and logger: `[:ok, result]` or `[:retry, seconds]`; an error
+    # that won't be retried is raised.
+    def observed_attempt(request, context, &)
+      log(:debug) do
+        "calmlens: sending #{request.method} #{loggable_path(request.url,
+                                                             context[:authenticate]) || '[cdn]'} attempt=#{context[:attempt] + 1}"
+      end
+      begin
+        outcome, value = send_attempt(request, context, &)
+      rescue Error => e
+        observe(request, context, nil, e)
+        raise
+      end
+      if outcome == :error
+        delay = http_delay(value.retry_after, context[:attempt])
+        unless context[:again] && delay <= ServerClient::RETRY_AFTER_MAX && value.retryable?
+          observe(request, context, nil, value)
+          raise value
+        end
+
+        outcome = :retry
+        value = delay
+      end
+      observe(request, context, outcome == :retry ? value : nil, nil)
+      [outcome, value]
+    end
+
+    # Reports one attempt to the `on_request` hook and the logger: never the API key, bodies or a
+    # CDN URL, which may be signed.
+    def observe(request, context, delay, error)
+      return unless @on_request || @logger
+
+      event = { operation: Thread.current[:calmlens_operation], method: request.method,
+                path: loggable_path(request.url, context[:authenticate]), attempt: context[:attempt] + 1, delay: delay,
+                status: context[:status] || error&.status, request_id: context[:request_id] || error&.request_id,
+                duration: (Process.clock_gettime(Process::CLOCK_MONOTONIC) - context[:started]).round(6) }
+      @on_request&.call(event)
+      log(:info) do
+        outcome = if delay
+                    "retrying in #{delay}s"
+                  else
+                    (error ? "failed with #{error.code}" : 'done')
+                  end
+        "calmlens: #{event[:operation] || request.method} #{event[:method]} #{event[:path] || '[cdn]'} " \
+          "status=#{event[:status].inspect} attempt=#{event[:attempt]} duration=#{event[:duration]}s " \
+          "request_id=#{event[:request_id].inspect} #{outcome}"
+      end
+    end
+
+    # The path of an API request, without its query; nil for a CDN URL without the API key, which may be signed.
+    def loggable_path(url, authenticate)
+      authenticate ? URI(url).path : nil
+    rescue URI::Error
+      nil
+    end
+
+    def log(level, &)
+      return unless @logger
+      return if level == :debug && @log_level != 'debug'
+
+      @logger.public_send(level, &)
     end
 
     # One attempt: `[:ok, result]`, `[:error, error]` for an error response, or `[:retry, seconds]`.
@@ -239,6 +314,8 @@ module CalmLens
       delivered = false
       within(context[:deadline]) do
         send_request(request) do |response|
+          context[:status] = response.status
+          context[:request_id] = response.headers['x-request-id']
           raise redirect_error(response) if redirect?(response)
 
           if context[:allow_http_errors] && !response.success?
@@ -246,7 +323,7 @@ module CalmLens
             retry_status = RETRYABLE_STATUSES.include?(response.status) && delay <= ServerClient::RETRY_AFTER_MAX
             next [:retry, delay] if context[:again] && retry_status
           end
-          next [:error, http_error(response, context[:limit])] unless response.success? || context[:allow_http_errors]
+          next [:error, http_error(response, context[:limit], request)] unless response.success? || context[:allow_http_errors]
 
           delivered = true
           [:ok, handler.call(response)]
@@ -308,7 +385,7 @@ module CalmLens
 
     # Exponential backoff with jitter: half the delay is fixed, the other half random.
     def backoff(attempt)
-      delay = [@retry_base_delay * (2**attempt), ServerClient::RETRY_MAX_DELAY].min
+      delay = [@retry_base_delay * (2**attempt), @max_retry_delay].min
       ((delay / 2.0) + (rand * delay / 2.0)).round(3)
     end
 
@@ -331,6 +408,8 @@ module CalmLens
     end
 
     def parse(method, response, limit)
+      Thread.current[@last_response_key] = LastResponse.new(status: response.status, headers: response.headers.dup.freeze,
+                                                            request_id: response.request_id)
       text = read(response, limit).dup.force_encoding(Encoding::UTF_8)
       return nil if text.empty? && (response.status == 204 || method == 'DELETE')
 
@@ -340,9 +419,11 @@ module CalmLens
                                      status: response.status, headers: response.headers)
     end
 
-    # The error for a non-2xx response: the API's code and details, or `sdk/http-error`.
-    def http_error(response, limit)
+    # The error for a non-2xx response: the API's code and details, or `sdk/http-error`, with the
+    # body as received. A CDN request's URL is left out: a signed URL grants access.
+    def http_error(response, limit, request)
       text = read(response, limit).dup.force_encoding(Encoding::UTF_8)
+      where = { body: text, http_method: request.method, url: (request.url if request.url.start_with?(@base_url)) }
       data = begin
         JSON.parse(text)
       rescue JSON::ParserError, EncodingError
@@ -350,7 +431,7 @@ module CalmLens
       end
       unless data.is_a?(Hash) && data['code'].is_a?(String)
         return Error.build(SdkErrorCodes::HTTP_ERROR, "HTTP #{response.status}", status: response.status,
-                                                                                 headers: response.headers)
+                                                                                 headers: response.headers, **where)
       end
 
       # The X-Request-Id header, or the body's `requestId` when a proxy dropped the header.
@@ -358,7 +439,7 @@ module CalmLens
       message = data['message'].is_a?(String) ? data['message'] : nil
       details = data['details'].is_a?(Hash) ? data['details'] : nil
       Error.build(data['code'], message, status: response.status, details: details, headers: response.headers,
-                                         request_id: request_id)
+                                         request_id: request_id, **where)
     rescue InvalidResponseError => e
       e
     end

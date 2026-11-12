@@ -2,8 +2,10 @@
 
 require 'minitest/autorun'
 require 'rbs'
+require 'calmlens'
 require_relative 'contract_fixtures'
 require_relative 'declared_types'
+require_relative '../script/generate_models'
 
 # The type contract (packages/sdk-contract/README.md, "Type contract"): the client returns plain
 # hashes, so the replay in contract_client_test.rb passes whatever sig/ declares. This test checks
@@ -80,7 +82,32 @@ class TypeContractTest < Minitest::Test
         value.each_with_index.flat_map { |item, index| errors(item, type.args[0], "#{path}[#{index}]") }
       else
         klass = Object.const_get(type.name.to_s)
+        return record_errors(value, model_record(klass, type.name), path) if klass.is_a?(Class) && klass < CalmLens::Model
+
         value.is_a?(klass) ? [] : ["#{path}: #{value.inspect} is not #{type}"]
+      end
+    end
+
+    # The JSON a model reads, as a record of its API keys: a field whose reader can't return nil is
+    # required. A field without a reader (`hash`, a Ruby method) takes any value.
+    def model_record(klass, type_name)
+      readers = @builder.build_instance(type_name).methods
+      fields = klass.fields.to_h do |reader, (key, _)|
+        method = readers[reader]
+        next [key, [RBS::Types::Bases::Any.new(location: nil), false]] unless method&.defined_in == type_name
+
+        returned = method.method_types.first.type.return_type
+        [key, [returned, !nullable?(returned)]]
+      end
+      RBS::Types::Record.new(all_fields: fields, location: nil)
+    end
+
+    def nullable?(type)
+      case type
+      when RBS::Types::Optional, RBS::Types::Bases::Nil then true
+      when RBS::Types::Union then type.types.any? { |member| nullable?(member) }
+      when RBS::Types::Alias then nullable?(@builder.expand_alias2(type.name, type.args))
+      else false
       end
     end
 
@@ -102,18 +129,17 @@ class TypeContractTest < Minitest::Test
     RBS::Environment.from_loader(loader).resolve_type_names
   end
 
-  def checker(complete: true) = Checker.new(ENVIRONMENT, complete: complete)
+  CHECKERS = { true => Checker.new(ENVIRONMENT, complete: true), false => Checker.new(ENVIRONMENT, complete: false) }.freeze
 
-  # The client method a fixture operation calls, such as `hashLists.addEntry` → HashLists#add_entry.
-  def method_type(operation)
-    *resources, method = operation.split('.')
-    snake = ->(name) { name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase }
-    class_names = resources.map { |name| name == 'cdn' ? 'CDN' : name.sub(/\A./, &:upcase) }
-    class_name = resources.empty? ? 'ServerClient' : class_names.join
-    definition = RBS::DefinitionBuilder.new(env: ENVIRONMENT).build_instance(RBS::TypeName.parse("::CalmLens::#{class_name}"))
-    method_definition = definition.methods.fetch(snake.call(method).to_sym) { flunk "No signature for #{operation}" }
-    method_definition.method_types.first
-  end
+  def checker(complete: true) = CHECKERS.fetch(complete)
+
+  # The Ruby name of a fixture operation, such as `hashLists.addEntry` → `hash_lists.add_entry`.
+  def ruby_name(operation) = operation.split('.').map { |part| part.gsub(/([a-z])([A-Z])/, '\1_\2').downcase }.join('.')
+
+  def walker = WALKER
+
+  # The client method a fixture operation calls.
+  def method_type(operation) = walker.method_type(ruby_name(operation))
 
   # The value the client returns for a fixture: nothing for deletes, the lenses for ensureLenses,
   # and the fixture's `result` when it isn't the response body.
@@ -161,37 +187,39 @@ class TypeContractTest < Minitest::Test
 
     define_method("test_options_#{index + 1}_#{label}_match_the_signature") do
       options = snake_options(fixture['options'])
-      type = method_type(fixture['operation']).type
-      parameter = (type.required_positionals + type.optional_positionals).first
-      if parameter
-        assert_conforms options, parameter.type, "#{fixture['operation']} options (requests.json case #{index + 1})"
-        required = snake_options(fixture.fetch('inputContract', {}).fetch('requiredKeys', []).to_h { |key| [key, true] }).keys
-        assert_empty required - checker.required_keys(parameter.type),
-                     "#{fixture['operation']}: required inputs must be required by its options type"
-      else
-        assert_empty options, "#{fixture['operation']} has no options parameter"
-      end
+      parameter = walker.options_type(ruby_name(fixture['operation']))
+      assert_conforms options, parameter, "#{fixture['operation']} options (requests.json case #{index + 1})"
+      required = snake_options(fixture.fetch('inputContract', {}).fetch('requiredKeys', []).to_h { |key| [key, true] }).keys
+      assert_empty required - checker.required_keys(parameter),
+                   "#{fixture['operation']}: required inputs must be required by its options type"
     end
   end
 
   # The declared-type contract (packages/sdk-contract/README.md, "Declared types"): every operation
   # in types.json against the RBS types of its client method's options and result.
   TYPES = fixture('types')
+  # One walker builds each RBS definition once for every test.
+  WALKER = DeclaredTypes.new(ENVIRONMENT, TYPES['definitions'])
 
   # Differences Ruby keeps on purpose, each matched against a full mismatch line, with the reason.
   ALLOWED = [
     [/\Aassets\.create options \$\.processingOptions\.[A-Za-z.]+: should be a String\z/,
      'The multipart upload form also takes these booleans as "true"/"false" strings; Ruby sends JSON booleans.'],
-    [/\.(when|unless)\[\]: is an open String, the API lists sexual-pornographic-media, /,
-     'Qualifier names are generated into sig/qualifiers.rbs (the qualifier_results keys) by ' \
-     'packages/sdk-contract/generate.ts; a literal union of them belongs in that generator, not a hand-written copy.'],
-    # Features the API leaves out of its schemas while their switch in packages/shared/src/SharedConstants.ts is
-    # off; the SDK keeps them so they need no SDK release when switched on.
-    [/\.aiGeneratedDetection: not in the API\z/, 'ENABLE_AI_GENERATED_DETECTION'],
+    # Policy settings the API leaves out of its schemas while ENABLE_LINK_SAFETY in
+    # packages/shared/src/SharedConstants.ts is off; the input keeps them for when it is switched on.
     [/\.(linkSafety|link_safety): not in the API\z/, 'ENABLE_LINK_SAFETY'],
-    [/: lists (asset\.link-flagged|link-safety), which the API lacks\z/, 'ENABLE_LINK_SAFETY'],
-    [/: lists appeal\.(submitted|resolved), which the API lacks\z/, 'ENABLE_APPEALS']
+    [/\AhashLists\.(addEntry|listEntries) result \$(\.items\[\])?\.hash: has no reader\z/,
+     'A model has no `hash` reader, which would replace Object#hash; read the entry hash with `entry[:hash]`.']
   ].freeze
+
+  # The models in lib/calmlens/models.rb and sig/models.rbs are what script/generate_models.rb
+  # writes from types.json; run `ruby script/generate_models.rb` after regenerating it.
+  def test_the_generated_models_match_types_json
+    ruby, rbs = CalmLens::ModelGenerator.new(TYPES).sources
+    root = File.expand_path('..', __dir__)
+    assert_equal ruby, File.read(File.join(root, 'lib/calmlens/models.rb'), encoding: 'UTF-8'), 'lib/calmlens/models.rb is stale'
+    assert_equal rbs, File.read(File.join(root, 'sig/models.rbs'), encoding: 'UTF-8'), 'sig/models.rbs is stale'
+  end
 
   # Options types.json leaves out (README "Declared types"): `project_id` (signed URLs name a
   # project), `wait` and the upload payload, which
@@ -200,9 +228,9 @@ class TypeContractTest < Minitest::Test
 
   # Every mismatch of `operation`'s options and result, as `<operation> <options|result> $.<path>: <problem>`.
   def self.mismatches(operation)
-    walker = DeclaredTypes.new(ENVIRONMENT, TYPES['definitions'])
+    walker = WALKER
     method_type = walker.method_type(operation['names']['ruby']).type
-    parameter = (method_type.required_positionals + method_type.optional_positionals).first&.type
+    parameter = walker.options_type(operation['names']['ruby'])
     options = operation['options']
     schema = { 'type' => 'object', 'properties' => options['properties'].transform_values { |property| property['schema'] },
                'required' => options['required'] }

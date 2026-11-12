@@ -20,6 +20,8 @@ module CalmLens
     # An error response did not carry a CalmLens error code, or the API answered with a redirect,
     # which the SDK never follows.
     HTTP_ERROR = 'sdk/http-error'
+    # The caller cancelled the call before it finished.
+    CANCELLED = 'sdk/cancelled'
     # A webhook signature or timestamp did not verify.
     INVALID_WEBHOOK_SIGNATURE = 'sdk/invalid-webhook-signature'
     # A verified webhook body was not a CalmLens event payload.
@@ -41,18 +43,32 @@ module CalmLens
   #     Include it when contacting support.
   # @!attribute [r] headers
   #   @return [Hash{String => String}] response headers with lowercase names (empty without a response).
+  # @!attribute [r] body
+  #   @return [String, nil] the error response's body as received, at most {BODY_LIMIT} bytes, such as
+  #     a proxy's HTML page; nil without a response.
+  # @!attribute [r] http_method
+  #   @return [String, nil] the request's HTTP method, for an API error response.
+  # @!attribute [r] url
+  #   @return [String, nil] the request's URL, for an API error response.
   class Error < StandardError
-    attr_reader :code, :details, :status, :request_id, :headers
+    # The most bytes of an error response body {#body} keeps.
+    BODY_LIMIT = 64 * 1024
+
+    attr_reader :code, :details, :status, :request_id, :headers, :body, :http_method, :url
 
     # @param code [String]
     # @param message [String, nil] defaults to the code.
-    def initialize(code, message = nil, details: nil, status: nil, headers: {}, request_id: nil)
-      super("[calmlens] #{message || code}")
+    def initialize(code, message = nil, details: nil, status: nil, headers: {}, request_id: nil, body: nil,
+                   http_method: nil, url: nil)
+      super(message || code)
       @code = code
       @details = details
       @status = status
       @headers = headers.freeze
       @request_id = request_id || headers['x-request-id']
+      @body = body&.byteslice(0, BODY_LIMIT)&.freeze
+      @http_method = http_method
+      @url = url
     end
 
     # @return [Integer, nil] whole seconds to wait before retrying, from the `Retry-After` header
@@ -92,15 +108,19 @@ module CalmLens
 
     # Builds the most specific error class for a code and HTTP status.
     # @return [Error]
-    def self.build(code, message = nil, status: nil, **options)
+    def self.build(code, message = nil, status: nil, **)
       klass = if status then APIError.class_for(status)
               elsif code == SdkErrorCodes::TIMEOUT then TimeoutError
               elsif code == SdkErrorCodes::TRANSPORT_ERROR then ConnectionError
-              elsif code == SdkErrorCodes::INVALID_RESPONSE then InvalidResponseError
-              elsif code == SdkErrorCodes::INVALID_CONFIG then ConfigurationError
+              elsif code == SdkErrorCodes::CANCELLED then CancelledError
+              elsif [SdkErrorCodes::INVALID_RESPONSE, SdkErrorCodes::RESPONSE_TOO_LARGE].include?(code) then InvalidResponseError
+              elsif [SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE, SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD].include?(code)
+                WebhookVerificationError
+              # `sdk/no-fetch` is the configuration error of SDKs that need a fetch implementation.
+              elsif [SdkErrorCodes::INVALID_CONFIG, 'sdk/no-fetch'].include?(code) then ConfigurationError
               else InvalidArgumentError
               end
-      klass.new(code, message, status: status, **options)
+      klass.new(code, message, status: status, **)
     end
 
     # @api private
@@ -126,6 +146,8 @@ module CalmLens
       when 403 then PermissionDeniedError
       when 404 then NotFoundError
       when 409 then ConflictError
+      when 413 then PayloadTooLargeError
+      when 422 then UnprocessableEntityError
       when 429 then RateLimitError
       when 500..599 then ServerError
       else APIError
@@ -143,6 +165,10 @@ module CalmLens
   class NotFoundError < APIError; end
   # HTTP 409: the request conflicts with the resource's current state.
   class ConflictError < APIError; end
+  # HTTP 413: the request body was larger than the API accepts.
+  class PayloadTooLargeError < APIError; end
+  # HTTP 422: the request was well formed but can't be applied, such as an upload CalmLens can't process.
+  class UnprocessableEntityError < APIError; end
   # HTTP 429: the request was throttled. See {Error#retry_after}.
   class RateLimitError < APIError; end
   # HTTP 5xx: CalmLens failed to handle the request.
@@ -153,7 +179,12 @@ module CalmLens
 
   # Connecting, sending or receiving exceeded its timeout, or {Assets#wait_for_decision} had no
   # decision in time (`sdk/timeout`).
-  class TimeoutError < ConnectionError; end
+  class TimeoutError < Error; end
+
+  # The caller cancelled the call (`sdk/cancelled`): an exception raised into the calling thread,
+  # such as `Thread#raise` or a `Timeout.timeout` around the call, stopped it before it finished.
+  # The original exception is in `cause`.
+  class CancelledError < Error; end
 
   # A successful response could not be read (`sdk/invalid-response`) or was too large
   # (`sdk/response-too-large`).

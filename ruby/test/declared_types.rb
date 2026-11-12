@@ -2,6 +2,7 @@
 
 require 'json'
 require 'rbs'
+require 'calmlens'
 
 # Walks an RBS type alongside a types.json schema (packages/sdk-contract/README.md, "Declared
 # types") and names every difference as `$.<path>: <problem>`. Only type_contract_test.rb uses it.
@@ -31,12 +32,50 @@ class DeclaredTypes
   end
 
   # The client method `name` (`hash_lists.add_entry`) names, from ServerClient through its accessors.
-  def method_type(name)
+  def method_type(name) = method_definition(name).method_types.first
+
+  def method_definition(name)
     *accessors, method = name.split('.')
     type_name = accessors.reduce(RBS::TypeName.parse('::CalmLens::ServerClient')) do |owner, accessor|
-      instance_method(owner, accessor).type.return_type.name
+      instance_definition(owner, accessor).method_types.first.type.return_type.name
     end
-    instance_method(type_name, method)
+    instance_definition(type_name, method)
+  end
+
+  # A method's options as one record of its arguments: path IDs (positional) and keywords. A method
+  # with overloads (uploads by content, part or URL) gives a union of them.
+  def options_type(name)
+    method_definition = method_definition(name)
+    records = method_definition.method_types.map do |method_type|
+      function = method_type.type
+      fields = (function.required_positionals + function.optional_positionals).to_h { |param| [param.name, [param.type, true]] }
+      function.required_keywords.each { |key, param| fields[key] = [param.type, true] }
+      function.optional_keywords.each { |key, param| fields[key] = [param.type, false] }
+      RBS::Types::Record.new(all_fields: fields, location: nil)
+    end
+    records.size == 1 ? records.first : RBS::Types::Union.new(types: records, location: nil)
+  end
+
+  # The model class an RBS type names, or nil.
+  def self.model_class(type)
+    return unless type.is_a?(RBS::Types::ClassInstance)
+
+    klass = Object.const_get(type.name.to_s)
+    klass if klass.is_a?(Class) && klass < CalmLens::Model
+  rescue NameError
+    nil
+  end
+
+  # A model's readers as a record keyed by the API's field names: each reader's type, all present.
+  # A field without a reader (its name is a Ruby method, such as `hash`) is left out.
+  def model_record(type)
+    klass = DeclaredTypes.model_class(type)
+    readers = @builder.build_instance(type.name).methods.select { |_, method| method.defined_in == type.name }
+    fields = klass.fields.filter_map do |reader, (key, _)|
+      method = readers[reader]
+      [key, [method.method_types.first.type.return_type, true]] if method
+    end
+    RBS::Types::Record.new(all_fields: fields.to_h, location: nil)
   end
 
   # A JSON Schema key as `record` writes it: as is in a record of String keys (results, and inputs
@@ -49,11 +88,11 @@ class DeclaredTypes
 
   private
 
-  def instance_method(type_name, method)
+  def instance_definition(type_name, method)
     method_definition = @builder.build_instance(type_name).methods[method.to_sym]
     raise ArgumentError, "#{type_name} has no method #{method}" unless method_definition
 
-    method_definition.method_types.first
+    method_definition
   end
 
   def walk(schema, type, path, refs, extras = [])
@@ -145,6 +184,8 @@ class DeclaredTypes
     when RBS::Types::Bases::Bool then 'boolean'
     when RBS::Types::Record, RBS::Types::Tuple then type.is_a?(RBS::Types::Record) ? 'object' : 'array'
     when RBS::Types::ClassInstance
+      return 'object' if DeclaredTypes.model_class(type)
+
       { '::String' => 'string', '::Symbol' => 'string', '::Integer' => 'integer', '::Float' => 'number',
         '::Numeric' => 'number', '::Array' => 'array', '::Hash' => 'object' }[type.name.to_s]
     end
@@ -245,6 +286,8 @@ class DeclaredTypes
     return ["#{path}: declares a record the API lacks"] unless schemas
     return ["#{path}: should be a record"] unless types
 
+    # An option may also take a result back (a policy's `settings`): its record form is what to compare.
+    types = types.reject { |type| DeclaredTypes.model_class(type) } if @mode == :input && types.any?(RBS::Types::Record)
     return types.flat_map { |type| record_errors(*schemas.first, type, path, extras) } if schemas.size == 1
     return record_errors(*merge(schemas), types.first, path, extras) if types.size == 1
 
@@ -316,13 +359,21 @@ class DeclaredTypes
 
       return map_errors(schema, refs, type, path)
     end
+    model = DeclaredTypes.model_class(type)
+    type = model_record(type) if model
     return ["#{path}: should be a record with fields #{properties.keys.join(', ')}"] unless type.is_a?(RBS::Types::Record)
 
     fields = type.all_fields
     required = Array(schema['required'])
     errors = properties.flat_map do |name, property|
       field = fields[DeclaredTypes.key_for(name, type)]
-      next ["#{path}.#{name}: missing"] unless field
+      next ["#{path}.#{name}: #{model ? 'has no reader' : 'missing'}"] unless field
+
+      # A model's reader returns nil for a field the API left out, so an optional field reads as nullable.
+      if model
+        next walk(required.include?(name) ? property : { 'anyOf' => [property, { 'type' => 'null' }] }, field[0], "#{path}.#{name}",
+                  refs)
+      end
 
       required_errors(property, required.include?(name), field[1], "#{path}.#{name}") +
         walk(property, field[0], "#{path}.#{name}", refs)

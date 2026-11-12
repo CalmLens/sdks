@@ -17,6 +17,6 @@ end
 target :usage do
   signature 'sig'
   check 'test/types'
-  library 'json', 'openssl', 'uri', 'net-http', 'securerandom', 'zlib', 'timeout'
+  library 'json', 'openssl', 'uri', 'net-http', 'securerandom', 'zlib', 'timeout', 'logger'
   configure_code_diagnostics(D::Ruby.strict)
 end

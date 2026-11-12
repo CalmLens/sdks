@@ -8,7 +8,8 @@ module CalmLens
   # @api private
   module Internal
     # Per-call settings accepted under the `request_options:` option of any method.
-    REQUEST_OPTIONS = %i[idempotency_key timeout open_timeout upload_timeout max_retries max_response_bytes].freeze
+    REQUEST_OPTIONS = %i[idempotency_key timeout open_timeout upload_timeout max_retries max_response_bytes headers extra_query
+                         extra_body].freeze
     # A key the API can receive as a header value; the API checks the rest (1 to 255 printable
     # ASCII characters without a space at either end) and answers `idempotency/invalid-key`.
     IDEMPOTENCY_KEY = /\A[^\r\n\0]+\z/
@@ -29,9 +30,13 @@ module CalmLens
       key.to_s.gsub(/_+([a-z0-9])/i) { Regexp.last_match(1).upcase }
     end
 
+    # Converts one option name to snake_case: `assetId` → `asset_id`.
+    def snake(key) = key.to_s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+
     # Converts every Hash key to camelCase strings, except inside `metadata`, whose keys are yours.
     def normalize(value)
       case value
+      when Model then value.to_h
       when Hash
         value.to_h do |key, item|
           name = camelize(key)
@@ -76,6 +81,11 @@ module CalmLens
 
       limit = request[:max_response_bytes]
       raise invalid('max_response_bytes must be a positive Integer') unless limit.nil? || (limit.is_a?(Integer) && limit.positive?)
+
+      headers(request[:headers]) if request.key?(:headers)
+      %i[extra_query extra_body].each do |name|
+        raise invalid("#{name} must be a Hash") unless request[name].nil? || request[name].is_a?(Hash)
+      end
     end
 
     def positive?(value)

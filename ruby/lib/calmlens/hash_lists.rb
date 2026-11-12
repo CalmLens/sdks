@@ -9,103 +9,88 @@ module CalmLens
     OPERATIONS = 'hashLists'
 
     # Lists one page of the project's hash lists, newest first unless `sort` says otherwise.
-    # @option options [String] :cursor the previous page's `nextCursor`
+    # @option options [String] :cursor the previous page's `next_cursor`
     # @option options [Integer] :page_size 1 to 100, default 50
     # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
     #   with `-`; `-createdAt` by default
-    # @return [Hash] a cursor page: items, nextCursor and hasMore.
-    def list(options = {})
+    # @return [HashListPage] {Page#auto_paging_each} fetches the rest.
+    def list(**options)
       call(options, __method__) do |api, request|
-        cursor_page(request('GET', project('hash-lists'), query: api, request_options: request), 'hash list')
+        page(HashListPage, request('GET', project('hash-lists'), query: api, request_options: request), options) { list(**_1) }
       end
     end
 
-    # Iterates every hash list, fetching pages as needed.
-    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
-    # @yieldparam hash_list [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each(options = {}, &block)
-      return enum_for(:each, options) unless block
-
-      each_item(options, __method__, method(:list), &block)
-    end
-
-    # @option options [String] :hash_list_id
-    # @return [Hash] the hash list
-    def retrieve(options)
-      call(options, __method__) { |api, request| request('GET', list_path(api), request_options: request) }
+    # @param hash_list_id [String]
+    # @return [HashList]
+    def retrieve(hash_list_id, **options)
+      call(with_ids(options, hash_list_id: hash_list_id), __method__) do |api, request|
+        build(HashList, request('GET', list_path(api), request_options: request))
+      end
     end
 
     # @option options [String] :name
     # @option options [String] :action `flag` or `block`
     # @option options [String, nil] :description
-    # @return [Hash] the hash list
-    def create(options)
-      call(options, __method__) { |api, request| request('POST', project('hash-lists'), body: api, request_options: request) }
+    # @return [HashList]
+    def create(**options)
+      call(options, __method__) do |api, request|
+        build(HashList, request('POST', project('hash-lists'), body: api, request_options: request))
+      end
     end
 
     # Renames a list or changes what its matches do. The new action applies to later uploads.
-    # @option options [String] :hash_list_id
+    # @param hash_list_id [String]
     # @option options [String] :name
     # @option options [String, nil] :description
     # @option options [String] :action `flag` or `block`
-    # @return [Hash] the hash list
-    def update(options)
-      call(options, __method__) do |api, request|
-        request('PATCH', list_path(api), body: without(api, 'hashListId'), request_options: request)
+    # @return [HashList]
+    def update(hash_list_id, **options)
+      call(with_ids(options, hash_list_id: hash_list_id), __method__) do |api, request|
+        build(HashList, request('PATCH', list_path(api), body: without(api, 'hashListId'), request_options: request))
       end
     end
 
     # Deletes the list and every entry in it. Later uploads are no longer compared with it.
-    # @option options [String] :hash_list_id
+    # @param hash_list_id [String]
     # @return [nil]
-    def delete(options)
-      call(options, __method__) do |api, request|
+    def delete(hash_list_id, **options)
+      call(with_ids(options, hash_list_id: hash_list_id), __method__) do |api, request|
         request('DELETE', list_path(api), request_options: request)
         nil
       end
     end
 
     # Lists one page of a list's entries, newest first unless `sort` says otherwise.
-    # @option options [String] :hash_list_id
-    # @option options [String] :cursor the previous page's `nextCursor`
+    # @param hash_list_id [String]
+    # @option options [String] :cursor the previous page's `next_cursor`
     # @option options [Integer] :page_size 1 to 100, default 50
     # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
     #   with `-`; `-createdAt` by default
-    # @return [Hash] a cursor page: items, nextCursor and hasMore.
-    def list_entries(options)
-      call(options, __method__) do |api, request|
-        request('GET', "#{list_path(api)}/entries", query: without(api, 'hashListId'), request_options: request)
+    # @return [HashListEntryPage] {Page#auto_paging_each} fetches the rest.
+    def list_entries(hash_list_id, **options)
+      call(with_ids(options, hash_list_id: hash_list_id), __method__) do |api, request|
+        response = request('GET', "#{list_path(api)}/entries", query: without(api, 'hashListId'), request_options: request)
+        page(HashListEntryPage, response, options) { list_entries(hash_list_id, **_1) }
       end
     end
 
-    # Iterates every entry of a list, fetching pages as needed.
-    # @param options [Hash] the options of {#list_entries}; `cursor` sets the starting position.
-    # @yieldparam entry [Hash]
-    # @return [Enumerator, nil] an Enumerator when no block is given.
-    def each_entry(options, &block)
-      return enum_for(:each_entry, options) unless block
-
-      each_item(options, __method__, method(:list_entries), &block)
-    end
-
     # Adds a PDQ hash, or an image asset's hash; a hash already in the list returns its entry.
-    # @option options [String] :hash_list_id
+    # @param hash_list_id [String]
     # @option options [String] :hash 64 hexadecimal characters; send this or `asset_id`
     # @option options [Integer] :quality
     # @option options [String] :asset_id an image asset whose hash to add
     # @option options [String] :label
-    # @return [Hash] the entry
-    def add_entry(options)
-      call(options, __method__) do |api, request|
-        request('POST', "#{list_path(api)}/entries", body: without(api, 'hashListId'), request_options: request)
+    # @return [HashListEntry] read its hash with `entry[:hash]`, since `hash` is Ruby's own method.
+    def add_entry(hash_list_id, **options)
+      call(with_ids(options, hash_list_id: hash_list_id), __method__) do |api, request|
+        build(HashListEntry, request('POST', "#{list_path(api)}/entries", body: without(api, 'hashListId'), request_options: request))
       end
     end
 
-    # @option options [String] :entry_id
+    # @param entry_id [String]
     # @return [nil]
-    def remove_entry(options)
-      call(options, __method__) do |api, request|
+    def remove_entry(entry_id, **options)
+      call(with_ids(options, entry_id: entry_id), __method__) do |api, request|
         request('DELETE', "/hash-list-entries/#{Internal.segment(api['entryId'])}", request_options: request)
         nil
       end
