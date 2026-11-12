@@ -800,7 +800,12 @@ module CalmLens
         normalized = text.downcase
         tokens = normalized.split(/\s+/).uniq.first(MAX_SEARCH_TOKENS)
         items = project_assets.filter_map do |item|
-          values = SEARCH_FIELDS.transform_values { |path| Array(item.dig(*path)).join(' ').downcase }
+          # An undecided asset's decision is searched as `pending`, as the API does.
+          values = SEARCH_FIELDS.to_h do |field, path|
+            value = item.dig(*path)
+            value = 'pending' if value.nil? && field == 'classification.moderation.decision'
+            [field, Array(value).join(' ').downcase]
+          end
           next unless tokens.all? { |token| values.each_value.any? { |value| value.include?(token) } }
 
           fields = values.filter_map { |field, value| field if tokens.any? { |token| value.include?(token) } }
