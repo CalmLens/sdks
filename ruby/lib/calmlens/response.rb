@@ -37,7 +37,8 @@ module CalmLens
 
     # Reads served image dimensions from the headers without consuming the body.
     # @return [ServedAssetInfo, nil]
-    def get_asset_info
+    # Named like CDN#get_asset_info and the other SDKs' response method.
+    def get_asset_info # rubocop:disable Naming/AccessorMethodName
       header = "#{headers['x-calmlens-asset-info']},"
       dimensions = {}
       start = 0
@@ -49,7 +50,7 @@ module CalmLens
         member = header[start...match.begin(0)].strip
         start = match.end(0)
         key = member.split(/[=; \t]/, 2).first
-        next unless key == 'width' || key == 'height'
+        next unless %w[width height].include?(key)
 
         dimension = /\A(?:width|height)=([0-9]{1,15})\z/.match(member)
         return nil unless dimension && !dimensions.key?(key) && dimension[1].to_i.positive?
