@@ -26,6 +26,7 @@ what kind of failure it is, and every class is also an instance of the classes a
 """
 from __future__ import annotations
 
+import asyncio
 import email.utils
 import math
 import time
@@ -185,8 +186,10 @@ class CalmLensTimeoutError(CalmLensError):
     its deadline without a decision."""
 
 
-class CalmLensCancelledError(CalmLensError):
-    """``sdk/cancelled``: the caller cancelled the call."""
+class CalmLensCancelledError(CalmLensError, asyncio.CancelledError):
+    """``sdk/cancelled``: the caller cancelled the call, by cancelling the task awaiting an
+    :class:`~calmlens.AsyncCalmLensServerClient` method. It is also an ``asyncio.CancelledError``,
+    so timeouts and task groups still see a cancellation; a cancelled call is never retried."""
 
 
 class CalmLensInvalidArgumentError(CalmLensError, ValueError):
@@ -214,7 +217,9 @@ _API_ERRORS: dict[int, type[CalmLensAPIError]] = {
 _LOCAL_ERRORS: dict[str, type[CalmLensError]] = {
     error_codes.SDK_TRANSPORT_ERROR: CalmLensConnectionError,
     error_codes.SDK_TIMEOUT: CalmLensTimeoutError,
-    "sdk/cancelled": CalmLensCancelledError,
+    error_codes.SDK_CANCELLED: CalmLensCancelledError,
+    # A local sdk/http-error is an HTTP failure the SDK reports without a response's status.
+    error_codes.SDK_HTTP_ERROR: CalmLensAPIError,
     error_codes.SDK_INVALID_RESPONSE: CalmLensInvalidResponseError,
     error_codes.SDK_RESPONSE_TOO_LARGE: CalmLensInvalidResponseError,
     error_codes.SDK_INVALID_CONFIG: CalmLensConfigurationError,

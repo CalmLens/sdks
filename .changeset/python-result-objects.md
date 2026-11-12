@@ -21,13 +21,15 @@ page after it. `client.request(...)` sends a request this SDK version has no met
 key, retries and errors.
 
 `AsyncCalmLensServerClient` has the same methods, awaitable, with `async for` iterators and
-`async with` CDN downloads. It needs no extra packages.
+`async with` CDN downloads. It needs no extra packages. Cancelling the task awaiting a call raises
+`CalmLensCancelledError`, which is also an `asyncio.CancelledError`, and the call isn't retried.
 
 Errors have a class for each kind of failure: `CalmLensBadRequestError`,
 `CalmLensAuthenticationError`, `CalmLensPermissionDeniedError`, `CalmLensNotFoundError`,
 `CalmLensConflictError`, `CalmLensPayloadTooLargeError`, `CalmLensUnprocessableEntityError`,
 `CalmLensRateLimitError` and `CalmLensServerError` under `CalmLensAPIError`, and
-`CalmLensConnectionError`, `CalmLensInvalidArgumentError` (with `CalmLensConfigurationError`),
+`CalmLensConnectionError`, `CalmLensTimeoutError`, `CalmLensCancelledError`,
+`CalmLensInvalidArgumentError` (with `CalmLensConfigurationError`),
 `CalmLensInvalidResponseError` and `CalmLensWebhookVerificationError`. They replace
 `CalmLensTransportError`, `CalmLensValidationError` and `WebhookVerificationError`. API errors keep
 the response body as `body`, so a proxy's error page isn't lost.

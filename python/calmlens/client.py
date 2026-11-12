@@ -38,7 +38,7 @@ from ._option_keys import NULLABLE_OPTION_KEYS
 from ._transform_schema import TRANSFORM_OPTIONS_SCHEMA
 from ._upload_mime_types import UPLOAD_MIME_PREFIXES, UPLOAD_MIME_REJECTED, UPLOAD_MIME_SUFFIXES, UPLOAD_MIME_TYPES
 from ._version import __version__
-from .errors import (CalmLensAPIError, CalmLensConfigurationError, CalmLensConnectionError, CalmLensError,
+from .errors import (CalmLensAPIError, CalmLensCancelledError, CalmLensConfigurationError, CalmLensConnectionError, CalmLensError,
                      CalmLensInvalidArgumentError, CalmLensInvalidResponseError, CalmLensTimeoutError, _error,
                      _parse_retry_after, api_error_class, MAX_ERROR_BODY_CHARACTERS)
 from ._object import CalmLensObject, CalmLensResponse, ListObject
@@ -154,7 +154,17 @@ _CALL: contextvars.ContextVar[tuple[str | None, RequestOptions]] = contextvars.C
 #: The response of the last request the current context sent, for the result it becomes.
 _LAST_RESPONSE: contextvars.ContextVar[CalmLensResponse | None] = contextvars.ContextVar(
     "calmlens_last_response", default=None)
+#: Set when the asynchronous call this context runs for is cancelled (see ``_async_client._run``).
+_CANCELLED: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
+    "calmlens_cancelled", default=None)
 _REQUEST_OPTION_KEYS = frozenset(RequestOptions.__annotations__)
+
+
+def _check_cancelled() -> None:
+    """Stop a cancelled call before it sends another request or retries."""
+    cancelled = _CANCELLED.get()
+    if cancelled is not None and cancelled.is_set():
+        raise CalmLensCancelledError(error_codes.SDK_CANCELLED, "The call was cancelled")
 _Function = TypeVar("_Function", bound=Callable[..., Any])
 
 
@@ -1478,6 +1488,7 @@ class CalmLensServerClient:
 
         attempt = 0
         while True:
+            _check_cancelled()
             budget = remaining()
             attempt_timeout = min(self.timeout if timeout is None else timeout, budget)
             can_retry = retryable and attempt < max_retries
@@ -1499,6 +1510,7 @@ class CalmLensServerClient:
                 failure = _transport_error(cause)
                 delay = _retry_delay(attempt) if can_retry else None
                 self._attempted(operation, method, url, attempt + 1, delay, None, None, started)
+                _check_cancelled()
                 remaining()
                 if delay is None:
                     raise failure from cause
@@ -1525,6 +1537,7 @@ class CalmLensServerClient:
             wait = error.retry_after if error.retry_after is not None else _retry_delay(attempt)
             retry = can_retry and error.is_retryable and wait <= _MAX_RETRY_AFTER_SECONDS
             self._attempted(operation, method, url, attempt + 1, wait if retry else None, status, request_id, started)
+            _check_cancelled()
             remaining()
             if not retry:
                 raise error

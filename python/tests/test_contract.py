@@ -19,6 +19,7 @@ import io
 import json
 import re
 import struct
+import threading
 import time
 import typing
 import unittest
@@ -86,10 +87,8 @@ _python_options = python_options
 #: JavaScript's name for the events iterator).
 _ITERATORS = {capability["id"]: capability["names"]["python"] for capability in SURFACE["capabilities"]
               if capability["kind"] == "method" and ".iterate" in capability["id"]}
-# JavaScript's ``events.iterate`` yields events and ``events.pages`` the pages: Python's
-# ``events.iter`` and ``events.iter_pages``.
+# ``events.pages`` is JavaScript's name for the events feed's pages: Python's ``events.iter_pages``.
 _ITERATORS["events.pages"] = "events.iter_pages"
-_ITERATORS["events.iterate"] = "events.iter"
 
 
 class _Partial(Exception):
@@ -558,12 +557,49 @@ def _decode_args(value: Any) -> Any:
     return value
 
 
+def _cancel_after(client: CalmLensServerClient, operation: str, args: dict[str, Any], transport: Any,
+                  count: int) -> Any:
+    """Run an operation on the async client and cancel its task once ``count`` requests are sent."""
+    raised: list[BaseException] = []
+
+    async def call() -> Any:
+        # The error as the cancelled call raises it, inside its task: awaiting a cancelled task
+        # from outside gives asyncio's own CancelledError on Python 3.10.
+        try:
+            return await method(**_python_options(args))
+        except calmlens.CalmLensCancelledError as error:
+            raised.append(error)
+            raise
+
+    async def main() -> Any:
+        task = asyncio.ensure_future(call())
+        while len(transport.received) < count and not task.done():
+            await asyncio.sleep(0.001)
+        task.cancel()
+        try:
+            return await task
+        except asyncio.CancelledError:
+            # Returned rather than raised: asyncio.run replaces a cancellation its main task raises.
+            if raised:
+                return raised[0]
+            raise
+        finally:
+            transport.released.set()
+    method = _resolve_name(calmlens.AsyncCalmLensServerClient.from_client(client), _snake(operation))
+    result = asyncio.run(main())
+    if isinstance(result, calmlens.CalmLensCancelledError):
+        raise result
+    return result
+
+
 class _Scripted:
     """A transport answering each request with the case's next scripted response."""
 
     def __init__(self, case: dict[str, Any]):
         self.case = case
         self.received: list[dict[str, Any]] = []
+        #: Set once the call is cancelled, ending a request whose response hangs.
+        self.released = threading.Event()
 
     def __call__(self, request: Any, timeout: float) -> _Response:
         self.received.append({"method": request.method, "url": request.url,
@@ -574,7 +610,9 @@ class _Scripted:
             raise AssertionError(f"request {len(self.received)} has no scripted response")
         scripted = responses[len(self.received) - 1]
         if scripted.get("hang"):
-            # The attempt's deadline ends a request that never answers.
+            # A cancellation, or else the attempt's deadline, ends a request that never answers.
+            if "cancelAfterRequests" in self.case:
+                self.released.wait(10)
             raise TimeoutError("timed out")
         if scripted.get("transportError"):
             raise ConnectionResetError("connection reset")
@@ -615,6 +653,10 @@ class ClientCaseTests(unittest.TestCase):
                         print(f"\nskipped {case['name']!r} (not applicable: {NOT_APPLICABLE[requires]})")
                         continue
                 for use_async in (False, True):
+                    if "cancelAfterRequests" in case and not use_async:
+                        print(f"\nskipped {case['name']!r} for the synchronous client: it has no cancellation; "
+                              "AsyncCalmLensServerClient's is cancelling the awaiting task")
+                        continue
                     with self.subTest(use_async=use_async):
                         self._run_case(case, use_async)
 
@@ -638,8 +680,12 @@ class ClientCaseTests(unittest.TestCase):
             if error is None:
                 assert client is not None
                 try:
-                    result = _invoke(client, step["operation"], _decode_args(step.get("args") or {}),
-                                     use_async=use_async)
+                    if "cancelAfterRequests" in case:
+                        result = _cancel_after(client, step["operation"], _decode_args(step.get("args") or {}),
+                                               transport, case["cancelAfterRequests"])
+                    else:
+                        result = _invoke(client, step["operation"], _decode_args(step.get("args") or {}),
+                                         use_async=use_async)
                 except _Partial as failure:
                     error, partial = failure.error, _json(failure.items)
                 except CalmLensError as failure:

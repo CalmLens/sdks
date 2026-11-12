@@ -10,12 +10,16 @@ connection pool, retries, errors and request options. Cancelling the awaiting ta
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
+import threading
 import ssl
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from typing import Any, List, Literal, TypeVar
 
 from . import client as _client
+from . import error_codes
+from .errors import CalmLensCancelledError
 from .client import (_UNSET, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RETRIES,
                      DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT, AppInfo, CalmLensServerClient, CDNResponse,
                      RequestAttempt, RequestOptions, Transport)
@@ -31,8 +35,18 @@ _DONE: Any = object()
 
 
 async def _run(call: Callable[[], _Result]) -> _Result:
-    """Run a blocking call in a worker thread, in the caller's context (its request options)."""
-    return await asyncio.to_thread(call)
+    """Run a blocking call in a worker thread, in the caller's context (its request options).
+    Cancelling the awaiting task stops the call before its next request or retry and raises
+    :class:`~calmlens.CalmLensCancelledError`; a request already sent finishes in its thread."""
+    cancelled = threading.Event()
+    context = contextvars.copy_context()
+    context.run(_client._CANCELLED.set, cancelled)
+    future = asyncio.get_running_loop().run_in_executor(None, context.run, call)
+    try:
+        return await future
+    except asyncio.CancelledError as error:
+        cancelled.set()
+        raise CalmLensCancelledError(error_codes.SDK_CANCELLED, "The call was cancelled") from error
 
 
 async def _aiter(start: Callable[[], Iterator[_Item]]) -> AsyncIterator[_Item]:
