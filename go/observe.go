@@ -62,12 +62,15 @@ func environmentLogger(level string) (*slog.Logger, error) {
 // key, bodies or query parameters.
 type Attempt struct {
 	// Operation is the method that sent the request, named as in the API reference, such as
-	// "assets.retrieve", or "request" for ServerClient.Request.
+	// "assets.retrieve", or empty for ServerClient.Request.
 	Operation string
-	// Method and Path are the request's, such as "GET" and "/assets/asset_1"; Path has no query.
+	// Method and Path are the request's, such as "GET" and "/v1/assets/asset_1": the URL path as
+	// sent, without the query.
 	Method, Path string
 	// Attempt counts from 1; a retry is attempt 2 or later.
 	Attempt int
+	// WillRetry reports whether another attempt follows, after Delay.
+	WillRetry bool
 	// Delay is the wait before the retry that follows, or 0 when none does.
 	Delay time.Duration
 	// Status is the response's HTTP status, or 0 when none arrived.

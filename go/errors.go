@@ -73,8 +73,9 @@ type Error struct {
 	// Body is the error response's body as sent, up to 16 KiB, such as a proxy's HTML page; empty
 	// when no response was received.
 	Body string `json:"-"`
-	// Method and Path are the API request's method and path (without the query), such as "GET"
-	// and "/assets/asset_1", or empty for an error raised before a request or by the CDN.
+	// Method and Path are the API request's method and URL path as sent (without the query), such
+	// as "GET" and "/v1/assets/asset_1", or empty for an error raised before a request or by the
+	// CDN.
 	Method, Path string `json:"-"`
 	// Attempts is how many times the request was sent, retries included, or 0 when it never was.
 	Attempts int `json:"-"`

@@ -88,6 +88,9 @@ func (e *Error) Kind() error {
 		return kind
 	}
 	if e.Status == 0 {
+		if e.Code == CodeSDKHTTPError {
+			return ErrAPI
+		}
 		// An API code the SDK raised before sending, such as upload/unsupported-type.
 		return ErrInvalidArgument
 	}

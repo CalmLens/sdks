@@ -81,9 +81,9 @@ func TestEachAttemptIsReportedAndLoggedWithoutSecrets(t *testing.T) {
 	if _, err = c.Assets.Retrieve(context.Background(), AssetIDOptions{AssetID: "a"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(attempts) != 2 || attempts[0].Operation != "assets.retrieve" || attempts[0].Method != "GET" || attempts[0].Path != "/assets/a" ||
-		attempts[0].Attempt != 1 || attempts[0].Status != 503 || attempts[0].Delay <= 0 || CodeOf(attempts[0].Err) != CodeSDKHTTPError ||
-		attempts[1].Attempt != 2 || attempts[1].Status != 200 || attempts[1].RequestID != "req_200" || attempts[1].Delay != 0 || attempts[1].Err != nil {
+	if len(attempts) != 2 || attempts[0].Operation != "assets.retrieve" || attempts[0].Method != "GET" || attempts[0].Path != "/v1/assets/a" ||
+		attempts[0].Attempt != 1 || attempts[0].Status != 503 || attempts[0].Delay <= 0 || !attempts[0].WillRetry || CodeOf(attempts[0].Err) != CodeSDKHTTPError ||
+		attempts[1].Attempt != 2 || attempts[1].Status != 200 || attempts[1].RequestID != "req_200" || attempts[1].Delay != 0 || attempts[1].WillRetry || attempts[1].Err != nil {
 		t.Fatalf("%+v", attempts)
 	}
 	text := logs.String()
@@ -150,7 +150,7 @@ func TestErrorsRecordTheRequestAndLogWithoutTheirBody(t *testing.T) {
 	}
 	_, err = c.Folders.Retrieve(context.Background(), FolderIDOptions{FolderID: "f"})
 	var failure *Error
-	if !errors.As(err, &failure) || failure.Method != "GET" || failure.Path != "/folders/f" || failure.Attempts != 1 || failure.Body != "<html>proxy</html>" || failure.Kind() != ErrServer {
+	if !errors.As(err, &failure) || failure.Method != "GET" || failure.Path != "/v1/folders/f" || failure.Attempts != 1 || failure.Body != "<html>proxy</html>" || failure.Kind() != ErrServer {
 		t.Fatalf("%#v", failure)
 	}
 	var logs bytes.Buffer

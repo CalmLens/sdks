@@ -123,7 +123,7 @@ func (r *RawResponse) Decode(out any) error { return decodeJSON(r.Body, out) }
 // it, with the client's API key, user agent, retries (for GET, HEAD and requests with an
 // IdempotencyKey), Params, logging and errors. A non-2xx answer returns a *Error.
 func (c *ServerClient) Request(ctx context.Context, options RequestOptions) (*RawResponse, error) {
-	ctx, err := withCall(ctx, "request", options.Params)
+	ctx, err := withCall(ctx, "", options.Params)
 	if err != nil {
 		return nil, err
 	}

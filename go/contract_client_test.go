@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
@@ -150,7 +151,61 @@ func into[T any](t *testing.T, args fixtureArgs) T {
 	if err = json.Unmarshal(data, &v); err != nil {
 		t.Fatalf("decode %s into %T: %v", data, v, err)
 	}
+	// A client case step's requestOptions are the call's Params.
+	if stepParams != nil {
+		if field := reflect.ValueOf(&v).Elem().FieldByName("Params"); field.IsValid() && field.Type() == reflect.TypeFor[Params]() {
+			field.Set(reflect.ValueOf(*stepParams))
+			stepParamsUsed = true
+		}
+	}
 	return v
+}
+
+// stepParams are the current client case step's requestOptions, which into gives the options it
+// decodes; stepParamsUsed records that a call took them.
+var (
+	stepParams     *Params
+	stepParamsUsed bool
+)
+
+// requestParams turns a step's requestOptions (JavaScript names) into Params.
+func requestParams(t *testing.T, raw json.RawMessage) *Params {
+	t.Helper()
+	if len(raw) == 0 {
+		return nil
+	}
+	var options map[string]any
+	if err := decodeJSON(raw, &options); err != nil {
+		t.Fatal(err)
+	}
+	params := &Params{}
+	for key, value := range options {
+		switch key {
+		case "timeoutMs":
+			ms, _ := value.(json.Number).Int64()
+			params.Timeout = time.Duration(ms) * time.Millisecond
+		case "maxRetries":
+			n, _ := value.(json.Number).Int64()
+			params.MaxRetries = Ptr(int(n))
+		case "idempotencyKey":
+			params.IdempotencyKey = value.(string)
+		case "headers":
+			params.Headers = http.Header{}
+			for name, header := range value.(map[string]any) {
+				params.Headers.Set(name, header.(string))
+			}
+		case "extraQuery":
+			params.ExtraQuery = url.Values{}
+			for name, item := range value.(map[string]any) {
+				params.ExtraQuery.Set(name, fmt.Sprint(item))
+			}
+		case "extraBody":
+			params.ExtraBody = value.(map[string]any)
+		default:
+			t.Fatalf("unknown request option %s", key)
+		}
+	}
+	return params
 }
 
 func markerValue(value any, key string) (any, bool) {
@@ -234,7 +289,9 @@ func fixtureSubmit(t *testing.T, args fixtureArgs) SubmitAssetOptions {
 	}
 	options := into[SubmitAssetOptions](t, plain)
 	options.Content, options.Part = fixtureContent(t, args["content"]), fixtureContent(t, args["part"])
-	options.IdempotencyKey, _ = args["idempotencyKey"].(string)
+	if key, ok := args["idempotencyKey"].(string); ok {
+		options.IdempotencyKey = key
+	}
 	return options
 }
 
@@ -272,6 +329,8 @@ func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 type fixtureCall struct {
 	result  any
 	partial any
+	// response is a raw request's LastResponse.
+	response *APIResponse
 }
 
 // invoke runs a request-fixture operation with JavaScript-style arguments.
@@ -279,13 +338,39 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	t.Helper()
 	one := func(result any, err error) (fixtureCall, error) { return fixtureCall{result: result}, err }
 	switch operation {
+	case "request":
+		options := into[RequestOptions](t, fixtureArgs{})
+		options.Method, _ = args["method"].(string)
+		options.Path, _ = args["path"].(string)
+		options.Body = args["body"]
+		if query, ok := args["query"].(map[string]any); ok {
+			options.Query = url.Values{}
+			for name, value := range query {
+				options.Query.Set(name, fmt.Sprint(value))
+			}
+		}
+		if headers, ok := args["headers"].(map[string]any); ok {
+			if options.Headers == nil {
+				options.Headers = http.Header{}
+			}
+			for name, value := range headers {
+				options.Headers.Set(name, value.(string))
+			}
+		}
+		response, err := c.Request(ctx, options)
+		if err != nil {
+			return fixtureCall{}, err
+		}
+		return fixtureCall{result: response.Body, response: response.LastResponse}, nil
 	case "assets.create":
 		return one(c.Assets.Create(ctx, fixtureSubmit(t, args)))
 	case "assets.classify":
 		return one(c.Assets.Classify(ctx, fixtureSubmit(t, args)))
 	case "text.classify":
 		options := into[ClassifyTextOptions](t, args)
-		options.IdempotencyKey, _ = args["idempotencyKey"].(string)
+		if key, ok := args["idempotencyKey"].(string); ok {
+			options.IdempotencyKey = key
+		}
 		return one(c.Text.Classify(ctx, options))
 	case "assets.retrieve":
 		return one(c.Assets.Retrieve(ctx, into[AssetIDOptions](t, args)))
@@ -309,7 +394,9 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 			}
 		}
 		options := into[UploadAssetPartOptions](t, plain)
-		options.IdempotencyKey, _ = args["idempotencyKey"].(string)
+		if key, ok := args["idempotencyKey"].(string); ok {
+			options.IdempotencyKey = key
+		}
 		if part := fixtureContent(t, args["part"]); part != nil {
 			options.Part = *part
 		}
@@ -828,13 +915,22 @@ type clientCase struct {
 	Requires            string
 	Client              map[string]any
 	CancelAfterRequests int
-	Responses           []scriptedResponse
-	Steps               []struct {
-		Operation string
-		Args      json.RawMessage
-		Expect    struct {
+	Env                 map[string]string
+	ClientFromEnv       bool
+	Attempts            []map[string]any
+	Logs                *struct {
+		Level          string
+		MustNotContain []string
+	}
+	Responses []scriptedResponse
+	Steps     []struct {
+		Operation      string
+		Args           json.RawMessage
+		RequestOptions json.RawMessage
+		Expect         struct {
 			Result        json.RawMessage
 			Error         map[string]any
+			LastResponse  map[string]any
 			PartialResult json.RawMessage
 			CDN           *struct {
 				Status     int
@@ -894,6 +990,12 @@ func clientOptions(t *testing.T, values map[string]any) (Options, error) {
 			options.MaxResponseBytes = int64(value.(float64))
 		case "partSizeBytes":
 			options.PartSizeBytes = int64(value.(float64))
+		case "appInfo":
+			info := value.(map[string]any)
+			options.AppInfo = &AppInfo{}
+			options.AppInfo.Name, _ = info["name"].(string)
+			options.AppInfo.Version, _ = info["version"].(string)
+			options.AppInfo.URL, _ = info["url"].(string)
 		default:
 			t.Fatalf("unknown client option %s", key)
 		}
@@ -937,9 +1039,27 @@ func TestClientCases(t *testing.T) {
 					t.Skip("not applicable: " + reason)
 				}
 			}
+			// The case's environment, and no other CALMLENS_* variable.
+			for _, name := range []string{"CALMLENS_API_KEY", "CALMLENS_PROJECT_ID", "CALMLENS_BASE_URL", "CALMLENS_LOG"} {
+				t.Setenv(name, clientCase.Env[name])
+			}
+			for name := range clientCase.Env {
+				if !strings.HasPrefix(name, "CALMLENS_") {
+					t.Fatalf("env sets %s", name)
+				}
+				t.Setenv(name, clientCase.Env[name])
+			}
 			values := clone(fixture.Client)
 			for key, value := range clientCase.Client {
 				values[key] = value
+			}
+			if clientCase.ClientFromEnv {
+				delete(values, "apiKey")
+				delete(values, "projectId")
+			}
+			everyRequest := clone(fixture.EveryRequest.Headers)
+			if key, ok := clientCase.Client["apiKey"]; ok {
+				everyRequest["x-api-key"] = key
 			}
 			options, optionsErr := clientOptions(t, values)
 			if reason, ok := inexpressibleClientCases[clientCase.Name]; ok {
@@ -955,6 +1075,13 @@ func TestClientCases(t *testing.T) {
 			defer cancel()
 			transport := &scriptedTransport{responses: clientCase.Responses, cancelAfter: clientCase.CancelAfterRequests, cancel: cancel}
 			options.HTTPClient = &http.Client{Transport: transport}
+			var attempts []Attempt
+			options.OnAttempt = func(attempt Attempt) { attempts = append(attempts, attempt) }
+			var logs bytes.Buffer
+			if clientCase.Logs != nil {
+				level := map[string]slog.Level{"info": slog.LevelInfo, "debug": slog.LevelDebug}[clientCase.Logs.Level]
+				options.Logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: level}))
+			}
 			client, constructionErr := NewServerClient(options)
 			var slept []time.Duration
 			if client != nil {
@@ -967,9 +1094,14 @@ func TestClientCases(t *testing.T) {
 				label := fmt.Sprintf("step %d (%s)", index+1, step.Operation)
 				var called fixtureCall
 				err := constructionErr
+				stepParams, stepParamsUsed = requestParams(t, step.RequestOptions), false
 				if err == nil {
 					called, err = invoke(t, ctx, client, step.Operation, decodeArgs(t, step.Args))
+					if stepParams != nil && !stepParamsUsed {
+						t.Fatalf("%s: %s took no request options", label, step.Operation)
+					}
 				}
+				stepParams = nil
 				if want := step.Expect.Error; want != nil {
 					checkError(t, label, err, want)
 					if len(step.Expect.PartialResult) > 0 {
@@ -1004,8 +1136,27 @@ func TestClientCases(t *testing.T) {
 					result = json.RawMessage("null")
 				}
 				checkResult(t, label, called.result, result)
+				if want := step.Expect.LastResponse; want != nil {
+					checkLastResponse(t, label, called, want)
+				}
 			}
-			checkRequests(t, clientCase, fixture.EveryRequest.Headers, transport.received)
+			checkRequests(t, clientCase, everyRequest, transport.received)
+			if clientCase.Attempts != nil {
+				checkAttempts(t, attempts, clientCase.Attempts)
+			}
+			if clientCase.Logs != nil {
+				lines := strings.Split(strings.TrimSpace(logs.String()), "\n")
+				if logs.Len() == 0 {
+					t.Fatal("nothing was logged")
+				}
+				for _, line := range lines {
+					for _, secret := range clientCase.Logs.MustNotContain {
+						if strings.Contains(line, secret) {
+							t.Fatalf("log line holds %q: %s", secret, line)
+						}
+					}
+				}
+			}
 			checkSleeps(t, clientCase.SleepsMs, slept)
 		})
 	}
@@ -1373,4 +1524,54 @@ func checkErrorKind(t *testing.T, label string, err error, kind string) {
 			t.Errorf("%s: errors.Is(err, %s) = %v, want %v (kind %s)", label, name, !want[name], want[name], kind)
 		}
 	}
+}
+
+// checkLastResponse compares a step result's LastResponse with the case's lastResponse.
+func checkLastResponse(t *testing.T, label string, called fixtureCall, want map[string]any) {
+	t.Helper()
+	response := called.response
+	if response == nil {
+		value := reflect.Indirect(reflect.ValueOf(called.result))
+		if field := value.FieldByName("LastResponse"); field.IsValid() {
+			response, _ = field.Interface().(*APIResponse)
+		}
+	}
+	if response == nil {
+		t.Fatalf("%s: no LastResponse on %T", label, called.result)
+	}
+	got := map[string]any{"status": response.StatusCode, "requestId": orNil(response.RequestID), "idempotencyKey": orNil(response.IdempotencyKey)}
+	if !reflect.DeepEqual(plain(t, got), plain(t, want)) {
+		t.Fatalf("%s: lastResponse %v, want %v", label, got, want)
+	}
+}
+
+// checkAttempts compares the attempt hook's events, without their durations, with the case's.
+func checkAttempts(t *testing.T, attempts []Attempt, want []map[string]any) {
+	t.Helper()
+	got := []map[string]any{}
+	for _, attempt := range attempts {
+		event := map[string]any{"operation": orNil(attempt.Operation), "method": attempt.Method, "path": attempt.Path, "attempt": attempt.Attempt,
+			"delayMs": nil, "status": nil, "requestId": orNil(attempt.RequestID), "errorCode": nil}
+		if attempt.WillRetry {
+			event["delayMs"] = attempt.Delay.Milliseconds()
+		}
+		if attempt.Status != 0 {
+			event["status"] = attempt.Status
+		}
+		if attempt.Err != nil {
+			event["errorCode"] = string(CodeOf(attempt.Err))
+		}
+		got = append(got, event)
+	}
+	if !reflect.DeepEqual(plain(t, got), plain(t, want)) {
+		t.Fatalf("attempts %v, want %v", plain(t, got), plain(t, want))
+	}
+}
+
+// orNil is value, or nil when it is empty.
+func orNil(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }

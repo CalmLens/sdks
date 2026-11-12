@@ -174,6 +174,8 @@ type ServerClient struct {
 	userAgent string
 	// logger is Options.Logger, or the CALMLENS_LOG logger, or nil.
 	logger *slog.Logger
+	// basePath is BaseURL's path, such as "/v1".
+	basePath string
 }
 
 // String describes the client without its API key. It takes a value so a dereferenced client
@@ -256,6 +258,7 @@ func NewServerClient(options Options) (*ServerClient, error) {
 		options.PartSizeBytes = DefaultPartSizeBytes
 	}
 	options.BaseURL = strings.TrimRight(options.BaseURL, "/")
+	base, _ := url.Parse(options.BaseURL)
 	options.CDNBaseURL = strings.TrimRight(options.CDNBaseURL, "/")
 	doer := options.HTTPClient
 	if client, ok := doer.(*http.Client); ok || doer == nil {
@@ -274,7 +277,7 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	if options.MaxRetries != nil {
 		maxRetries = *options.MaxRetries
 	}
-	c := &ServerClient{options: options, maxRetries: maxRetries, http: doer, userAgent: userAgent + agent, logger: logger, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
+	c := &ServerClient{options: options, maxRetries: maxRetries, http: doer, userAgent: userAgent + agent, logger: logger, basePath: base.EscapedPath(), lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
 	c.services()
 	return c, nil
 }
@@ -460,6 +463,8 @@ func (c *ServerClient) retryDelay(err *Error, attempt int) (time.Duration, bool)
 
 // send performs a call, retrying it when that is safe, and decodes the response into out.
 func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
+	// requestPath is the URL path as sent, base path included, such as "/v1/assets/asset_1".
+	requestPath := c.basePath + spec.path
 	endpoint := c.options.BaseURL + spec.path
 	if len(spec.params) > 0 {
 		endpoint += "?" + spec.params.Encode()
@@ -527,7 +532,7 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		case spec.raw != nil:
 			reader, size = spec.raw, spec.size
 		}
-		record := Attempt{Operation: operationOf(ctx), Method: spec.method, Path: spec.path, Attempt: attempt + 1}
+		record := Attempt{Operation: operationOf(ctx), Method: spec.method, Path: requestPath, Attempt: attempt + 1}
 		started := time.Now()
 		err := c.attempt(ctx, spec.method, endpoint, headers, reader, size, timeout, out, &record)
 		record.Duration, record.Err = time.Since(started), err
@@ -537,7 +542,7 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		}
 		sdkErr, ok := err.(*Error)
 		if ok {
-			sdkErr.Method, sdkErr.Path, sdkErr.Attempts = spec.method, spec.path, attempt+1
+			sdkErr.Method, sdkErr.Path, sdkErr.Attempts = spec.method, requestPath, attempt+1
 		}
 		delay, wait := time.Duration(0), false
 		if ok && retryable && attempt < maxRetries && sdkErr.Retryable() && ctx.Err() == nil && rewind != nil && rewind() == nil {
@@ -548,7 +553,7 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 			c.observe(ctx, record, true)
 			return err
 		}
-		record.Delay = delay
+		record.Delay, record.WillRetry = delay, true
 		c.observe(ctx, record, false)
 		if waitErr := c.sleep(ctx, delay); waitErr != nil {
 			return transportError(waitErr)
