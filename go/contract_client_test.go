@@ -161,6 +161,13 @@ func into[T any](t *testing.T, args fixtureArgs) T {
 	return v
 }
 
+// stepStopAfter is the current client case step's stopAfter: an iterator step stops consuming
+// after that many items, as a caller breaking out of its loop does (0 for all of them).
+var stepStopAfter int
+
+// stopped reports whether an iterator step has consumed stepStopAfter items.
+func stopped(consumed int) bool { return stepStopAfter > 0 && consumed >= stepStopAfter }
+
 // stepParams are the current client case step's requestOptions, which into gives the options it
 // decodes; stepParamsUsed records that a call took them.
 var (
@@ -538,7 +545,7 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	case "events.iterate":
 		it := c.Events.ListAll(into[ListEventsOptions](t, args))
 		events := []Event{}
-		for it.Next(ctx) {
+		for !stopped(len(events)) && it.Next(ctx) {
 			events = append(events, it.Event())
 		}
 		return fixtureCall{result: events, partial: events}, it.Err()
@@ -562,7 +569,7 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 // collect gathers every item an iterator yields, with those yielded before a failure as partial.
 func collect[T any](ctx context.Context, it *Iterator[T]) (fixtureCall, error) {
 	items := []T{}
-	for it.Next(ctx) {
+	for !stopped(len(items)) && it.Next(ctx) {
 		items = append(items, it.Item())
 	}
 	return fixtureCall{result: items, partial: items}, it.Err()
@@ -927,6 +934,7 @@ type clientCase struct {
 		Operation      string
 		Args           json.RawMessage
 		RequestOptions json.RawMessage
+		StopAfter      int
 		Expect         struct {
 			Result        json.RawMessage
 			Error         map[string]any
@@ -1095,13 +1103,14 @@ func TestClientCases(t *testing.T) {
 				var called fixtureCall
 				err := constructionErr
 				stepParams, stepParamsUsed = requestParams(t, step.RequestOptions), false
+				stepStopAfter = step.StopAfter
 				if err == nil {
 					called, err = invoke(t, ctx, client, step.Operation, decodeArgs(t, step.Args))
 					if stepParams != nil && !stepParamsUsed {
 						t.Fatalf("%s: %s took no request options", label, step.Operation)
 					}
 				}
-				stepParams = nil
+				stepParams, stepStopAfter = nil, 0
 				if want := step.Expect.Error; want != nil {
 					checkError(t, label, err, want)
 					if len(step.Expect.PartialResult) > 0 {

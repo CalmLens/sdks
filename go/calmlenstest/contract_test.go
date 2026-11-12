@@ -48,6 +48,13 @@ var surfaceFunctions = map[string]any{
 	"calmlenstest.CreateMockAPIKey": CreateMockAPIKey,
 }
 
+// unlistedMethods are exported client methods that aren't API capabilities, with the reason.
+var unlistedMethods = map[string]string{
+	"String":   "fmt.Stringer, printing the client without its API key",
+	"GoString": "fmt.GoStringer, for %#v without the API key",
+	"Request":  "the raw request escape hatch, covered by client-cases.json's raw-request cases; surface.json has no capability for it yet",
+}
+
 // errorKindSentinels are the errors.Is sentinels of surface.json's errorKinds, by Go name.
 var errorKindSentinels = map[string]error{
 	"ErrAPI": calmlens.ErrAPI, "ErrBadRequest": calmlens.ErrBadRequest, "ErrAuthentication": calmlens.ErrAuthentication,
@@ -179,11 +186,6 @@ func TestRetryableContract(t *testing.T) {
 			Retryable bool
 			Kind      string
 		}
-		ErrorKinds []struct {
-			ID     string
-			Parent *string
-			Names  struct{ Go string }
-		}
 		Capabilities []surfaceCapability
 	}](t, "surface.json")
 	// SDK codes Go never raises, by the reason surface.json gives.
@@ -203,28 +205,9 @@ func TestRetryableContract(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("%s %d", c.Code, status), func(t *testing.T) {
 			e := &calmlens.Error{Code: calmlens.ErrorCode(c.Code), Status: status}
-			// The error is its kind and every kind above it, and no other. A code Go never raises
-			// has no kind here.
-			want := map[string]bool{}
-			if _, ok := notRaised[c.Code]; ok {
-				c.Kind = ""
-			}
-			for id := &c.Kind; id != nil && *id != ""; {
-				found := false
-				for _, kind := range fixture.ErrorKinds {
-					if kind.ID == *id {
-						want[kind.Names.Go], id, found = true, kind.Parent, true
-						break
-					}
-				}
-				if !found {
-					t.Fatalf("unknown error kind %q", *id)
-				}
-			}
-			for name, sentinel := range errorKindSentinels {
-				if c.Kind != "" && errors.Is(e, sentinel) != want[name] {
-					t.Errorf("errors.Is(err, calmlens.%s) = %v, want %v (kind %s)", name, !want[name], want[name], c.Kind)
-				}
+			// A code Go never raises has no kind here.
+			if _, ok := notRaised[c.Code]; !ok {
+				checkErrorKind(t, c.Code, e, c.Kind)
 			}
 			if got := e.Retryable(); got != c.Retryable {
 				t.Fatalf("Retryable() = %v, want %v", got, c.Retryable)
@@ -327,6 +310,32 @@ func TestSurface(t *testing.T) {
 			t.Errorf("missing error kind %s (%s)", kind.ID, name)
 		}
 		used[name] = true
+	}
+	// Every exported method on the client and its services is a capability, so the SDK can't keep
+	// a method the API dropped.
+	named := map[string]bool{}
+	for _, capability := range surface.Capabilities {
+		named[capability.Names.Go] = true
+	}
+	methods := func(prefix string, typ reflect.Type) {
+		for i := 0; i < typ.NumMethod(); i++ {
+			name := prefix + typ.Method(i).Name
+			if _, allowed := unlistedMethods[name]; !allowed && !named[name] {
+				t.Errorf("%s is exported but no surface.json method capability names it", name)
+			}
+		}
+	}
+	methods("", reflect.TypeOf(client))
+	services := reflect.ValueOf(client).Elem()
+	for i := 0; i < services.NumField(); i++ {
+		if field := services.Type().Field(i); field.IsExported() && field.Type.Kind() == reflect.Pointer {
+			methods(field.Name+".", field.Type)
+		}
+	}
+	for name := range unlistedMethods {
+		if named[name] {
+			t.Errorf("unlistedMethods lists %s, which surface.json now names", name)
+		}
 	}
 	// A reference the manifest no longer lists is stale.
 	var stale []string
@@ -448,6 +457,7 @@ type mockScenario struct {
 			Error      *struct {
 				Code       string
 				Status     *int
+				Kind       string
 				Details    map[string]any
 				RetryAfter *int `json:"retryAfter"`
 			}
@@ -1053,6 +1063,7 @@ func TestSharedMockScenarios(t *testing.T) {
 						if string(apiErr.Code) != want.Code || !reflect.DeepEqual(status, want.Status) {
 							t.Fatalf("%s: got %s (status %v), want %s (status %v): %v", label, apiErr.Code, apiErr.Status, want.Code, want.Status, err)
 						}
+						checkErrorKind(t, label, err, want.Kind)
 						if want.RetryAfter != nil && (apiErr.RetryAfter == nil || *apiErr.RetryAfter != time.Duration(*want.RetryAfter)*time.Second) {
 							t.Fatalf("%s: Retry-After %v, want %ds", label, apiErr.RetryAfter, *want.RetryAfter)
 						}
@@ -1128,5 +1139,37 @@ func TestSharedMockScenarios(t *testing.T) {
 				t.Fatalf("scenario took %s", elapsed)
 			}
 		})
+	}
+}
+
+// checkErrorKind checks that err is the kind surface.json's errorKinds calls kind, and each kind
+// above it, through errors.Is, and no other kind.
+func checkErrorKind(t *testing.T, label string, err error, kind string) {
+	t.Helper()
+	surface := fixtures.Read[struct {
+		ErrorKinds []struct {
+			ID     string
+			Parent *string
+			Names  struct{ Go string }
+		}
+	}](t, "surface.json")
+	want := map[string]bool{}
+	for id := &kind; id != nil; {
+		found := false
+		for _, k := range surface.ErrorKinds {
+			if k.ID == *id {
+				want[k.Names.Go], id, found = true, k.Parent, true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("%s: unknown error kind %q", label, *id)
+		}
+	}
+	wrapped := fmt.Errorf("wrapped: %w", err)
+	for name, sentinel := range errorKindSentinels {
+		if errors.Is(wrapped, sentinel) != want[name] {
+			t.Errorf("%s: errors.Is(err, calmlens.%s) = %v, want %v (kind %s)", label, name, !want[name], want[name], kind)
+		}
 	}
 }
