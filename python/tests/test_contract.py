@@ -920,7 +920,6 @@ _UNNAMED_METHODS = {
                                 "it as a function",
     "parse_webhook_event": "the module function, also on the client for convenience; surface names it "
                            "as a function",
-    "request": "the raw request of the shared client design, which surface.json doesn't list as a method yet",
     "events.iter_pages": "the events feed page by page (mock-scenarios.json's events.pages), which "
                          "surface.json doesn't list as a method",
 }
