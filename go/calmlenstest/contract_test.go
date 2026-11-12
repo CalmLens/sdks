@@ -52,7 +52,6 @@ var surfaceFunctions = map[string]any{
 var unlistedMethods = map[string]string{
 	"String":   "fmt.Stringer, printing the client without its API key",
 	"GoString": "fmt.GoStringer, for %#v without the API key",
-	"Request":  "the raw request escape hatch, covered by client-cases.json's raw-request cases; surface.json has no capability for it yet",
 }
 
 // errorKindSentinels are the errors.Is sentinels of surface.json's errorKinds, by Go name.
