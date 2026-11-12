@@ -191,8 +191,10 @@ class ContractClientTest < Minitest::Test
   each_case('api_error', fixture('errors')) { |entry| entry['code'] }
 
   # The mock answers each error code with this status, so a stale generated file would mislead tests.
+  # Proxy cases (`sdk/http-error`) carry no API code.
   def test_generated_error_codes_match_the_shared_errors_fixture
-    assert_equal self.class.fixture('errors').to_h { |entry| [entry['code'], entry['status']] }, CalmLens::ErrorCodes::STATUSES
+    api_codes = self.class.fixture('errors').reject { |entry| entry['code'].start_with?('sdk/') }
+    assert_equal api_codes.to_h { |entry| [entry['code'], entry['status']] }, CalmLens::ErrorCodes::STATUSES
   end
 
   # ---- client-cases.json -----------------------------------------------------------------------
