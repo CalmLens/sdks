@@ -6,10 +6,10 @@ namespace CalmLens;
 
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
+use CalmLens\Model\Lens;
 use GuzzleHttp\ClientInterface;
 
 /**
- * @phpstan-import-type Lens from Types
  * @phpstan-import-type LensType from Types
  * @phpstan-import-type RequestOptions from Types
  */
@@ -101,13 +101,17 @@ final class ServerClient
      * Creates a named lens, or changes it to this definition; `active` is true unless it says
      * otherwise. Sending the same definition again returns the lens unchanged, from the client's
      * lens cache once it has seen it.
+     *
+     * @param array{
+     *     identifier: string, name: string, description?: ?string, type: LensType, active?: bool,
+     *     transform?: array<string, mixed>|null,
+     * } $params
+     * @param RequestOptions $requestOptions
      */
-    public function ensureLens(array $options): array
+    public function ensureLens(array $params, array $requestOptions = []): Lens
     {
-        Values::knownOptions($options, 'ensureLens');
-        $request = $options['requestOptions'] ?? [];
-        unset($options['requestOptions']);
-        return $this->ensureLenses(['lenses' => [$options], 'requestOptions' => $request])[0];
+        Values::knownOptions($params, 'ensureLens');
+        return $this->ensureLenses(['lenses' => [$params]], $requestOptions)[0];
     }
 
     /**
@@ -119,14 +123,14 @@ final class ServerClient
      *         identifier: string, name: string, description?: ?string, type: LensType, active?: bool,
      *         transform?: array<string, mixed>|null,
      *     }>,
-     *     requestOptions?: RequestOptions,
-     * } $options
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return list<Lens>
      */
-    public function ensureLenses(array $options): array
+    public function ensureLenses(array $params, array $requestOptions = []): array
     {
-        Values::knownOptions($options, 'ensureLenses');
-        $definitions = $options['lenses'] ?? null;
+        Values::knownOptions($params, 'ensureLenses');
+        $definitions = $params['lenses'] ?? null;
         if (!is_array($definitions) || !array_is_list($definitions) || $definitions === []) {
             Values::invalid('Supply a non-empty list of lenses');
         }
@@ -146,7 +150,7 @@ final class ServerClient
         $resolved = $this->session->ensuredLenses;
         foreach (array_chunk($missing, self::ENSURE_LENSES_BATCH_SIZE, true) as $chunk) {
             $sent = array_values($chunk);
-            $response = $this->session->request('PUT', $this->session->project('lenses'), body: ['lenses' => $sent], options: $options['requestOptions'] ?? []);
+            $response = $this->session->request('PUT', $this->session->project('lenses'), body: ['lenses' => $sent], options: $requestOptions);
             $returned = is_array($response['lenses'] ?? null) && array_is_list($response['lenses']) ? $response['lenses'] : [];
             if (count($returned) !== count($sent)) {
                 throw CalmLensException::create('sdk/invalid-response', 'Unexpected lens response');
@@ -165,6 +169,6 @@ final class ServerClient
                 $resolved[$key] = $this->session->ensuredLenses[$key] = $returned[$index];
             }
         }
-        return array_map(fn ($key) => $resolved[$key], $keys);
+        return array_map(fn ($key) => Lens::constructFrom($resolved[$key]), $keys);
     }
 }

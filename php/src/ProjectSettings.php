@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace CalmLens;
 
+use CalmLens\Model\ProjectSettingsResource;
+
 /**
  * The project's settings, with defaults filled in. `update` replaces them: settings left out
  * return to their defaults. Send the `revision` you read to refuse a change made since
  * (`project-settings/revision-conflict`). The settings share their revision with the metadata fields.
  *
- * @phpstan-import-type ProjectSettingsResource from Types
  * @phpstan-import-type RequestOptions from Types
  */
 final class ProjectSettings extends Resource
@@ -19,13 +20,14 @@ final class ProjectSettings extends Resource
     /**
      * The project's `revision` and `settings`.
      *
-     * @param array{requestOptions?: RequestOptions} $options
+     * @param array{} $params
+     * @param RequestOptions $requestOptions
      * @return ProjectSettingsResource
      */
-    public function get(array $options = []): array
+    public function get(array $params = [], array $requestOptions = []): ProjectSettingsResource
     {
-        [, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->session->project('settings'), options: $request);
+        [, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(ProjectSettingsResource::class, $this->session->request('GET', $this->session->project('settings'), options: $request));
     }
 
     /**
@@ -45,16 +47,17 @@ final class ProjectSettings extends Resource
      *             uncertaintyMarginPercent?: int|float, reviewMissingEvidence?: bool,
      *         },
      *     },
-     *     searchIndexingBudgetUnits?: int|float, requestOptions?: RequestOptions,
-     * } $options
+     *     searchIndexingBudgetUnits?: int|float,
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return ProjectSettingsResource
      */
-    public function update(array $options): array
+    public function update(array $params, array $requestOptions = []): ProjectSettingsResource
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         if (is_array($api['settings'] ?? null)) {
             $api['settings'] = (object) $api['settings'];
         }
-        return $this->session->request('PUT', $this->session->project('settings'), body: (object) $api, options: $request);
+        return self::model(ProjectSettingsResource::class, $this->session->request('PUT', $this->session->project('settings'), body: (object) $api, options: $request));
     }
 }

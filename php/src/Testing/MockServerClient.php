@@ -12,6 +12,9 @@ use CalmLens\Internal\Session;
 use CalmLens\Internal\Transforms;
 use CalmLens\Internal\UploadForm;
 use CalmLens\Internal\Values;
+use CalmLens\Model\Asset;
+use CalmLens\Model\Event;
+use CalmLens\Model\UploadToken;
 use CalmLens\ModerationContext;
 use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
@@ -273,10 +276,8 @@ final class MockServerClient
     /**
      * Signs an upload token like `uploadTokens->sign`, with the same validation, at a fixed clock
      * (`now`, epoch milliseconds) and nonce, so tests can compare exact tokens.
-     *
-     * @return array{token: string, expiresAt: int}
      */
-    public static function signUploadToken(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): array
+    public static function signUploadToken(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): UploadToken
     {
         return \CalmLens\UploadTokens::signAt($apiKey, $options, $now, $nonce);
     }
@@ -347,7 +348,7 @@ final class MockServerClient
      * given one is ignored): the asset's next number, from 1, or null without an `assetId`. Pass the result to
      * `Webhooks::toPayload` to build a matching webhook body.
      */
-    public function enqueueEvent(array $event): array
+    public function enqueueEvent(array $event): Event
     {
         $now = ($this->now)();
         $assetId = $event['assetId'] ?? null;
@@ -367,7 +368,7 @@ final class MockServerClient
             'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null, 'assetSequence' => $sequence,
             'asset' => $snapshot, 'actor' => self::API_KEY_ACTOR, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
-        return $event;
+        return Event::constructFrom($event);
     }
 
     /**
@@ -382,7 +383,7 @@ final class MockServerClient
      * (`sdk/invalid-argument`) for another outcome, and `NotFoundException` (`asset/not-found`)
      * for an unknown asset. To finish processing as moderation would, use `completeProcessing`.
      */
-    public function decide(string $assetId, string $outcome): array
+    public function decide(string $assetId, string $outcome): Asset
     {
         if (!in_array($outcome, self::DECISIONS, true)) {
             throw self::invalidArgument('decide takes ' . implode(', ', self::DECISIONS) . " (got $outcome)");
@@ -400,7 +401,7 @@ final class MockServerClient
             'title' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => $this->snapshot($asset), 'actor' => self::REVIEWER_ACTOR,
             'facts' => [['key' => 'asset-type', 'value' => $asset['type']],
                 ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $assetId], ['key' => 'note', 'value' => null]]]);
-        return $asset;
+        return Asset::constructFrom($asset);
     }
 
     /**
@@ -413,7 +414,7 @@ final class MockServerClient
      * (`asset/not-found`) for an unknown asset and `InvalidArgumentException`
      * (`sdk/invalid-argument`) for one that isn't processing or awaiting a pending re-run.
      */
-    public function completeProcessing(string $assetId, string|MockDecision|null $decision = null): array
+    public function completeProcessing(string $assetId, string|MockDecision|null $decision = null): Asset
     {
         $asset = $this->ownAsset($assetId);
         $rerun = isset($this->pendingReruns[$assetId]);
@@ -422,9 +423,9 @@ final class MockServerClient
         }
         $decision = $decision === null ? null : MockDecision::from($decision);
         if ($rerun) {
-            return $this->settleRerun($asset, $decision ?? $this->decisionFor($asset, MockModerationInput::COMPLETE, true));
+            return Asset::constructFrom($this->settleRerun($asset, $decision ?? $this->decisionFor($asset, MockModerationInput::COMPLETE, true)));
         }
-        return $this->moderateStored($asset, MockModerationInput::COMPLETE, $decision);
+        return Asset::constructFrom($this->moderateStored($asset, MockModerationInput::COMPLETE, $decision));
     }
 
     /**
@@ -1950,7 +1951,7 @@ final class MockServerClient
     /** Keyword search fields, in the order matches are reported, and where each value sits in the asset. */
     private const SEARCH_FIELDS = ['name' => ['name'], 'id' => ['id'], 'externalId' => ['externalId'],
         'description' => ['description'], 'tags' => ['tags'], 'type' => ['type'], 'content.format' => ['content', 'format'],
-        'content.extension' => ['content', 'extension'], 'classification.moderation.status' => ['classification', 'moderation', 'status']];
+        'content.extension' => ['content', 'extension'], 'classification.moderation.decision' => ['classification', 'moderation', 'status']];
 
     /**
      * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8

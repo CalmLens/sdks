@@ -7,24 +7,18 @@ namespace CalmLens;
 use CalmLens\Internal\UploadBody;
 use CalmLens\Internal\UploadForm;
 use CalmLens\Internal\Values;
+use CalmLens\Model\Asset;
+use CalmLens\Model\AssetBatch;
+use CalmLens\Model\AssetSearchResults;
+use CalmLens\Model\TimelineSegment;
 use GuzzleHttp\Psr7\LimitStream;
 use Psr\Http\Message\StreamInterface;
 
 /**
- * @phpstan-import-type Asset from Types
- * @phpstan-import-type AssetBatch from Types
- * @phpstan-import-type AssetContext from Types
- * @phpstan-import-type AssetPage from Types
- * @phpstan-import-type AssetSearchResults from Types
- * @phpstan-import-type MetadataValue from Types
- * @phpstan-import-type RequestOptions from Types
- * @phpstan-import-type TimelinePage from Types
- * @phpstan-import-type UploadContent from Types
- * @phpstan-import-type UploadPart from Types
  * @phpstan-type CreateAssetOptions array{
  *     externalUrl?: ?string, name: string, description?: ?string, visibility?: 'public'|'private'|null,
  *     metadata?: list<array{id: string, value: MetadataValue}>|null, tags?: list<string>|null,
- *     externalId?: ?string, folderId?: ?string, authorId?: ?string, context?: ?AssetContext,
+ *     externalId?: ?string, folderId?: ?string, authorId?: ?string, context?: ?AssetContextParams,
  *     uploadPresetId?: ?string,
  *     processingOptions?: array{
  *         retainContent?: bool|string|null, storeSensitiveMetadata?: bool|string|null,
@@ -36,8 +30,13 @@ use Psr\Http\Message\StreamInterface;
  *         }|null,
  *     }|null,
  *     content?: UploadContent, part?: UploadPart, url?: string, sizeInBytes?: int, totalSizeInBytes?: int,
- *     requestOptions?: RequestOptions,
  * }
+ *
+ * @phpstan-import-type AssetContextParams from Types
+ * @phpstan-import-type MetadataValue from Types
+ * @phpstan-import-type RequestOptions from Types
+ * @phpstan-import-type UploadContent from Types
+ * @phpstan-import-type UploadPart from Types
  */
 final class Assets extends Resource
 {
@@ -75,15 +74,14 @@ final class Assets extends Resource
      * The best `pageSize` matches (1 to 20, 10 by default) for a keyword or natural-language `query`,
      * ranked by relevance. Search has no cursor: refine the query, or list with a filter, for more.
      *
-     * @param array{
-     *     query: string, pageSize?: int, mode?: 'keyword'|'semantic'|'hybrid', requestOptions?: RequestOptions,
-     * } $options
+     * @param array{query: string, pageSize?: int, mode?: 'keyword'|'semantic'|'hybrid'} $params
+     * @param RequestOptions $requestOptions
      * @return AssetSearchResults
      */
-    public function search(array $options): array
+    public function search(array $params, array $requestOptions = []): AssetSearchResults
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(AssetSearchResults::class, $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request));
     }
 
     /**
@@ -92,30 +90,28 @@ final class Assets extends Resource
      * descending when prefixed with `-` (`-createdAt` by default). Pass the page's `nextCursor` as
      * `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
      *
-     * @param array{
-     *     cursor?: string, pageSize?: int, sort?: string, filter?: ?string, requestOptions?: RequestOptions,
-     * } $options
-     * @return AssetPage
+     * @param array{cursor?: string, pageSize?: int, sort?: string, filter?: ?string} $params
+     * @param RequestOptions $requestOptions
+     * @return Collection<Asset>
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): Collection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::collection(Collection::class, Asset::class, $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
      * One page of an asset's child assets, with the same `cursor`, `pageSize` and `sort` as `list`.
      *
-     * @param array{
-     *     assetId: string, cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
-     * } $options
-     * @return AssetPage
+     * @param array{assetId: string, cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return Collection<Asset>
      */
-    public function listChildren(array $options): array
+    public function listChildren(array $params, array $requestOptions = []): Collection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return $this->session->request('GET', $path . '/children', query: $api, options: $request);
+        return self::collection(Collection::class, Asset::class, $this->session->request('GET', $path . '/children', query: $api, options: $request), fn (array $next) => $this->listChildren($next, $requestOptions), $params);
     }
 
     /**
@@ -124,69 +120,86 @@ final class Assets extends Resource
      * as `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
      * `classification.moderation.timeline.segmentCount` says how many segments there are.
      *
-     * @param array{
-     *     assetId: string, cursor?: string, pageSize?: int, requestOptions?: RequestOptions,
-     * } $options
-     * @return TimelinePage
+     * @param array{assetId: string, cursor?: string, pageSize?: int} $params
+     * @param RequestOptions $requestOptions
+     * @return Collection<TimelineSegment>
      */
-    public function listTimeline(array $options): array
+    public function listTimeline(array $params, array $requestOptions = []): Collection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->session->project(ltrim($this->path($api, 'assets', 'assetId'), '/'));
-        return $this->session->request('GET', $path . '/timeline', query: $api, options: $request);
+        return self::collection(Collection::class, TimelineSegment::class, $this->session->request('GET', $path . '/timeline', query: $api, options: $request), fn (array $next) => $this->listTimeline($next, $requestOptions), $params);
     }
 
     /** Yields every asset `list` would, fetching pages as needed. */
-    public function each(array $options = []): \Generator
+    /**
+     * @param array{cursor?: string, pageSize?: int, sort?: string, filter?: ?string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, Asset>
+     */
+    public function each(array $params = [], array $requestOptions = []): \Generator
     {
-        yield from $this->items($this->list(...), $options);
+        yield from $this->list($params, $requestOptions)->autoPagingIterator();
     }
 
     /** Yields every child of the asset `assetId`, fetching pages as needed. */
-    public function eachChild(array $options): \Generator
+    /**
+     * @param array{assetId: string, cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, Asset>
+     */
+    public function eachChild(array $params, array $requestOptions = []): \Generator
     {
-        yield from $this->items($this->listChildren(...), $options);
+        yield from $this->listChildren($params, $requestOptions)->autoPagingIterator();
     }
 
     /** Yields every segment of an audio or video asset's findings timeline, in time order. */
-    public function eachTimelineSegment(array $options): \Generator
+    /**
+     * @param array{assetId: string, cursor?: string, pageSize?: int} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, TimelineSegment>
+     */
+    public function eachTimelineSegment(array $params, array $requestOptions = []): \Generator
     {
-        yield from $this->items($this->listTimeline(...), $options);
+        yield from $this->listTimeline($params, $requestOptions)->autoPagingIterator();
     }
 
     /**
-     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function retrieve(array $options): array
+    public function retrieve(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Asset::class, $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request));
     }
 
     /**
      * @param array{
      *     assetId: string, name?: string, description?: ?string, externalId?: ?string, externalUrl?: ?string,
      *     metadata?: list<array{id: string, value: MetadataValue}>|null, tags?: list<string>|null,
-     *     visibility?: 'public'|'private'|null, requestOptions?: RequestOptions,
-     * } $options
+     *     visibility?: 'public'|'private'|null,
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function update(array $options): array
+    public function update(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return $this->session->request('PATCH', $path, body: (object) $api, options: $request);
+        return self::model(Asset::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
 
     /**
-     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function retry(array $options): array
+    public function retry(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Asset::class, $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request));
     }
 
     /**
@@ -197,15 +210,16 @@ final class Assets extends Resource
      *
      * @param array{
      *     assetId: string, decision: 'allowed'|'limited'|'age-restricted'|'blocked'|'purged', note: string,
-     *     confirmPurge?: true, requestOptions?: RequestOptions,
-     * } $options
+     *     confirmPurge?: true,
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function decide(array $options): array
+    public function decide(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
-        return $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request);
+        return self::model(Asset::class, $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request));
     }
 
     /**
@@ -218,15 +232,16 @@ final class Assets extends Resource
      * re-run keeps it. A reviewed asset fails with `asset/reviewed`, and one whose content is gone
      * with `asset/content-unavailable`.
      *
-     * @param array{assetId: string, rerun?: bool, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string, rerun?: bool} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function explain(array $options): array
+    public function explain(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
         $body = !empty($api['rerun']) ? ['rerun' => true] : new \stdClass();
-        return $this->session->request('POST', $path . '/explain', body: $body, options: $request);
+        return self::model(Asset::class, $this->session->request('POST', $path . '/explain', body: $body, options: $request));
     }
 
     /**
@@ -235,24 +250,26 @@ final class Assets extends Resource
      * returned asset has `content.status` `removed` and `content.removalReason` `requested`; the
      * CDN no longer serves it.
      *
-     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function removeContent(array $options): array
+    public function removeContent(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Asset::class, $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request));
     }
 
     /**
      * Deletes an asset record together with its stored content. An asset extracted from another
      * (one with a `parentId`) fails with `asset/child-not-deletable`: delete its parent instead.
      *
-     * @param array{assetId: string, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string} $params
+     * @param RequestOptions $requestOptions
      */
-    public function delete(array $options): void
+    public function delete(array $params, array $requestOptions = []): void
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $this->session->request('DELETE', $this->path($api, 'assets', 'assetId'), options: $request);
     }
 
@@ -266,17 +283,16 @@ final class Assets extends Resource
      * `batch-id` fact naming `batchId`. Assets under a safety hold are skipped. Not retried: it
      * carries no `Idempotency-Key`.
      *
-     * @param array{
-     *     assetIds: list<string>, operation: 'delete'|'remove-content', requestOptions?: RequestOptions,
-     * } $options
+     * @param array{assetIds: list<string>, operation: 'delete'|'remove-content'} $params
+     * @param RequestOptions $requestOptions
      * @return AssetBatch
      */
-    public function batch(array $options): array
+    public function batch(array $params, array $requestOptions = []): AssetBatch
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         self::validateBatch($api);
         $body = ['assetIds' => $api['assetIds'], 'operation' => $api['operation']];
-        return $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request);
+        return self::model(AssetBatch::class, $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request));
     }
 
     /** Refuses a batch the API would reject for its size, an ID or the operation (`sdk/invalid-argument`). */
@@ -297,45 +313,52 @@ final class Assets extends Resource
     }
 
     /**
-     * @param array{assetId: string, folderId: ?string, requestOptions?: RequestOptions} $options
+     * @param array{assetId: string, folderId: ?string} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function move(array $options): array
+    public function move(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
         if (!array_key_exists('folderId', $api)) {
             Values::invalid('folderId is required (null moves to root)');
         }
-        return $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request);
+        return self::model(Asset::class, $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request));
     }
 
     /**
      * Uploads an asset and returns without waiting for its decision (`wait=false`), with
      * `classification.status` `queued`.
      *
-     * @param CreateAssetOptions $options
+     * @param CreateAssetOptions $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function create(array $options): array { return $this->submit($options, false); }
+    public function create(array $params, array $requestOptions = []): Asset
+    {
+        return Asset::constructFrom($this->submit($params, $requestOptions, false));
+    }
 
     /**
      * Uploads an asset and waits for its moderation decision (`wait=true`).
      *
-     * @param CreateAssetOptions $options
+     * @param CreateAssetOptions $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function classify(array $options): array
+    public function classify(array $params, array $requestOptions = []): Asset
     {
-        if (isset($options['content']['plainText']) && (!is_string($options['content']['plainText']) || trim($options['content']['plainText']) === '')) {
+        if (isset($params['content']['plainText']) && (!is_string($params['content']['plainText']) || trim($params['content']['plainText']) === '')) {
             Values::invalid('Text must not be blank', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
-        return $this->submit($options, true);
+        return Asset::constructFrom($this->submit($params, $requestOptions, true));
     }
 
-    private function submit(array $options, bool $wait): array
+    /** @return array<string, mixed> the uploaded asset */
+    private function submit(array $params, array $requestOptions, bool $wait): array
     {
-        [$api, $request] = $this->split($options, 'create');
+        [$api, $request] = $this->split($params, 'create', $requestOptions);
         if (!is_string($api['name'] ?? null) || $api['name'] === ''
             || count(array_intersect(['content', 'part', 'url'], array_keys($api))) !== 1 || array_key_exists('isFinal', $api)) {
             Values::invalid('Supply a name and exactly one of content, part or url', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
@@ -482,7 +505,7 @@ final class Assets extends Resource
                 if ($final && $error->errorCode === ErrorCodes::UPLOAD_NOT_OPEN) {
                     // The final part completed the upload, but its response was lost.
                     unset($request['idempotencyKey']);
-                    return self::asset($this->retrieve(['assetId' => $asset['id'], 'requestOptions' => $request]));
+                    return self::asset($this->retrieve(['assetId' => $asset['id']], $request)->toArray());
                 }
                 throw $error;
             }
@@ -495,14 +518,13 @@ final class Assets extends Resource
      * Uploads the next part of a multipart upload. Whether the final part waits for the decision was
      * chosen when the upload started; pass `wait` (a boolean) to override it.
      *
-     * @param array{
-     *     assetId: string, part: UploadPart, wait?: bool, requestOptions?: RequestOptions,
-     * } $options
+     * @param array{assetId: string, part: UploadPart, wait?: bool} $params
+     * @param RequestOptions $requestOptions
      * @return Asset
      */
-    public function uploadPart(array $options): array
+    public function uploadPart(array $params, array $requestOptions = []): Asset
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
         $part = $api['part'] ?? null;
         if (!is_array($part) || !is_int($part['partNumber'] ?? null) || $part['partNumber'] < 1) {
@@ -516,20 +538,25 @@ final class Assets extends Resource
             }
             $query['wait'] = $api['wait'];
         }
-        return self::asset($this->session->request('POST', $path . '/part', query: $query, raw: $body,
-            headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true));
+        return Asset::constructFrom(self::asset($this->session->request('POST', $path . '/part', query: $query, raw: $body,
+            headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true)));
     }
 
     /**
      * Retrieves an asset until it is settled, its `classification.status` `completed` (with its
-     * decision in `classification.moderation.status`) or `failed`, and returns it. A `queued` or
+     * decision in `classification.moderation.decision`) or `failed`, and returns it. A `queued` or
      * `processing` asset is still waiting, even when a reviewer has already decided it. Waits 0.5
      * seconds before the second check and 1.5 times longer each time, at most 2 seconds. Throws
      * `TimeoutException` (`sdk/timeout`, with the asset's statuses in `details`) once `timeout`
      * seconds (default 60) pass without it settling; 0 checks once.
+     *
+     * @param array{assetId: string, timeout?: int|float} $params
+     * @param RequestOptions $requestOptions
+     * @return Asset
      */
-    public function waitForDecision(array $options): array
+    public function waitForDecision(array $params, array $requestOptions = []): Asset
     {
+        $options = $params;
         $timeout = $options['timeout'] ?? self::DEFAULT_DECISION_TIMEOUT;
         if ((!is_int($timeout) && !is_float($timeout)) || !is_finite((float) $timeout) || $timeout < 0) {
             Values::invalid('timeout must be a non-negative number');
@@ -539,7 +566,7 @@ final class Assets extends Resource
         Values::segment($options['assetId'] ?? null);
         $deadline = ($this->session->clock)() + $timeout;
         $delay = self::DECISION_FIRST_INTERVAL;
-        [$api, $request] = $this->split($options, 'retrieve');
+        [$api, $request] = $this->split($options, 'retrieve', $requestOptions);
         $path = $this->path($api, 'assets', 'assetId');
         $classification = [];
         $status = null;
@@ -559,7 +586,7 @@ final class Assets extends Resource
             $classification = $asset['classification'] ?? [];
             $status = $classification['moderation']['status'] ?? null;
             if (in_array($classification['status'] ?? null, ['completed', 'failed'], true)) {
-                return $asset;
+                return self::model(Asset::class, $asset);
             }
             if ($remaining <= 0) {
                 break;

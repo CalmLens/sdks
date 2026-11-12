@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\Values;
+use CalmLens\Model\Event;
+use CalmLens\Model\EventCollection;
 
 /**
- * @phpstan-import-type EventPage from Types
  * @phpstan-import-type EventType from Types
  * @phpstan-import-type RequestOptions from Types
  */
@@ -25,13 +26,13 @@ final class Events extends Resource
      *
      * @param array{
      *     cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string,
-     *     requestOptions?: RequestOptions,
-     * } $options
-     * @return EventPage
+     * } $params
+     * @param RequestOptions $requestOptions
+     * @return EventCollection
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): EventCollection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         if (array_key_exists('types', $api)) {
             $types = $api['types'];
             if (!is_array($types) || !array_is_list($types)) {
@@ -45,17 +46,30 @@ final class Events extends Resource
             // The API takes the types as one comma-separated value.
             $api['types'] = $types === [] ? null : implode(',', $types);
         }
-        return $this->session->request('GET', $this->session->project('events'), query: $api, options: $request);
+        return self::collection(EventCollection::class, null, $this->session->request('GET', $this->session->project('events'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
     }
-    /** Yields pages from `cursor` until `hasMore` is false; save each page's `nextCursor` to resume. */
-    public function eachPage(array $options = []): \Generator
+
+    /**
+     * Yields pages from `cursor` until `hasMore` is false; save each page's `nextCursor` to resume.
+     *
+     * @param array{cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, EventCollection>
+     */
+    public function eachPage(array $params = [], array $requestOptions = []): \Generator
     {
-        yield from $this->pages($this->list(...), $options, events: true);
+        yield from $this->list($params, $requestOptions)->autoPagingPages();
     }
-    public function each(array $options = []): \Generator
+
+    /**
+     * Yields every event from `cursor` until `hasMore` is false.
+     *
+     * @param array{cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, Event>
+     */
+    public function each(array $params = [], array $requestOptions = []): \Generator
     {
-        foreach ($this->eachPage($options) as $page) {
-            yield from $page['items'];
-        }
+        yield from $this->list($params, $requestOptions)->autoPagingIterator();
     }
 }

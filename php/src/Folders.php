@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\Values;
+use CalmLens\Model\Folder;
+use CalmLens\Model\FolderCollection;
 
 /**
- * @phpstan-import-type Folder from Types
- * @phpstan-import-type FolderPage from Types
  * @phpstan-import-type RequestOptions from Types
  */
 final class Folders extends Resource
@@ -23,73 +23,83 @@ final class Folders extends Resource
      *
      * @param array{
      *     parentId?: string, cursor?: string, pageSize?: int, sort?: string, search?: string,
-     *     requestOptions?: RequestOptions,
-     * } $options
-     * @return FolderPage
+     * } $params
+     * @param RequestOptions $requestOptions
+     * @return FolderCollection
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): FolderCollection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('folders'), query: $api, options: $request);
-        if (!is_array($page) || !is_array($page['items'] ?? null) || !is_array($page['ancestors'] ?? []) || !is_bool($page['hasMore'] ?? null)) {
-            throw CalmLensException::create('sdk/invalid-response', 'Invalid folder page');
-        }
-        return $page;
-    }
-
-    /** Yields every child folder `list` would, fetching pages as needed. */
-    public function each(array $options = []): \Generator
-    {
-        yield from $this->items($this->list(...), $options);
+        return self::collection(FolderCollection::class, null, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
-     * @param array{name: string, parentId?: ?string, requestOptions?: RequestOptions} $options
+     * Yields every child folder `list` would, fetching pages as needed.
+     *
+     * @param array{
+     *     parentId?: string, cursor?: string, pageSize?: int, sort?: string, search?: string,
+     * } $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, Folder>
+     */
+    public function each(array $params = [], array $requestOptions = []): \Generator
+    {
+        yield from $this->list($params, $requestOptions)->autoPagingIterator();
+    }
+
+    /**
+     * @param array{name: string, parentId?: ?string} $params
+     * @param RequestOptions $requestOptions
      * @return Folder
      */
-    public function create(array $options): array
+    public function create(array $params, array $requestOptions = []): Folder
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('POST', $this->session->project('folders'), body: (object) $api, options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Folder::class, $this->session->request('POST', $this->session->project('folders'), body: (object) $api, options: $request));
     }
     /**
-     * @param array{folderId: string, requestOptions?: RequestOptions} $options
+     * @param array{folderId: string} $params
+     * @param RequestOptions $requestOptions
      * @return Folder
      */
-    public function retrieve(array $options): array
+    public function retrieve(array $params, array $requestOptions = []): Folder
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->path($api, 'folders', 'folderId'), options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Folder::class, $this->session->request('GET', $this->path($api, 'folders', 'folderId'), options: $request));
     }
     /**
-     * @param array{folderId: string, name?: string, requestOptions?: RequestOptions} $options
+     * @param array{folderId: string, name?: string} $params
+     * @param RequestOptions $requestOptions
      * @return Folder
      */
-    public function update(array $options): array
+    public function update(array $params, array $requestOptions = []): Folder
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'folders', 'folderId');
-        return $this->session->request('PATCH', $path, body: (object) $api, options: $request);
+        return self::model(Folder::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
     /**
-     * @param array{folderId: string, parentId: ?string, requestOptions?: RequestOptions} $options
+     * @param array{folderId: string, parentId: ?string} $params
+     * @param RequestOptions $requestOptions
      * @return Folder
      */
-    public function move(array $options): array
+    public function move(array $params, array $requestOptions = []): Folder
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'folders', 'folderId');
         if (!array_key_exists('parentId', $api)) {
             Values::invalid('parentId is required (null moves to root)');
         }
-        return $this->session->request('POST', $path . '/move', body: ['parentId' => $api['parentId']], options: $request);
+        return self::model(Folder::class, $this->session->request('POST', $path . '/move', body: ['parentId' => $api['parentId']], options: $request));
     }
     /**
-     * @param array{folderId: string, requestOptions?: RequestOptions} $options
+     * @param array{folderId: string} $params
+     * @param RequestOptions $requestOptions
      */
-    public function delete(array $options): void
+    public function delete(array $params, array $requestOptions = []): void
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $this->session->request('DELETE', $this->path($api, 'folders', 'folderId'), options: $request);
     }
 }

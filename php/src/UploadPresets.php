@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace CalmLens;
 
+use CalmLens\Model\EnsuredUploadPresets;
+use CalmLens\Model\UploadPreset;
+
 /**
  * The project's upload presets: the rules for uploads from browsers and apps. `ensure` creates or
  * replaces presets by `key`, for deploys that declare them in code; send each preset's `revision`
  * (0 for one that must not exist yet) to refuse a change made since you read it.
  *
- * @phpstan-import-type EnsuredUploadPresets from Types
- * @phpstan-import-type ProcessingOptions from Types
+ * @phpstan-import-type ProcessingOptionsParams from Types
  * @phpstan-import-type RequestOptions from Types
- * @phpstan-import-type UploadPresetPage from Types
  */
 final class UploadPresets extends Resource
 {
@@ -23,25 +24,27 @@ final class UploadPresets extends Resource
      * descending when prefixed with `-`) says otherwise. Pass the page's `nextCursor` as `cursor`
      * and a `pageSize` (1 to 100, 50 by default).
      *
-     * @param array{
-     *     cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
-     * } $options
-     * @return UploadPresetPage
+     * @param array{cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return Collection<UploadPreset>
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): Collection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('upload-presets'), query: $api, options: $request);
-        if (!is_array($page) || !is_array($page['items'] ?? null) || !array_is_list($page['items']) || !is_bool($page['hasMore'] ?? null)) {
-            throw CalmLensException::create('sdk/invalid-response', 'Invalid upload preset page');
-        }
-        return $page;
+        return self::collection(Collection::class, UploadPreset::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
-    /** Yields every upload preset of the project, fetching pages as needed. */
-    public function each(array $options = []): \Generator
+    /**
+     * Yields every upload preset of the project, fetching pages as needed.
+     *
+     * @param array{cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, UploadPreset>
+     */
+    public function each(array $params = [], array $requestOptions = []): \Generator
     {
-        yield from $this->items($this->list(...), $options);
+        yield from $this->list($params, $requestOptions)->autoPagingIterator();
     }
 
     /**
@@ -54,27 +57,28 @@ final class UploadPresets extends Resource
      *     uploadPresets: list<array{
      *         key: string, revision?: int, name: string, access?: 'token'|'anyone', enabled?: bool,
      *         allowedContentTypes?: list<string>|null, maxSizeInBytes?: ?int, folderId?: ?string,
-     *         policyId?: ?string, visibility?: 'public'|'private', processingOptions?: ?ProcessingOptions,
+     *         policyId?: ?string, visibility?: 'public'|'private', processingOptions?: ?ProcessingOptionsParams,
      *         revealDecision?: bool, dailyUploadLimit?: ?int, allowedOrigins?: list<string>|null,
      *     }>,
-     *     requestOptions?: RequestOptions,
-     * } $options
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return EnsuredUploadPresets
      */
-    public function ensure(array $options): array
+    public function ensure(array $params, array $requestOptions = []): EnsuredUploadPresets
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('PUT', $this->session->project('upload-presets'), body: (object) $api, options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(EnsuredUploadPresets::class, $this->session->request('PUT', $this->session->project('upload-presets'), body: (object) $api, options: $request));
     }
 
     /**
      * Deletes an upload preset (`uploadPresetId`); assets already uploaded through it stay.
      *
-     * @param array{uploadPresetId: string, requestOptions?: RequestOptions} $options
+     * @param array{uploadPresetId: string} $params
+     * @param RequestOptions $requestOptions
      */
-    public function delete(array $options): void
+    public function delete(array $params, array $requestOptions = []): void
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $this->session->request('DELETE', $this->path($api, 'upload-presets', 'uploadPresetId'), options: $request);
     }
 }

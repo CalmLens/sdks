@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace CalmLens;
 
+use CalmLens\Model\Lens;
+
 /**
  * The project's lenses: named image transforms the CDN applies at `/@<identifier>`. The CDN serves
  * files made with each lens's current definition. `ServerClient::ensureLenses` creates or changes
  * lenses by identifier, for applications that declare theirs in code.
  *
- * @phpstan-import-type Lens from Types
- * @phpstan-import-type LensPage from Types
  * @phpstan-import-type LensType from Types
  * @phpstan-import-type RequestOptions from Types
  */
@@ -24,25 +24,27 @@ final class Lenses extends Resource
      * and a `pageSize` (1 to 100, 50 by default). The built-in lenses are always available and
      * aren't listed.
      *
-     * @param array{
-     *     cursor?: string, pageSize?: int, sort?: string, requestOptions?: RequestOptions,
-     * } $options
-     * @return LensPage
+     * @param array{cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return Collection<Lens>
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): Collection
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('lenses'), query: $api, options: $request);
-        if (!is_array($page) || !is_array($page['items'] ?? null) || !array_is_list($page['items']) || !is_bool($page['hasMore'] ?? null)) {
-            throw CalmLensException::create('sdk/invalid-response', 'Invalid lens page');
-        }
-        return $page;
+        return self::collection(Collection::class, Lens::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
-    /** Yields every lens of the project, fetching pages as needed. */
-    public function each(array $options = []): \Generator
+    /**
+     * Yields every lens of the project, fetching pages as needed.
+     *
+     * @param array{cursor?: string, pageSize?: int, sort?: string} $params
+     * @param RequestOptions $requestOptions
+     * @return \Generator<int, Lens>
+     */
+    public function each(array $params = [], array $requestOptions = []): \Generator
     {
-        yield from $this->items($this->list(...), $options);
+        yield from $this->list($params, $requestOptions)->autoPagingIterator();
     }
 
     /**
@@ -51,26 +53,28 @@ final class Lenses extends Resource
      *
      * @param array{
      *     identifier: string, name: string, description?: ?string, type: LensType, active?: bool,
-     *     transform?: array<string, mixed>|null, requestOptions?: RequestOptions,
-     * } $options
+     *     transform?: array<string, mixed>|null,
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return Lens
      */
-    public function create(array $options): array
+    public function create(array $params, array $requestOptions = []): Lens
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $lens = $this->session->request('POST', $this->session->project('lenses'), body: (object) $api, options: $request);
         $this->forget(fn (array $cached) => ($cached['identifier'] ?? null) === ($lens['identifier'] ?? null));
-        return $lens;
+        return self::model(Lens::class, $lens);
     }
 
     /**
-     * @param array{lensId: string, requestOptions?: RequestOptions} $options
+     * @param array{lensId: string} $params
+     * @param RequestOptions $requestOptions
      * @return Lens
      */
-    public function retrieve(array $options): array
+    public function retrieve(array $params, array $requestOptions = []): Lens
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->path($api, 'lenses', 'lensId'), options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(Lens::class, $this->session->request('GET', $this->path($api, 'lenses', 'lensId'), options: $request));
     }
 
     /**
@@ -79,28 +83,30 @@ final class Lenses extends Resource
      *
      * @param array{
      *     lensId: string, name?: string, description?: ?string, type?: LensType, active?: bool,
-     *     transform?: array<string, mixed>|null, requestOptions?: RequestOptions,
-     * } $options
+     *     transform?: array<string, mixed>|null,
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return Lens
      */
-    public function update(array $options): array
+    public function update(array $params, array $requestOptions = []): Lens
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'lenses', 'lensId');
         $lens = $this->session->request('PATCH', $path, body: (object) $api, options: $request);
         $this->forget(fn (array $cached) => ($cached['id'] ?? null) === ($lens['id'] ?? null));
-        return $lens;
+        return self::model(Lens::class, $lens);
     }
 
     /**
      * Deletes a lens. URLs that select it stop being served; files the CDN already delivered may
      * stay in caches until they expire.
      *
-     * @param array{lensId: string, requestOptions?: RequestOptions} $options
+     * @param array{lensId: string} $params
+     * @param RequestOptions $requestOptions
      */
-    public function delete(array $options): void
+    public function delete(array $params, array $requestOptions = []): void
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $lensId = $api['lensId'] ?? null;
         $this->session->request('DELETE', $this->path($api, 'lenses', 'lensId'), options: $request);
         $this->forget(fn (array $cached) => ($cached['id'] ?? null) === $lensId);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\Values;
+use CalmLens\Model\Event;
 
 final class Webhooks
 {
@@ -45,8 +46,9 @@ final class Webhooks
      * the same flat shape `events->list` returns it, with its `actor` right after `projectId`.
      * Fields that are not part of that shape are left out.
      */
-    public static function toPayload(array $event): array
+    public static function toPayload(Event|array $event): array
     {
+        $event = $event instanceof Event ? $event->toArray() : $event;
         // Like the JavaScript SDK's builder, an event given without an actor (as some shared
         // webhook fixtures are) yields a payload without one.
         return [
@@ -91,7 +93,7 @@ final class Webhooks
      */
     public static function parseEvent(string $payload, ?string $signature, string|int|null $timestamp,
         #[\SensitiveParameter] string $secret, int $toleranceSeconds = self::SIGNATURE_TOLERANCE_SECONDS, ?int $now = null,
-        array $headers = []): array
+        array $headers = []): Event
     {
         if (!self::verify($payload, $signature, $timestamp, $secret, $toleranceSeconds, $now, $headers)) {
             throw CalmLensException::create('sdk/invalid-webhook-signature', 'Webhook signature or timestamp is invalid');
@@ -105,7 +107,7 @@ final class Webhooks
             throw CalmLensException::create('sdk/invalid-webhook-payload', 'Webhook body is not an event');
         }
         // Unknown event types and fields are kept.
-        return json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+        return Event::constructFrom(json_decode($payload, true, 512, JSON_THROW_ON_ERROR));
     }
 
     /** The API's event shape: the fields every event has and, when present, the types of the other known fields. */
@@ -143,8 +145,9 @@ final class Webhooks
     }
 
     /** True for a test delivery: `facts` holds the fact `test` with the boolean value true. */
-    public static function isTest(array $event): bool
+    public static function isTest(Event|array $event): bool
     {
+        $event = $event instanceof Event ? $event->toArray() : $event;
         foreach ($event['facts'] ?? [] as $fact) {
             if (($fact['key'] ?? null) === 'test' && ($fact['value'] ?? null) === true) {
                 return true;
@@ -157,10 +160,11 @@ final class Webhooks
      * The value of one of an event's facts, by key, such as `flagged-categories` (a list of
      * categories) on `asset.blocked`, or null when the event doesn't carry it. A key the event
      * repeats gives its first value. The fact's `url`, when it has one, is on the fact in
-     * `$event['facts']`.
+     * `$event->facts`.
      */
-    public static function eventFact(array $event, string $key): mixed
+    public static function eventFact(Event|array $event, string $key): mixed
     {
+        $event = $event instanceof Event ? $event->toArray() : $event;
         foreach ($event['facts'] ?? [] as $fact) {
             if (is_array($fact) && ($fact['key'] ?? null) === $key) {
                 return $fact['value'] ?? null;
@@ -175,8 +179,9 @@ final class Webhooks
      *
      * @return array<string, mixed>
      */
-    public static function eventFacts(array $event): array
+    public static function eventFacts(Event|array $event): array
     {
+        $event = $event instanceof Event ? $event->toArray() : $event;
         $values = [];
         foreach ($event['facts'] ?? [] as $fact) {
             if (is_array($fact) && is_string($fact['key'] ?? null) && !array_key_exists($fact['key'], $values)) {
@@ -193,8 +198,9 @@ final class Webhooks
      * false. Events that aren't about an asset have no sequence and are always new. Store the highest
      * `assetSequence` applied per `assetId` and ignore lower ones.
      */
-    public static function isNewerAssetEvent(array $event, ?int $lastSequence): bool
+    public static function isNewerAssetEvent(Event|array $event, ?int $lastSequence): bool
     {
+        $event = $event instanceof Event ? $event->toArray() : $event;
         $sequence = $event['assetSequence'] ?? null;
         return $sequence === null || $lastSequence === null || $sequence > $lastSequence;
     }

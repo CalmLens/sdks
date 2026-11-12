@@ -6,6 +6,8 @@ namespace CalmLens;
 
 use CalmLens\Internal\Transforms;
 use CalmLens\Internal\Values;
+use CalmLens\Model\AssetInfo;
+use CalmLens\Model\SignedAssetUrl;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -18,7 +20,6 @@ use Psr\Http\Message\ResponseInterface;
  * `getAssetUrl` otherwise, and add viewer claims to either.
  *
  * @phpstan-import-type RequestOptions from Types
- * @phpstan-import-type SignedAssetUrl from Types
  * @phpstan-import-type ViewerClaims from Types
  */
 final class Cdn extends Resource
@@ -85,10 +86,11 @@ final class Cdn extends Resource
      * API key.
      *
      * @param array{projectId?: string, assetId?: string, externalId?: string, resource?: string, lens?: string,
-     *   transform?: string|array<string, mixed>, viewerClaims?: array{region?: string, ageConfirmed?: bool}} $options
+     *   transform?: string|array<string, mixed>, viewerClaims?: ViewerClaims} $params
      */
-    public function getAssetUrl(array $options): string
+    public function getAssetUrl(array $params): string
     {
+        $options = $params;
         Values::knownOptions($options, 'cdn.getAssetUrl');
         $options = Values::withoutNulls($options, 'cdn.getAssetUrl');
         $project = Values::segment($options['projectId'] ?? $this->session->projectId);
@@ -111,13 +113,14 @@ final class Cdn extends Resource
      * @param array{
      *     assetId?: string, externalId?: string, expiresIn?: int, original?: bool, projectId?: string,
      *     resource?: string, lens?: string, transform?: string|array<string, mixed>,
-     *     viewerClaims?: ViewerClaims, requestOptions?: RequestOptions,
-     * } $options
-     * @return SignedAssetUrl the signed URL and its expiry in unix milliseconds
+     *     viewerClaims?: ViewerClaims,
+     * } $params
+     * @param RequestOptions $requestOptions
+     * @return SignedAssetUrl
      */
-    public function signAssetUrl(array $options): array
+    public function signAssetUrl(array $params, array $requestOptions = []): SignedAssetUrl
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $expiresIn = $api['expiresIn'] ?? self::DEFAULT_SIGNED_URL_EXPIRES_IN;
         if (!is_int($expiresIn) || $expiresIn < 1 || $expiresIn > self::MAX_SIGNED_URL_EXPIRES_IN) {
             Values::invalid('expiresIn must be a whole number of seconds from 1 to ' . self::MAX_SIGNED_URL_EXPIRES_IN);
@@ -136,7 +139,7 @@ final class Cdn extends Resource
         if (!is_string($signed['url'] ?? null) || $signed['url'] === '') {
             throw CalmLensException::create('sdk/invalid-response', 'The API returned no signed asset URL');
         }
-        return ['url' => self::appendLocation($signed['url'], $api), 'expiresAt' => $signed['expiresAt'] ?? null];
+        return SignedAssetUrl::constructFrom(['url' => self::appendLocation($signed['url'], $api), 'expiresAt' => $signed['expiresAt'] ?? null]);
     }
 
     /**
@@ -151,18 +154,15 @@ final class Cdn extends Resource
      * would. A refusal throws the CDN's error, such as `signed-url/expired` or
      * `asset/not-available`.
      *
-     * @param array{viewerClaims?: array{region?: string, ageConfirmed?: bool}, requestOptions?: array<string, mixed>} $options
-     * @return array{id: string, projectId: string, type: string, externalUrl: ?string,
-     *   content: array{format: ?string, width: ?int, height: ?int, durationSeconds: int|float|null, pageCount: ?int,
-     *   rendered: ?array<string, mixed>, preview: ?array<string, mixed>, hls: ?array<string, mixed>}, availability: string}
+     * @param array{viewerClaims?: ViewerClaims} $params
+     * @param RequestOptions $requestOptions
+     * @return AssetInfo
      */
-    public function getAssetInfo(string $url, array $options = []): array
+    public function getAssetInfo(string $url, array $params = [], array $requestOptions = []): AssetInfo
     {
+        $options = $params;
+        $request = $requestOptions;
         Values::knownOptions($options, 'cdn.getAssetInfo');
-        $request = $options['requestOptions'] ?? [];
-        if (!is_array($request)) {
-            Values::invalid('requestOptions must be an array');
-        }
         $parts = parse_url($url);
         if (!is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) {
             Values::invalid('The URL must be an absolute asset URL');
@@ -186,17 +186,24 @@ final class Cdn extends Resource
             || !is_array($info['content'] ?? null) || !in_array($info['availability'] ?? null, self::AVAILABILITIES, true)) {
             throw CalmLensException::create('sdk/invalid-response', 'The CDN returned no asset info');
         }
-        return $info;
+        return AssetInfo::constructFrom($info);
     }
 
     /**
      * Fetches CDN content with the client's API key and returns a PSR-7 response with a streaming
      * body; HTTP errors are returned, not thrown. It takes `getAssetUrl`'s options, with `resource`
      * defaulting to `rendered`, and `init` with a `method` (GET or HEAD) and extra `headers`.
+     *
+     * @param array{
+     *     projectId?: string, assetId?: string, externalId?: string, resource?: string, lens?: string,
+     *     transform?: string|array<string, mixed>, viewerClaims?: ViewerClaims,
+     *     init?: array{method?: 'GET'|'HEAD', headers?: array<string, string>},
+     * } $params
+     * @param RequestOptions $requestOptions
      */
-    public function serve(array $options): ResponseInterface
+    public function serve(array $params, array $requestOptions = []): ResponseInterface
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $init = $api['init'] ?? [];
         if (!is_array($init) || !is_array($init['headers'] ?? [])) {
             Values::invalid('init and headers must be arrays');

@@ -81,12 +81,12 @@ final class ClientTest extends TestCase
         $mock->enqueueJson(['items' => [['id' => 'child-1']], 'hasMore' => true, 'nextCursor' => 'opaque+/=']);
         $mock->enqueueJson(['items' => [['id' => 'child-2']], 'hasMore' => false, 'nextCursor' => null]);
         $client = $mock->client();
-        self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'pageSize' => 2]), false));
+        self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], array_map(fn ($asset) => $asset->toArray(), iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'pageSize' => 2]), false)));
         self::assertSame('/assets/parent/children', $mock->requests()[1]->path);
         self::assertSame('pageSize=2&cursor=opaque%2B%2F%3D', $mock->requests()[1]->request->getUri()->getQuery());
         $mock->enqueueJson(['items' => [['id' => 'event-1']], 'hasMore' => true, 'nextCursor' => 'next+/=']);
         $mock->enqueueJson(['items' => [['id' => 'event-2']], 'hasMore' => false, 'nextCursor' => 'end']);
-        self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['cursor' => 'start']), false));
+        self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], array_map(fn ($event) => $event->toArray(), iterator_to_array($client->events->each(['cursor' => 'start']), false)));
         self::assertSame('cursor=next%2B%2F%3D', $mock->requests()[3]->request->getUri()->getQuery());
     }
 
@@ -121,7 +121,7 @@ final class ClientTest extends TestCase
         }]));
         $stream = Utils::streamFor('prefixpayload');
         $stream->seek(6);
-        self::assertSame(self::ASSET, $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]));
+        self::assertSame(self::ASSET, $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]])->toArray());
         self::assertCount(2, $calls);
         self::assertSame('payload', $calls[0][2]);
         self::assertSame($calls[0], $calls[1]);
@@ -169,9 +169,9 @@ final class ClientTest extends TestCase
             return Create::promiseFor(new Response(200, [], json_encode($body)));
         }]));
         $lenses = array_map(fn ($i) => ['identifier' => 'lens-' . $i, 'name' => 'Lens', 'type' => 'image'], range(1, 101));
-        self::assertSame($lenses, $client->ensureLenses(['lenses' => $lenses]));
+        self::assertSame($lenses, array_map(fn ($lens) => $lens->toArray(), $client->ensureLenses(['lenses' => $lenses])));
         self::assertSame([100, 1], array_map('count', $calls));
-        self::assertSame($lenses, $client->ensureLenses(['lenses' => $lenses]));
+        self::assertSame($lenses, array_map(fn ($lens) => $lens->toArray(), $client->ensureLenses(['lenses' => $lenses])));
         self::assertCount(2, $calls);
         $client->ensureLens(['identifier' => 'lens-1', 'name' => 'Renamed', 'type' => 'image']);
         $client->ensureLens($lenses[0]);
@@ -247,7 +247,7 @@ final class ClientTest extends TestCase
             ->enqueueJson(['code' => ErrorCodes::SIGNED_URL_EXPIRED, 'message' => 'The signed URL has expired'], 403);
         $cdn = $mock->client()->cdn;
         $url = 'https://cdn.calmlens.com/v1/assets/project-1/sig_00/?viewerClaims=' . rawurlencode('{"region":"DE","ageConfirmed":false}');
-        self::assertSame($info, $cdn->getAssetInfo($url));
+        self::assertSame($info, $cdn->getAssetInfo($url)->toArray());
         $cdn->getAssetInfo($url, ['viewerClaims' => ['ageConfirmed' => true]]);
         $this->error(ErrorCodes::SIGNED_URL_EXPIRED, fn () => $cdn->getAssetInfo('https://cdn.calmlens.com/v1/assets/project-1/sig_00'));
         $sent = array_map(fn ($recorded) => $recorded->request, $mock->requests());

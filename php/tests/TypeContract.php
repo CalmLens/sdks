@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use CalmLens\CalmLensObject;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprIntegerNode;
+use PHPStan\PhpDocParser\Ast\ConstExpr\ConstFetchNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprStringNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\InvalidTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
@@ -12,7 +14,10 @@ use PHPStan\PhpDocParser\Ast\Type\ArrayTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\ConstTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\GenericTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
+use PHPStan\PhpDocParser\Ast\Type\IntersectionTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\NullableTypeNode;
+use PHPStan\PhpDocParser\Ast\Type\ObjectShapeItemNode;
+use PHPStan\PhpDocParser\Ast\Type\ObjectShapeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Ast\Type\UnionTypeNode;
 use PHPStan\PhpDocParser\Lexer\Lexer;
@@ -23,10 +28,17 @@ use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
 
 /**
- * Compares a method's declared PHPStan types (its `@param ... $options` and `@return` docblock
- * shapes, with `@phpstan-type` aliases from `CalmLens\Types` and its own class) with the JSON
- * Schema of the operation in types.json, and names every difference as `$.<path>: <problem>`.
- * packages/sdk-contract/README.md, "Declared types", has the rules.
+ * Compares a method's declared PHPStan types with the JSON Schema of the operation in
+ * types.json, and names every difference as `$.<path>: <problem>`: its `@param ... $params` array
+ * shape, and the `@property-read` docblocks of the model class its `@return` names.
+ * packages/sdk-contract/README.md, "Declared types", has the rules. `DeclaredTypes` first resolves
+ * a docblock type into plain nodes: aliases, model classes (as object shapes),
+ * `Collection<Item>` and constant wildcards such as `self::STATUS_*`.
+ *
+ * Two PHP conventions apply to model objects. A field the API may leave out reads as null, so it
+ * is declared nullable rather than optional. A union of object branches is one class holding
+ * every branch's fields (stripe-php's convention for variants), so it is compared with the
+ * branches merged: a field only some branches have may be left out, and the tag is an enum.
  */
 final class TypeContract
 {
@@ -141,6 +153,9 @@ final class TypeContract
     {
         if ($member instanceof ConstTypeNode) {
             return $member->constExpr instanceof ConstExprStringNode ? 'string' : ($member->constExpr instanceof ConstExprIntegerNode ? 'integer' : (string) $member);
+        }
+        if ($member instanceof ObjectShapeNode) {
+            return 'object';
         }
         if ($member instanceof ArrayShapeNode) {
             return in_array($member->kind, [ArrayShapeNode::KIND_LIST, ArrayShapeNode::KIND_NON_EMPTY_LIST], true) ? 'array' : 'object';
@@ -352,6 +367,13 @@ final class TypeContract
     private function compareObjects(array $declared, array $branches, string $path, array $inside, array $native): void
     {
         $tag = self::tag($branches);
+        // A model class holds every branch of a union: compare it with the branches merged.
+        if ($tag !== null && count($declared) === 1 && $declared[0] instanceof ObjectShapeNode) {
+            $merged = self::mergeSchemas($branches);
+            $merged['properties'][$tag] = ['enum' => array_map(fn (array $branch) => $branch['properties'][$tag]['const'], $branches), 'type' => 'string'];
+            $this->compareObject($declared[0], $merged, $path, $inside, $native);
+            return;
+        }
         if ($tag !== null) {
             $declaredByTag = [];
             foreach ($declared as $member) {
@@ -425,7 +447,7 @@ final class TypeContract
         return ArrayShapeNode::createSealed($items);
     }
 
-    private static function key(ArrayShapeItemNode $item): string
+    private static function key(ArrayShapeItemNode|ObjectShapeItemNode $item): string
     {
         $key = $item->keyName;
         return $key instanceof ConstExprStringNode ? $key->value : (string) $key;
@@ -448,7 +470,28 @@ final class TypeContract
             $this->compare($declared->genericTypes[count($declared->genericTypes) - 1], $values, $path . '{}', $inside);
             return;
         }
-        if (!$declared instanceof ArrayShapeNode) {
+        if ($declared instanceof GenericTypeNode && count($declared->genericTypes) === 2) {
+            // Keys a PHP property can't have, such as `self-harm`: an array keyed by them.
+            $keys = [];
+            foreach ($this->members($declared->genericTypes[0]) as $member) {
+                if ($member instanceof ConstTypeNode && $member->constExpr instanceof ConstExprStringNode) {
+                    $keys[] = $member->constExpr->value;
+                }
+            }
+            foreach ($schema['properties'] as $key => $property) {
+                if (!in_array($key, $keys, true)) {
+                    $this->problem("$path.$key", 'missing');
+                    continue;
+                }
+                $this->compare($declared->genericTypes[1], $property, "$path.$key", $inside);
+            }
+            foreach (array_diff($keys, array_keys($schema['properties'])) as $key) {
+                $this->problem("$path.$key", 'not in the API');
+            }
+            return;
+        }
+        $object = $declared instanceof ObjectShapeNode;
+        if (!$declared instanceof ArrayShapeNode && !$object) {
             $this->problem($path, 'should be an array shape, array{...}');
             return;
         }
@@ -465,6 +508,18 @@ final class TypeContract
             }
             $item = $items[$key];
             unset($items[$key]);
+            if ($object) {
+                // A property the API may leave out reads as null.
+                if (!in_array($key, $required, true) && $property !== []) {
+                    if (!in_array('null', array_map(self::kind(...), $this->members($item->valueType)), true)) {
+                        $this->problem($at, 'not nullable, the API may leave it out');
+                    } else {
+                        $property = ['anyOf' => [$property, ['type' => 'null']]];
+                    }
+                }
+                $this->compare($item->valueType, $property, $at, $inside);
+                continue;
+            }
             // An open value: the schema cannot say whether it is sent.
             if ($property !== []) {
                 if (in_array($key, $required, true) && $item->optional) {
@@ -480,5 +535,145 @@ final class TypeContract
                 $this->problem("$path.$key", 'not in the API');
             }
         }
+    }
+}
+
+/**
+ * Resolves a docblock type into plain nodes the comparison reads: `@phpstan-type` aliases, model
+ * classes as object shapes of their `@property-read` tags (parents and `@extends` templates
+ * included), `Collection<Item>`, and constant wildcards (`self::STATUS_*`, `Category::*`) as
+ * their string values. Names resolve like PHP's: through the file's `use` imports, else the
+ * class's namespace.
+ */
+final class DeclaredTypes
+{
+    /** @var array<string, ObjectShapeNode> */
+    private static array $classes = [];
+
+    /** @param array<string, array{TypeNode, ReflectionClass}> $aliases name => [type, the class declaring it] */
+    public function __construct(private array $aliases) {}
+
+    /** @return array<string, array{TypeNode, ReflectionClass}> the `@phpstan-type` aliases of these classes */
+    public static function aliasesOf(string ...$classes): array
+    {
+        $aliases = [];
+        foreach ($classes as $class) {
+            $reflection = new ReflectionClass($class);
+            foreach (TypeContract::docblock($reflection->getDocComment())->getTypeAliasTagValues() as $alias) {
+                $aliases[$alias->alias] = [$alias->type, $reflection];
+            }
+        }
+        return $aliases;
+    }
+
+    /** @param array<string, TypeNode> $templates */
+    public function resolve(TypeNode $type, ReflectionClass $scope, array $templates = []): TypeNode
+    {
+        return match (true) {
+            $type instanceof UnionTypeNode => new UnionTypeNode(array_map(fn ($t) => $this->resolve($t, $scope, $templates), $type->types)),
+            $type instanceof NullableTypeNode => new NullableTypeNode($this->resolve($type->type, $scope, $templates)),
+            $type instanceof IntersectionTypeNode => new IntersectionTypeNode(array_map(fn ($t) => $this->resolve($t, $scope, $templates), $type->types)),
+            $type instanceof ArrayTypeNode => new ArrayTypeNode($this->resolve($type->type, $scope, $templates)),
+            $type instanceof ArrayShapeNode => ArrayShapeNode::createSealed(array_map(fn (ArrayShapeItemNode $item) => new ArrayShapeItemNode(
+                $item->keyName, $item->optional, $this->resolve($item->valueType, $scope, $templates)), $type->items), $type->kind),
+            $type instanceof ConstTypeNode && $type->constExpr instanceof ConstFetchNode => $this->constants($type->constExpr, $scope),
+            $type instanceof GenericTypeNode => $this->generic($type, $scope, $templates),
+            $type instanceof IdentifierTypeNode => $this->identifier($type, $scope, $templates),
+            default => $type,
+        };
+    }
+
+    private function generic(GenericTypeNode $type, ReflectionClass $scope, array $templates): TypeNode
+    {
+        $arguments = array_map(fn ($t) => $this->resolve($t, $scope, $templates), $type->genericTypes);
+        $class = self::className($type->type->name, $scope);
+        if ($class !== null && is_subclass_of($class, CalmLensObject::class)) {
+            return $this->model(new ReflectionClass($class), $arguments);
+        }
+        return new GenericTypeNode($type->type, $arguments, $type->variances);
+    }
+
+    private function identifier(IdentifierTypeNode $type, ReflectionClass $scope, array $templates): TypeNode
+    {
+        if (isset($templates[$type->name])) {
+            return $templates[$type->name];
+        }
+        if (isset($this->aliases[$type->name])) {
+            [$alias, $declaring] = $this->aliases[$type->name];
+            return $this->resolve($alias, $declaring);
+        }
+        $class = self::className($type->name, $scope);
+        if ($class !== null && is_subclass_of($class, CalmLensObject::class)) {
+            return $this->model(new ReflectionClass($class), []);
+        }
+        return $type;
+    }
+
+    /** A model class as an object shape of its properties, its templates bound to `$arguments`. */
+    private function model(ReflectionClass $class, array $arguments): ObjectShapeNode
+    {
+        $key = $class->getName() . '<' . implode(',', array_map('strval', $arguments)) . '>';
+        if (isset(self::$classes[$key])) {
+            return self::$classes[$key];
+        }
+        $properties = [];
+        $templates = [];
+        $chain = [];
+        for ($c = $class; $c !== false; $c = $c->getParentClass()) {
+            array_unshift($chain, $c);
+        }
+        // Each class's templates: its own `@template` names bound to the arguments its child gave.
+        $bound = $arguments;
+        foreach (array_reverse($chain) as $c) {
+            $doc = TypeContract::docblock($c->getDocComment());
+            $names = array_map(fn ($tag) => $tag->name, $doc->getTemplateTagValues());
+            $templates[$c->getName()] = array_combine(array_slice($names, 0, count($bound)), array_slice($bound, 0, count($names))) ?: [];
+            $extends = $doc->getExtendsTagValues();
+            $bound = $extends === [] ? [] : array_map(fn ($t) => $this->resolve($t, $c, $templates[$c->getName()]), $extends[0]->type->genericTypes);
+        }
+        foreach ($chain as $c) {
+            $doc = TypeContract::docblock($c->getDocComment());
+            foreach ([...$doc->getPropertyTagValues(), ...$doc->getPropertyReadTagValues()] as $tag) {
+                $properties[ltrim($tag->propertyName, '$')] = $this->resolve($tag->type, $c, $templates[$c->getName()]);
+            }
+        }
+        $items = [];
+        foreach ($properties as $name => $type) {
+            $items[] = new ObjectShapeItemNode(new IdentifierTypeNode($name), false, $type);
+        }
+        return self::$classes[$key] = new ObjectShapeNode($items);
+    }
+
+    /** `Class::PREFIX_*` as the union of the matching constants' values. */
+    private function constants(ConstFetchNode $fetch, ReflectionClass $scope): TypeNode
+    {
+        $class = in_array($fetch->className, ['self', 'static'], true) ? $scope->getName() : self::className($fetch->className, $scope);
+        $prefix = rtrim($fetch->name, '*');
+        $values = [];
+        foreach ((new ReflectionClass($class))->getReflectionConstants() as $constant) {
+            if ($constant->isPublic() && ($fetch->name === $constant->getName() || (str_ends_with($fetch->name, '*') && str_starts_with($constant->getName(), $prefix)))) {
+                $values[] = new ConstTypeNode(new ConstExprStringNode((string) $constant->getValue(), ConstExprStringNode::SINGLE_QUOTED));
+            }
+        }
+        return count($values) === 1 ? $values[0] : new UnionTypeNode($values);
+    }
+
+    /** A class name as PHP resolves it in `$scope`'s file, or null for a builtin type. */
+    private static function className(string $name, ReflectionClass $scope): ?string
+    {
+        if (str_starts_with($name, '\\')) {
+            return class_exists($name) ? ltrim($name, '\\') : null;
+        }
+        [$first] = explode('\\', $name, 2);
+        preg_match_all('/^use ([\\w\\\\]+)(?: as (\\w+))?;/m', file_get_contents($scope->getFileName()), $uses, PREG_SET_ORDER);
+        foreach ($uses as $use) {
+            $short = $use[2] ?? substr(strrchr('\\' . $use[1], '\\'), 1);
+            if ($short === $first) {
+                $resolved = $use[1] . substr($name, strlen($first));
+                return class_exists($resolved) ? $resolved : null;
+            }
+        }
+        $local = $scope->getNamespaceName() . '\\' . $name;
+        return class_exists($local) ? $local : null;
     }
 }

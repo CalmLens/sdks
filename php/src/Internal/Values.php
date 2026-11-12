@@ -24,7 +24,7 @@ final class Values
     {
         $allowed = self::LOCAL_OPTION_KEYS[$operation] ?? OptionKeys::KEYS[$operation]
             ?? throw new \LogicException("No option keys for $operation");
-        $unknown = array_diff(array_map('strval', array_keys($options)), [...$allowed, 'requestOptions']);
+        $unknown = array_diff(array_map('strval', array_keys($options)), $allowed);
         if ($unknown !== []) {
             self::invalid('Unknown option' . (count($unknown) > 1 ? 's' : '') . " for $operation: " . implode(', ', $unknown));
         }

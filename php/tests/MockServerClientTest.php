@@ -5,6 +5,10 @@ declare(strict_types=1);
 use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Exception;
+use CalmLens\Model\Asset;
+use CalmLens\Model\Event;
+use CalmLens\Model\EventCollection;
+use CalmLens\Model\ManualReview;
 use CalmLens\SdkErrorCodes;
 use CalmLens\Testing\MockDecision;
 use CalmLens\Testing\MockModerationInput;
@@ -14,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 
 final class MockServerClientTest extends TestCase
 {
-    private static function image(MockServerClient $mock, string $visibility = 'public'): array
+    private static function image(MockServerClient $mock, string $visibility = 'public'): Asset
     {
         return $mock->client()->assets->create([
             'name' => 'photo.png', 'visibility' => $visibility, 'externalId' => 'post-1',
@@ -154,9 +158,9 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient();
         $client = $mock->client();
         $cat = $client->text->classify(['name' => 'Black cat', 'text' => 'meow']);
-        $mock->assets['child'] = ['id' => 'child', 'parentId' => $cat['id'], 'createdAt' => 1] + $cat;
-        self::assertSame(['child'], array_column($client->assets->listChildren(['assetId' => $cat['id']])['items'], 'id'));
-        self::assertSame([$cat['id'], 'child'], array_column($client->assets->list()['items'], 'id'));
+        $mock->assets['child'] = ['id' => 'child', 'parentId' => $cat->id, 'createdAt' => 1] + $cat->toArray();
+        self::assertSame(['child'], array_map(fn (Asset $asset) => $asset->id, $client->assets->listChildren(['assetId' => $cat->id])->items));
+        self::assertSame([$cat->id, 'child'], array_map(fn (Asset $asset) => $asset->id, $client->assets->list()->items));
     }
 
     public function testTimelineChecksPageSizeThenRefusesASafetyHeldAsset(): void
@@ -242,9 +246,9 @@ final class MockServerClientTest extends TestCase
         }
         $names = fn (string $filter) => array_column($client->assets->list(['filter' => $filter])['items'], 'name');
         self::assertSame(['note-b.txt', 'note-a.txt'], $names('name==note-*'));
-        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.status==blocked,name==note-a.txt'));
-        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.status=out=(allowed,blocked)'));
-        self::assertSame(['photo.png'], $names('classification.moderation.status=in=("blocked")'));
+        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.decision==blocked,name==note-a.txt'));
+        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.decision=out=(allowed,blocked)'));
+        self::assertSame(['photo.png'], $names('classification.moderation.decision=in=("blocked")'));
     }
 
     public function testFailNextRequestSimulatesConnectionFailuresAndApiErrors(): void
@@ -421,7 +425,7 @@ final class MockServerClientTest extends TestCase
         $apiKey = ['type' => 'api-key', 'id' => null];
         self::assertSame([['decision' => 'blocked', 'note' => 'Spam', 'decidedBy' => $apiKey, 'applied' => true],
             ['decision' => 'limited', 'note' => null, 'decidedBy' => $apiKey, 'applied' => true]],
-            array_map(fn (array $review) => array_diff_key($review, ['id' => true, 'reviewedAt' => true]), $reviews));
+            array_map(fn (ManualReview $review) => array_diff_key($review->toArray(), ['id' => true, 'reviewedAt' => true]), $reviews));
     }
 
     public function testAssetsLeaveOutTheProcessingOptionsTheyWereUploadedWith(): void
@@ -539,8 +543,8 @@ final class MockServerClientTest extends TestCase
         ], $actors);
         $facts = array_merge(...array_map(fn (array $event) => array_column($event['facts'], 'key'), $mock->events));
         self::assertNotContains('decided-by', $facts);
-        self::assertSame(['type' => 'api-key', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed'])['actor']);
-        self::assertSame(['type' => 'system', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed', 'actor' => ['type' => 'system', 'id' => null]])['actor']);
+        self::assertSame(['type' => 'api-key', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed'])->actor->toArray());
+        self::assertSame(['type' => 'system', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed', 'actor' => ['type' => 'system', 'id' => null]])->actor->toArray());
         $client->assets->removeContent(['assetId' => $asset['id']]);
         self::assertSame(['asset.content-removed', ['type' => 'api-key', 'id' => null]], [end($mock->events)['type'], end($mock->events)['actor']]);
     }
@@ -563,7 +567,7 @@ final class MockServerClientTest extends TestCase
         }
         $pages = iterator_to_array($client->events->eachPage(['cursor' => $start['nextCursor'], 'types' => ['asset.deleted'], 'pageSize' => 2]), false);
         self::assertSame([['asset.deleted', 'asset.deleted'], ['asset.deleted']],
-            array_map(fn (array $page) => array_column($page['items'], 'type'), $pages));
+            array_map(fn (EventCollection $page) => array_map(fn (Event $event) => $event->type, $page->items), $pages));
     }
 
     public static function configurationOperations(): iterable
@@ -625,7 +629,7 @@ final class MockServerClientTest extends TestCase
         self::assertSame(1, $client->projectSettings->update(['settings' => ['blockUnmoderatedAssets' => true, 'humanReview' => ['allowedSamplePercent' => 0]]])['revision']);
         $review = $client->projectSettings->update(['settings' => ['humanReview' => ['allowedSamplePercent' => 5]]]);
         self::assertSame([2, ['allowedSamplePercent' => 5, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0, 'reviewMissingEvidence' => false]],
-            [$review['revision'], $review['settings']['humanReview']]);
+            [$review->revision, $review->settings->humanReview->toArray()]);
         // Settings left out return to their defaults.
         self::assertSame([3, 0], [($reset = $client->projectSettings->update(['settings' => []]))['revision'], $reset['settings']['humanReview']['allowedSamplePercent']]);
 

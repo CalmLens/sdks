@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CalmLens\Assets;
 use CalmLens\CalmLensException;
+use CalmLens\CalmLensObject;
 use CalmLens\Cdn;
 use CalmLens\ErrorCodes;
 use CalmLens\Exception;
@@ -50,6 +51,7 @@ final class ContractTest extends TestCase
     /** Sorts object keys at every level, so JSON values compare whatever their key order. */
     private static function canon(mixed $value): mixed
     {
+        $value = self::plain($value);
         if (!is_array($value)) {
             return $value;
         }
@@ -81,10 +83,26 @@ final class ContractTest extends TestCase
         return new ServerClient('key', 'project-1', maxRetries: 0, httpClient: new Client(['handler' => function () { self::fail('Unexpected network request'); }]));
     }
 
+    /**
+     * Calls an operation with fixture options, the idempotency key and other request options
+     * passed apart, and returns its result as plain JSON-shaped data.
+     */
     private static function invoke(ServerClient $client, string $operation, array $options): mixed
     {
+        $request = $options['requestOptions'] ?? [];
+        unset($options['requestOptions']);
         $parts = explode('.', $operation);
-        return count($parts) === 1 ? $client->{$parts[0]}($options) : $client->{$parts[0]}->{$parts[1]}($options);
+        $target = count($parts) === 1 ? $client : $client->{$parts[0]};
+        return self::plain($target->{end($parts)}($options, ...($request === [] ? [] : [$request])));
+    }
+
+    /** API objects, and lists of them, as the arrays they were decoded from. */
+    private static function plain(mixed $value): mixed
+    {
+        if ($value instanceof CalmLensObject) {
+            return $value->toArray();
+        }
+        return is_array($value) ? array_map(self::plain(...), $value) : $value;
     }
 
     // requests.json
@@ -137,7 +155,14 @@ final class ContractTest extends TestCase
             $target = count($parts) === 1 ? $client : $client->{$parts[0]};
             $method = new ReflectionMethod($target, end($parts));
             self::assertSame('array', (string) $method->getParameters()[0]->getType());
-            self::assertSame(self::expectedResult($fixture) === null ? 'void' : 'array', (string) $method->getReturnType());
+            $returns = (string) $method->getReturnType();
+            if (self::expectedResult($fixture) === null) {
+                self::assertSame('void', $returns);
+            } elseif ($fixture['operation'] === 'ensureLenses') {
+                self::assertSame('array', $returns);
+            } else {
+                self::assertTrue(is_subclass_of($returns, CalmLensObject::class), "$returns is an API object");
+            }
         }
         self::assertSame(self::expectedResult($fixture), self::invoke($client, $fixture['operation'], $fixture['options'] ?? []));
         self::assertSame(1, $calls);
@@ -307,7 +332,7 @@ final class ContractTest extends TestCase
         $all = [];
         try {
             foreach ($items as $item) {
-                $all[] = $item;
+                $all[] = self::plain($item);
             }
         } catch (CalmLensException $error) {
             throw new PartialResult($all, $error);
@@ -670,7 +695,7 @@ final class ContractTest extends TestCase
         switch ($kind) {
             case 'signing':
                 self::assertSame(['token' => $entry['expected']['token'], 'expiresAt' => $entry['expected']['expiresAt']],
-                    MockServerClient::signUploadToken($entry['apiKey'], $entry['options'], $entry['now'], $entry['nonce']));
+                    MockServerClient::signUploadToken($entry['apiKey'], $entry['options'], $entry['now'], $entry['nonce'])->toArray());
                 // The real client signs the same claims with a fresh nonce and the real clock.
                 $before = (int) floor(microtime(true) * 1000);
                 $client = new ServerClient($entry['apiKey'], 'project-1');
@@ -952,7 +977,7 @@ final class ContractTest extends TestCase
         $client = $mock->client();
         switch ($operation) {
             case 'mock.completeProcessing':
-                return $mock->completeProcessing($args['assetId'], isset($args['decision']) ? self::buildDecision($args['decision']) : null);
+                return self::plain($mock->completeProcessing($args['assetId'], isset($args['decision']) ? self::buildDecision($args['decision']) : null));
             case 'mock.moderateCalls':
                 return $moderateCalls;
             case 'mock.buildDecision':
@@ -965,9 +990,9 @@ final class ContractTest extends TestCase
                 $mock->clearRequests();
                 return null;
             case 'mock.decide':
-                return $mock->decide($args['assetId'], $args['outcome']);
+                return self::plain($mock->decide($args['assetId'], $args['outcome']));
             case 'mock.enqueueEvent':
-                return $mock->enqueueEvent($args);
+                return self::plain($mock->enqueueEvent($args));
             case 'mock.grant':
                 $mock->setApiKeyGrants($args['grants']);
                 return null;
@@ -981,7 +1006,7 @@ final class ContractTest extends TestCase
                 $json = str_starts_with($response->getHeaderLine('Content-Type'), 'application/json') ? json_decode($body, true) : null;
                 return ['status' => $response->getStatusCode(), 'code' => $json['code'] ?? null, 'body' => $body, 'response' => $response];
             case 'cdn.getAssetInfo':
-                return $client->cdn->getAssetInfo($args['url'], array_diff_key($args, ['url' => true]));
+                return self::plain($client->cdn->getAssetInfo($args['url'], array_diff_key($args, ['url' => true])));
             case 'events.pages':
                 return self::collect($client->events->eachPage($args));
         }
@@ -1231,22 +1256,21 @@ final class ContractTest extends TestCase
     // types.json: each operation's declared options and result shapes against the API's schemas.
 
     /**
-     * Option keys PHP takes besides the API's fields, which types.json leaves out: request options
-     * on every method, and the upload payload, which PHP takes as `content` or `part` arrays.
+     * Param keys PHP takes besides the API's fields, which types.json leaves out: the upload payload,
+     * which PHP takes as `content` or `part` arrays, and the project a signed URL is for.
      */
     private const NATIVE_OPTIONS = [
-        '*' => ['requestOptions'],
         'assets.create' => ['content', 'part', 'url', 'sizeInBytes', 'totalSizeInBytes'],
         'assets.uploadPart' => ['part', 'wait'],
         'cdn.signAssetUrl' => ['projectId'],
     ];
 
-    /** @return array{ReflectionMethod, array<string, PHPStan\PhpDocParser\Ast\Type\TypeNode>} the operation's method and the aliases its docblocks see */
+    /** The operation's method, and the resolver for the types its docblocks name. */
     private static function declaredMethod(string $php): array
     {
         [$property, $name] = str_contains($php, '->') ? explode('->', $php) : [null, $php];
         $class = $property === null ? ServerClient::class : (new ReflectionProperty(ServerClient::class, $property))->getType()->getName();
-        return [new ReflectionMethod($class, $name), TypeContract::aliases(\CalmLens\Types::class, $class)];
+        return [new ReflectionMethod($class, $name), new DeclaredTypes(DeclaredTypes::aliasesOf(\CalmLens\Types::class, $class))];
     }
 
     public static function declaredTypes(): iterable
@@ -1268,25 +1292,25 @@ final class ContractTest extends TestCase
     {
         $types = self::fixtures('types');
         $id = $operation['id'];
-        [$method, $aliases] = self::declaredMethod($operation['names']['php']);
+        [$method, $resolver] = self::declaredMethod($operation['names']['php']);
+        $scope = $method->getDeclaringClass();
         $doc = TypeContract::docblock($method->getDocComment());
         $problems = [];
-        $params = array_values(array_filter($doc->getParamTagValues(), fn ($tag) => $tag->parameterName === '$options'));
+        $params = array_values(array_filter($doc->getParamTagValues(), fn ($tag) => $tag->parameterName === '$params'));
         if ($params === []) {
-            $problems[] = 'options $: no @param shape for $options';
+            $problems[] = 'options $: no @param shape for $params';
         } else {
-            $native = [...self::NATIVE_OPTIONS['*'], ...(self::NATIVE_OPTIONS[$id] ?? []), ...$operation['options']['clientOptions']];
-            foreach (TypeContract::options($params[0]->type, $operation['options'], $native, $operation['method'] === 'PATCH', $types['definitions'], $aliases) as $problem) {
+            $native = [...(self::NATIVE_OPTIONS[$id] ?? []), ...$operation['options']['clientOptions']];
+            foreach (TypeContract::options($resolver->resolve($params[0]->type, $scope), $operation['options'], $native,
+                $operation['method'] === 'PATCH', $types['definitions'], []) as $problem) {
                 $problems[] = "options $problem";
             }
         }
-        $returns = $doc->getReturnTagValues();
-        if ($operation['result'] === null) {
-            // No model: the method returns nothing, or something other than a response body.
-        } elseif ($returns === []) {
-            $problems[] = 'result $: no @return shape';
-        } else {
-            foreach (TypeContract::result($returns[0]->type, $operation['result'], $types['definitions'], $aliases) as $problem) {
+        if ($operation['result'] !== null) {
+            // The model class the method returns, as its `@return` names it (with its item class).
+            $returns = $doc->getReturnTagValues();
+            $declared = $returns !== [] ? $returns[0]->type : new PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode('\\' . $method->getReturnType());
+            foreach (TypeContract::result($resolver->resolve($declared, $scope), $operation['result'], $types['definitions'], []) as $problem) {
                 $problems[] = "result $problem";
             }
         }

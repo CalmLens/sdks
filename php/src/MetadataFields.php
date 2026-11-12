@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\Values;
+use CalmLens\Model\MetadataFieldsResource;
 
 /**
  * The project's metadata field definitions. They share the project settings' `revision`: send the
  * one you read to refuse a change made since (`project-settings/revision-conflict`).
  *
  * @phpstan-import-type MetadataFieldIcon from Types
- * @phpstan-import-type MetadataFieldsResource from Types
  * @phpstan-import-type MetadataFieldType from Types
  * @phpstan-import-type RequestOptions from Types
  */
@@ -22,13 +22,14 @@ final class MetadataFields extends Resource
     /**
      * The project's `revision` and metadata `fields`.
      *
-     * @param array{requestOptions?: RequestOptions} $options
+     * @param array{} $params
+     * @param RequestOptions $requestOptions
      * @return MetadataFieldsResource
      */
-    public function list(array $options = []): array
+    public function list(array $params = [], array $requestOptions = []): MetadataFieldsResource
     {
-        [, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('GET', $this->session->project('metadata-fields'), options: $request);
+        [, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(MetadataFieldsResource::class, $this->session->request('GET', $this->session->project('metadata-fields'), options: $request));
     }
 
     /**
@@ -41,24 +42,25 @@ final class MetadataFields extends Resource
      *         id: string, title: string, description?: string, type: MetadataFieldType,
      *         icon: MetadataFieldIcon, color: string,
      *     }>,
-     *     requestOptions?: RequestOptions,
-     * } $options
+     * } $params
+     * @param RequestOptions $requestOptions
      * @return MetadataFieldsResource
      */
-    public function ensure(array $options): array
+    public function ensure(array $params, array $requestOptions = []): MetadataFieldsResource
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        return $this->session->request('PUT', $this->session->project('metadata-fields'), body: (object) $api, options: $request);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
+        return self::model(MetadataFieldsResource::class, $this->session->request('PUT', $this->session->project('metadata-fields'), body: (object) $api, options: $request));
     }
 
     /**
      * Deletes a field definition (`fieldId`), optionally at a `revision`; assets keep their values.
      *
-     * @param array{fieldId: string, revision?: int, requestOptions?: RequestOptions} $options
+     * @param array{fieldId: string, revision?: int} $params
+     * @param RequestOptions $requestOptions
      */
-    public function delete(array $options): void
+    public function delete(array $params, array $requestOptions = []): void
     {
-        [$api, $request] = $this->split($options, __FUNCTION__);
+        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->session->project('metadata-fields/' . Values::segment($api['fieldId'] ?? null));
         unset($api['fieldId']);
         $this->session->request('DELETE', $path, query: $api, options: $request);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\Values;
+use CalmLens\Model\UploadToken;
 
 final class UploadTokens
 {
@@ -22,18 +23,18 @@ final class UploadTokens
      * Signs a token locally for `uploadPresetId`, optionally with an `externalId` and an
      * `expiresIn` lifetime in seconds (1 to 3600, default 600). `expiresAt` is Unix milliseconds.
      *
-     * @return array{token: string, expiresAt: int}
+     * @param array{uploadPresetId: string, externalId?: string, expiresIn?: int} $params
      */
-    public function sign(array $options): array
+    public function sign(array $params): UploadToken
     {
-        return self::signAt($this->apiKey, $options, (int) floor(microtime(true) * 1000), Values::uuid());
+        return self::signAt($this->apiKey, $params, (int) floor(microtime(true) * 1000), Values::uuid());
     }
 
     /**
      * Signs with a fixed clock (`now`, epoch milliseconds) and nonce, with the same validation as
      * `sign`. Use `Testing\MockServerClient::signUploadToken` in tests. @internal
      */
-    public static function signAt(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): array
+    public static function signAt(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): UploadToken
     {
         Values::knownOptions($options, 'uploadTokens.sign');
         $preset = $options['uploadPresetId'] ?? null;
@@ -53,6 +54,6 @@ final class UploadTokens
         // As JSON.stringify writes it: raw UTF-8, with `/` unescaped.
         $body = rtrim(strtr(base64_encode(Values::json($claims)), '+/', '-_'), '=');
         $signature = hash_hmac('sha256', self::SIGNING_CONTEXT . $body, hash('sha256', $apiKey));
-        return ['token' => self::PREFIX . $body . '.' . $signature, 'expiresAt' => $expiresAt];
+        return UploadToken::constructFrom(['token' => self::PREFIX . $body . '.' . $signature, 'expiresAt' => $expiresAt]);
     }
 }

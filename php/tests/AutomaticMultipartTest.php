@@ -86,8 +86,8 @@ final class AutomaticMultipartTest extends TestCase
             return 'allowed';
         });
         $file = self::fileOf(11 * self::MIB);
-        $asset = $mock->client()->assets->classify(['name' => 'clip.mp4', 'content' => ['bytes' => $file, 'type' => 'video/mp4'],
-            'requestOptions' => ['idempotencyKey' => 'upload-1']]);
+        $asset = $mock->client()->assets->classify(['name' => 'clip.mp4', 'content' => ['bytes' => $file, 'type' => 'video/mp4']],
+            ['idempotencyKey' => 'upload-1']);
 
         self::assertSame('completed', $asset['upload']['status']);
         self::assertSame(11 * self::MIB, $asset['content']['sizeInBytes']);
@@ -123,12 +123,11 @@ final class AutomaticMultipartTest extends TestCase
             $moderated[] = strlen((string) $input->content->bytes);
             return 'allowed';
         });
-        $options = ['name' => 'report.pdf', 'content' => ['bytes' => self::fileOf(12 * self::MIB), 'type' => 'application/pdf'],
-            'requestOptions' => ['idempotencyKey' => 'upload-3']];
+        $options = ['name' => 'report.pdf', 'content' => ['bytes' => self::fileOf(12 * self::MIB), 'type' => 'application/pdf']];
         $mock->failNextRequest('transport-error', 'assets.uploadPart');
-        self::assertSame('sdk/transport-error', self::errorCode(fn () => $mock->client()->assets->classify($options)));
+        self::assertSame('sdk/transport-error', self::errorCode(fn () => $mock->client()->assets->classify($options, ['idempotencyKey' => 'upload-3'])));
 
-        $finished = $mock->client()->assets->classify($options);
+        $finished = $mock->client()->assets->classify($options, ['idempotencyKey' => 'upload-3']);
         self::assertSame('completed', $finished['upload']['status']);
         self::assertSame(12 * self::MIB, $finished['content']['sizeInBytes']);
         self::assertSame([$finished['id']], array_column($mock->client()->assets->list()['items'], 'id'));
@@ -149,8 +148,8 @@ final class AutomaticMultipartTest extends TestCase
             return ($request['query']['partNumber'] ?? null) === '3'
                 ? self::apiError(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, ['expectedPartNumber' => 4, 'receivedPartNumber' => 3]) : null;
         }, maxRetries: 1);
-        $asset = $client->assets->create(['name' => 'report.pdf', 'content' => ['bytes' => $file, 'type' => 'application/pdf'],
-            'requestOptions' => ['idempotencyKey' => 'upload-2']]);
+        $asset = $client->assets->create(['name' => 'report.pdf', 'content' => ['bytes' => $file, 'type' => 'application/pdf']],
+            ['idempotencyKey' => 'upload-2']);
 
         self::assertSame('completed', $asset['upload']['status']);
         self::assertSame(['upload-2', 'upload-2:part-2', 'upload-2:part-2', 'upload-2:part-3', 'upload-2:part-4'], array_column($sent, 'key'));
@@ -196,8 +195,8 @@ final class AutomaticMultipartTest extends TestCase
         $sent = [];
         $client = self::scripted($sent);
         self::assertSame('sdk/invalid-argument', self::errorCode(fn () => $client->assets->create([
-            'name' => 'clip.mp4', 'content' => ['bytes' => self::fileOf(6 * self::MIB), 'type' => 'video/mp4'],
-            'requestOptions' => ['idempotencyKey' => str_repeat('k', 241)]])));
+            'name' => 'clip.mp4', 'content' => ['bytes' => self::fileOf(6 * self::MIB), 'type' => 'video/mp4']],
+            ['idempotencyKey' => str_repeat('k', 241)])));
         self::assertSame(ErrorCodes::UPLOAD_TOO_LARGE, self::errorCode(fn () => $client->assets->create([
             'name' => 'huge.png', 'content' => ['bytes' => self::fileOf(21 * self::MIB), 'type' => 'image/png']])));
         self::assertSame([], $sent);
