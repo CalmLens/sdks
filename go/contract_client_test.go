@@ -1122,7 +1122,7 @@ func TestClientCases(t *testing.T) {
 					t.Fatalf("%s: %v", label, err)
 				}
 				if want := step.Expect.CDN; want != nil {
-					response := called.result.(*http.Response)
+					response := called.result.(*CDNResponse)
 					data, _ := io.ReadAll(response.Body)
 					response.Body.Close()
 					headers := map[string]*string{}

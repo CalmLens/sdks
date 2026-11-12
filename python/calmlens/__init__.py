@@ -6,7 +6,7 @@
 from . import error_codes
 from ._version import __version__
 from .client import (CDN_RESOURCES, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RETRIES,
-                     DEFAULT_SIGNED_URL_EXPIRES_IN, DEFAULT_TIMEOUT, MAX_SIGNED_URL_EXPIRES_IN, USER_AGENT, CalmLensServerClient, CDNResponse, Transport, TransportRequest, RequestOptions, AppInfo,
+                     DEFAULT_SIGNED_URL_EXPIRES_IN, DEFAULT_TIMEOUT, MAX_SIGNED_URL_EXPIRES_IN, USER_AGENT, CalmLensServerClient, CDNResponse, ServedAssetInfo, Transport, TransportRequest, RequestOptions, AppInfo,
                      RequestAttempt, DEFAULT_BASE_URL,
                      TransportResponse)
 from .moderation_context import (MODERATION_CONTEXT_USED_CHARACTERS, MODERATION_CONTEXT_USED_ITEMS,
@@ -27,7 +27,7 @@ from .webhooks import (WEBHOOK_DELIVERY_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOO
 __all__ = [
     "__version__", "error_codes", "USER_AGENT", "DEFAULT_TIMEOUT", "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES",
     "DEFAULT_MAX_RESPONSE_BYTES",
-    "CalmLensServerClient", "CDNResponse", "Transport", "TransportRequest", "TransportResponse", "CDN_RESOURCES",
+    "CalmLensServerClient", "CDNResponse", "ServedAssetInfo", "Transport", "TransportRequest", "TransportResponse", "CDN_RESOURCES",
     "DEFAULT_SIGNED_URL_EXPIRES_IN", "MAX_SIGNED_URL_EXPIRES_IN",
     "AsyncCalmLensServerClient", "AsyncCDNResponse", "CalmLensObject", "CalmLensResponse", "ListObject", "RequestOptions", "AppInfo", "RequestAttempt",
     "DEFAULT_BASE_URL", *_errors.__all__,

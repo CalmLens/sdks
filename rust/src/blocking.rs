@@ -566,6 +566,10 @@ impl CdnResponse {
     pub fn headers(&self) -> &HeaderMap {
         self.response.headers()
     }
+    /// Reads served image dimensions from the headers without consuming the body.
+    pub fn get_asset_info(&self) -> Option<crate::ServedAssetInfo> {
+        self.response.get_asset_info()
+    }
     /// The next chunk of the body, or `None` at the end.
     pub fn chunk(&mut self) -> Result<Option<Bytes>> {
         if !self.pending.is_empty() {

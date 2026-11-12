@@ -157,10 +157,15 @@ class TransportTest < Minitest::Test
   end
 
   def test_cdn_serve_streams_into_a_block_and_returns_its_value
-    with_server(->(*) { [200, { 'Content-Type' => 'image/png', 'X-Request-Id' => 'req-9' }, 'p' * 70_000] }) do |client, _server|
+    headers = {
+      'Content-Type' => 'image/png', 'X-Request-Id' => 'req-9',
+      'X-CalmLens-Asset-Info' => 'width=80, description="sample, width=42", height=60'
+    }
+    with_server(->(*) { [200, headers, 'p' * 70_000] }) do |client, _server|
       chunks = []
       result = client.cdn.serve(asset_id: 'asset') do |response|
         assert_equal [200, 'image/png', 'req-9'], [response.status, response.content_type, response.request_id]
+        assert_equal CalmLens::ServedAssetInfo.new(width: 80, height: 60), response.get_asset_info
         response.each_chunk { |chunk| chunks << chunk }
         :done
       end

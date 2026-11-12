@@ -228,9 +228,13 @@ final class ClientTest extends TestCase
     public function testCdnStreamsBytesAndProtectsAuthenticationHeader(): void
     {
         $mock = new MockTransport();
-        $mock->enqueue(new Response(206, ['Content-Range' => 'bytes 1-3/4'], 'abc'));
+        $mock->enqueue(new Response(206, [
+            'Content-Range' => 'bytes 1-3/4',
+            'X-CalmLens-Asset-Info' => 'width=80, description="sample, width=42", height=60',
+        ], 'abc'));
         $response = $mock->client()->cdn->serve(['assetId' => 'a', 'init' => ['headers' => ['x-api-key' => 'attacker', 'Range' => 'bytes=1-3']]]);
         self::assertSame(206, $response->getStatusCode());
+        self::assertEquals(new \CalmLens\Model\ServedAssetInfo(80, 60), $response->getAssetInfo());
         self::assertSame('abc', $response->getBody()->getContents());
         self::assertSame('test-key', $mock->requests()[0]->request->getHeaderLine('X-Api-Key'));
         self::assertSame('bytes=1-3', $mock->requests()[0]->request->getHeaderLine('Range'));

@@ -78,6 +78,10 @@ pub use client::{
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use observe::AttemptEvent;
 #[cfg(feature = "async")]
+mod served_asset_info;
+#[cfg(feature = "async")]
+pub use served_asset_info::ServedAssetInfo;
+#[cfg(feature = "async")]
 pub use transport::{
     DEFAULT_MAX_RESPONSE_BYTES, RETRY_AFTER_MAX, RETRY_BASE_DELAY, RETRY_MAX_DELAY,
 };

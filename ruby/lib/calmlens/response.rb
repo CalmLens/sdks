@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module CalmLens
+  # Pixel dimensions of the representation served by the CDN.
+  ServedAssetInfo = Struct.new(:width, :height, keyword_init: true)
+
   # An HTTP response. {CDN#serve} returns one; custom transports and the mock produce them.
   #
   # The body is read at most once: either stream it with {#each_chunk} or read it with {#body}.
@@ -30,6 +33,31 @@ module CalmLens
     # @return [Integer, nil] the `Content-Length` header.
     def content_length
       Integer(headers['content-length'], 10, exception: false)
+    end
+
+    # Reads served image dimensions from the headers without consuming the body.
+    # @return [ServedAssetInfo, nil]
+    def get_asset_info
+      header = "#{headers['x-calmlens-asset-info']},"
+      dimensions = {}
+      start = 0
+      header.scan(/"(?:[^"\\]|\\.)*"|[",]/) do |delimiter|
+        return nil if delimiter == '"'
+        next unless delimiter == ','
+
+        match = Regexp.last_match
+        member = header[start...match.begin(0)].strip
+        start = match.end(0)
+        key = member.split(/[=; \t]/, 2).first
+        next unless key == 'width' || key == 'height'
+
+        dimension = /\A(?:width|height)=([0-9]{1,15})\z/.match(member)
+        return nil unless dimension && !dimensions.key?(key) && dimension[1].to_i.positive?
+
+        dimensions[key] = dimension[1].to_i
+      end
+      width, height = dimensions.values_at('width', 'height')
+      ServedAssetInfo.new(width: width, height: height).freeze if width && height
     end
 
     # @return [Boolean] true for a 2xx status.

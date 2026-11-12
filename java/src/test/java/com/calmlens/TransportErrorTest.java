@@ -113,8 +113,9 @@ class TransportErrorTest {
   }
 
   @Test void truncatedCdnBody() throws Exception {
-    String url = serve(socket -> write(socket, "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\npartial"));
+    String url = serve(socket -> write(socket, "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nX-CalmLens-Asset-Info: width=80, description=\"sample, width=42\", height=60\r\n\r\npartial"));
     try (CdnResponse response = client(url, Duration.ofSeconds(5)).cdn().serve(CdnRequestParams.builder().setAssetId("asset").build())) {
+      assertEquals(new ServedAssetInfo(80, 60), response.getAssetInfo());
       var error = assertThrows(ConnectionException.class, () -> response.readAllBytes(1000));
       assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, error.getCode());
       assertInstanceOf(IOException.class, error.getCause());

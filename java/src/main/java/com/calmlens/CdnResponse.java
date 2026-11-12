@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.http.HttpTimeoutException;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * A streamed CDN response from {@code cdn.serve}. Any status is returned (check {@link #status()}:
@@ -23,6 +24,9 @@ import java.util.Map;
  * }</pre>
  */
 public final class CdnResponse implements Closeable {
+  private static final Pattern ASSET_INFO_DELIMITER = Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"|[\",]");
+  private static final Pattern ASSET_INFO_DIMENSION = Pattern.compile("^(width|height)=([0-9]{1,15})$");
+
   private final Transport.Response response;
   private final InputStream body;
 
@@ -42,6 +46,37 @@ public final class CdnResponse implements Closeable {
    * @return the first value, or null
    */
   public String header(String name) { return response.header(name); }
+
+  /** @return served image dimensions, or null if missing or invalid. The body stays unread. */
+  public ServedAssetInfo getAssetInfo() {
+    var values = headers().get("x-calmlens-asset-info");
+    if (values == null) return null;
+    String header = String.join(",", values) + ",";
+    var delimiters = ASSET_INFO_DELIMITER.matcher(header);
+    int start = 0;
+    long width = 0;
+    long height = 0;
+    while (delimiters.find()) {
+      if (delimiters.group().equals("\"")) return null;
+      if (!delimiters.group().equals(",")) continue;
+      String member = header.substring(start, delimiters.start()).strip();
+      start = delimiters.end();
+      String key = member.split("[=; \t]", 2)[0];
+      if (!key.equals("width") && !key.equals("height")) continue;
+      var dimension = ASSET_INFO_DIMENSION.matcher(member);
+      if (!dimension.matches()) return null;
+      long size = Long.parseLong(dimension.group(2));
+      if (size == 0) return null;
+      if (key.equals("width")) {
+        if (width != 0) return null;
+        width = size;
+      } else {
+        if (height != 0) return null;
+        height = size;
+      }
+    }
+    return width == 0 || height == 0 ? null : new ServedAssetInfo(width, height);
+  }
 
   /** @return the body stream; IO failures follow the {@link InputStream} contract */
   public InputStream body() { return body; }

@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import asyncio
 import unittest
 from typing import Any
 import unittest.mock
@@ -381,12 +382,24 @@ class ClientTests(ClientTestCase):
         self.assertEqual(url, "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens")
         self.assertTrue(self.client.cdn.get_asset_url(asset_id='a', resource='rendered', transform='width=20,label=[x]').endswith("/rendered/width=20,label=%5Bx%5D"))
         self.assertEqual(self.client.cdn.get_asset_url(asset_id='a', resource='rendered', lens='x', transform='format=avif'), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x,format=avif")
-        self.result, self.headers = b"0123456789", {"Content-Type": "image/png", "X-Request-Id": "req_cdn"}
+        self.result, self.headers = b"0123456789", {
+            "Content-Type": "image/png", "X-Request-Id": "req_cdn",
+            "X-CalmLens-Asset-Info": 'width=80, description="sample, width=42", height=60',
+        }
         with self.client.cdn.serve(asset_id='a', init={'headers': {'x-api-key': 'wrong', 'range': 'bytes=0-1'}}) as response:
             self.assertEqual(self.calls[-1].get_header("X-api-key"), "key")
             self.assertEqual(self.calls[-1].get_header("Range"), "bytes=0-1")
             self.assertEqual((response.content_type, response.request_id, response.ok), ("image/png", "req_cdn", True))
+            self.assertEqual(response.get_asset_info(), calmlens.ServedAssetInfo(80, 60))
             self.assertEqual(list(response.iter_bytes(4)), [b"0123", b"4567", b"89"])
+
+        async def check_async():
+            client = calmlens.AsyncCalmLensServerClient.from_client(self.client)
+            async with await client.cdn.serve(asset_id="a") as response:
+                self.assertEqual(response.get_asset_info(), calmlens.ServedAssetInfo(80, 60))
+                self.assertEqual(await response.read(), b"0123456789")
+
+        asyncio.run(check_async())
 
 
 INFO = {"id": "asset", "projectId": "p", "type": "image", "availability": "available",

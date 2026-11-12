@@ -168,7 +168,7 @@ fn streaming_cdn_preserves_range_method_and_headers() {
         assert!(head.contains("range: bytes=0-3"));
         assert!(head.contains("x-api-key: key"));
         assert!(!head.contains("override"));
-        stream.write_all(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Type: video/mp4\r\nContent-Range: bytes 0-3/100\r\nConnection: close\r\n\r\ndata").unwrap();
+        stream.write_all(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Type: image/jpeg\r\nContent-Range: bytes 0-3/100\r\nX-CalmLens-Asset-Info: width=80, description=\"sample, width=42\", height=60\r\nConnection: close\r\n\r\ndata").unwrap();
     });
     let client = blocking::ServerClient::builder("key", "project")
         .base_url(&url)
@@ -190,7 +190,9 @@ fn streaming_cdn_preserves_range_method_and_headers() {
             )
             .unwrap();
     assert_eq!(response.status().as_u16(), 206);
-    assert_eq!(response.headers()["content-type"], "video/mp4");
+    assert_eq!(response.headers()["content-type"], "image/jpeg");
+    let info = response.get_asset_info().unwrap();
+    assert_eq!((info.width, info.height), (80, 60));
     let mut bytes = Vec::new();
     std::io::copy(&mut response, &mut bytes).unwrap();
     assert_eq!(bytes, b"data");

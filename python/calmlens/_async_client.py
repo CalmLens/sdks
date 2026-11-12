@@ -22,7 +22,7 @@ from . import error_codes
 from .errors import CalmLensCancelledError
 from .client import (_UNSET, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RETRIES,
                      DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT, AppInfo, CalmLensServerClient, CDNResponse,
-                     RequestAttempt, RequestOptions, Transport)
+                     RequestAttempt, RequestOptions, ServedAssetInfo, Transport)
 from .types import *  # noqa: F403  (the types the methods take and return)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -83,6 +83,10 @@ class AsyncCDNResponse:
     @property
     def request_id(self) -> str | None:
         return self._response.request_id
+
+    def get_asset_info(self) -> ServedAssetInfo | None:
+        """Read served image dimensions from the headers without consuming the body."""
+        return self._response.get_asset_info()
 
     async def read(self, amount: int | None = None) -> bytes:
         return await _run(lambda: self._response.read(amount))

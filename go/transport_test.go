@@ -171,6 +171,7 @@ func TestTimeoutDoesNotCutOffUploadsOrDownloads(t *testing.T) {
 		}
 		// Headers arrive at once; the body trickles in for longer than Options.Timeout.
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-CalmLens-Asset-Info", `width=80, description="sample, width=42", height=60`)
 		w.WriteHeader(200)
 		w.(http.Flusher).Flush()
 		time.Sleep(150 * time.Millisecond)
@@ -191,6 +192,9 @@ func TestTimeoutDoesNotCutOffUploadsOrDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
+	if info := res.GetAssetInfo(); info == nil || *info != (ServedAssetInfo{Width: 80, Height: 60}) {
+		t.Fatalf("unexpected served dimensions: %+v", info)
+	}
 	if body, err := io.ReadAll(res.Body); err != nil || !strings.Contains(string(body), "asset") {
 		t.Fatalf("download cut off: %v", err)
 	}

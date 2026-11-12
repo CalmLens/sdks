@@ -2793,6 +2793,18 @@ class CDN:
             attempt += 1
 
 
+@dataclass(frozen=True)
+class ServedAssetInfo:
+    """Pixel dimensions of the representation served by the CDN."""
+
+    width: int
+    height: int
+
+
+_ASSET_INFO_DELIMITER = re.compile(r'"(?:[^"\\]|\\.)*"|[",]')
+_ASSET_INFO_DIMENSION = re.compile(r"(width|height)=([0-9]{1,15})")
+
+
 class CDNResponse:
     """A streamed CDN response. ``read()`` and iteration raise ``CalmLensConnectionError``
     (``sdk/transport-error`` or ``sdk/timeout``, with the native ``__cause__``) when the
@@ -2823,6 +2835,29 @@ class CDNResponse:
     @property
     def request_id(self) -> str | None:
         return self.headers.get("x-request-id")
+
+    def get_asset_info(self) -> ServedAssetInfo | None:
+        """Read served image dimensions from the headers without consuming the body."""
+        header = self.headers.get("x-calmlens-asset-info", "") + ","
+        dimensions: dict[str, int] = {}
+        start = 0
+        for delimiter in _ASSET_INFO_DELIMITER.finditer(header):
+            if delimiter[0] == '"':
+                return None
+            if delimiter[0] != ",":
+                continue
+            member = header[start:delimiter.start()].strip()
+            start = delimiter.end()
+            key = re.split(r"[=; \t]", member, maxsplit=1)[0]
+            if key not in ("width", "height"):
+                continue
+            match = _ASSET_INFO_DIMENSION.fullmatch(member)
+            if match is None or key in dimensions or int(match[2]) == 0:
+                return None
+            dimensions[key] = int(match[2])
+        if "width" in dimensions and "height" in dimensions:
+            return ServedAssetInfo(dimensions["width"], dimensions["height"])
+        return None
 
     def read(self, amount: int | None = None) -> bytes:
         """Read the rest of the body, or at most ``amount`` bytes."""

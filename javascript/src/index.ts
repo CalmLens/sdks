@@ -167,6 +167,7 @@ export type {
 } from "./client/CalmLensTypes";
 export { DEFAULT_CDN_BASE_URL } from "./client/CalmLensUtils";
 export { SDK_VERSION } from "./client/CalmLensVersion";
+export type { CdnResponse, ServedAssetInfo } from "./client/ServedAssetInfo";
 export type {
   AssetHls,
   AssetHlsRendition,

@@ -3108,6 +3108,10 @@ impl CdnResponse {
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
     }
+    /// Reads served image dimensions from the headers without consuming the body.
+    pub fn get_asset_info(&self) -> Option<crate::ServedAssetInfo> {
+        crate::ServedAssetInfo::from_headers(&self.headers)
+    }
     /// The next chunk of the body, or `None` at the end.
     pub async fn chunk(&mut self) -> Result<Option<Bytes>> {
         match self.body.next().await {

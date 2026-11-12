@@ -125,6 +125,7 @@ import {
 } from "./CalmLensUtils";
 import { isBrowserRuntime, isReactNativeRuntime } from "./CalmLensVersion";
 import { verifyWebhookSignature } from "./CalmLensWebhooks";
+import { type CdnResponse, parseServedAssetInfo } from "./ServedAssetInfo";
 
 /** The most lens definitions ensureLenses() sends in one request. */
 export const ENSURE_LENSES_MAX_PER_REQUEST = 100;
@@ -214,21 +215,25 @@ const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 const writableCdnResponse = (
   response: Response,
   metadata: Pick<Response, "url" | "redirected" | "type"> = response,
-): Response => {
+): CdnResponse => {
   // Opaque, network-error and upgrade responses cannot be reconstructed by Fetch.
-  if (response.status < 200) return response;
-  const writable = new Response(response.body, response);
+  const writable = response.status < 200 ? response : new Response(response.body, response);
   const { url, redirected, type } = metadata;
   return Object.defineProperties(writable, {
     url: { value: url },
     redirected: { value: redirected },
     type: { value: type },
+    getAssetInfo: {
+      value(this: Response) {
+        return parseServedAssetInfo(this.headers.get("X-CalmLens-Asset-Info"));
+      },
+    },
     clone: {
       value(this: Response) {
         return writableCdnResponse(Response.prototype.clone.call(this), { url, redirected, type });
       },
     },
-  });
+  }) as CdnResponse;
 };
 
 /**
@@ -491,7 +496,7 @@ export default class CalmLensServerClient {
       serve: async (
         options: CdnServeOptions,
         requestOptions?: RequestOptions,
-      ): Promise<Response> => {
+      ): Promise<CdnResponse> => {
         const { init, resource = "rendered", ...urlOptions } = checked("cdn.serve", options);
         const connection = this.#connection.forCall("cdn.serve", requestOptions);
         if (requestOptions?.extraBody)

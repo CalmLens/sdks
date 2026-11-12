@@ -8,7 +8,6 @@ use CalmLens\Internal\Transforms;
 use CalmLens\Internal\Values;
 use CalmLens\Model\AssetInfo;
 use CalmLens\Model\SignedAssetUrl;
-use Psr\Http\Message\ResponseInterface;
 
 /**
  * Builds asset URLs, signs private assets' URLs, reads an asset URL's display info and fetches
@@ -203,7 +202,7 @@ final class Cdn extends Resource
      * } $params
      * @param RequestOptions $requestOptions
      */
-    public function serve(array $params, array $requestOptions = []): ResponseInterface
+    public function serve(array $params, array $requestOptions = []): CdnResponse
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $init = $api['init'] ?? [];
@@ -215,7 +214,14 @@ final class Cdn extends Resource
             Values::invalid('CDN method must be GET or HEAD');
         }
         unset($api['init']);
-        return $this->session->cdn($method, $this->getAssetUrl($api + ['resource' => 'rendered']), $init['headers'] ?? [], $request);
+        $response = $this->session->cdn($method, $this->getAssetUrl($api + ['resource' => 'rendered']), $init['headers'] ?? [], $request);
+        return new CdnResponse(
+            $response->getStatusCode(),
+            $response->getHeaders(),
+            $response->getBody(),
+            $response->getProtocolVersion(),
+            $response->getReasonPhrase(),
+        );
     }
 
     /**

@@ -107,6 +107,12 @@ module CalmLens
                         | () -> Enumerator[T, nil]
   end
 
+  class ServedAssetInfo < Struct[Integer]
+    def initialize: (width: Integer, height: Integer) -> void
+    attr_reader width: Integer
+    attr_reader height: Integer
+  end
+
   class Response
     attr_reader status: Integer
     attr_reader headers: Hash[String, String]
@@ -117,6 +123,7 @@ module CalmLens
     def request_id: () -> String?
     def content_type: () -> String?
     def content_length: () -> Integer?
+    def get_asset_info: () -> ServedAssetInfo?
     def success?: () -> bool
     def each_chunk: () { (String chunk) -> void } -> nil
                   | () -> Enumerator[String, nil]

@@ -437,7 +437,7 @@ describe("deadlines for large transfers", () => {
     }
   });
 
-  test("cdn.serve returns writable headers while a slow body streams past the deadline", async () => {
+  test("cdn.serve exposes served dimensions and writable headers while the body streams past the deadline", async () => {
     const server = Bun.serve({
       port: 0,
       fetch: () =>
@@ -450,7 +450,13 @@ describe("deadlines for large transfers", () => {
               controller.close();
             },
           }),
-          { status: 206, headers: { "content-range": "bytes 0-11/12" } },
+          {
+            status: 206,
+            headers: {
+              "content-range": "bytes 0-11/12",
+              "x-calmlens-asset-info": 'width=80, description="sample, width=42", height=60',
+            },
+          },
         ),
     });
     try {
@@ -476,6 +482,14 @@ describe("deadlines for large transfers", () => {
       expect(upstream?.headers.get("cache-control")).toBeNull();
       expect(response.url).toBe(client.cdn.getAssetUrl({ assetId: "a", resource: "rendered" }));
       const copy = response.clone();
+      expect(copy.getAssetInfo()).toEqual({ width: 80, height: 60 });
+      expect(response.getAssetInfo()).toEqual({ width: 80, height: 60 });
+      for (const invalid of ["width=80", "width=0, height=60", "width=80, width=42, height=60"]) {
+        response.headers.set("X-CalmLens-Asset-Info", invalid);
+        expect(response.getAssetInfo()).toBeUndefined();
+      }
+      response.headers.delete("X-CalmLens-Asset-Info");
+      expect(response.getAssetInfo()).toBeUndefined();
       expect(copy.url).toBe(response.url);
       expect(copy.headers.get("cache-control")).toBe("private, no-store");
       expect(await response.text()).toBe("first,second");

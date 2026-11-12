@@ -1037,7 +1037,11 @@ func TestSharedMockScenarios(t *testing.T) {
 						var response *http.Response
 						var serveErr error
 						if step.Operation == "cdn.serve" {
-							response, serveErr = m.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: decode[calmlens.CDNAssetURLOptions](t, args)})
+							var cdnResponse *calmlens.CDNResponse
+							cdnResponse, serveErr = m.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: decode[calmlens.CDNAssetURLOptions](t, args)})
+							if serveErr == nil {
+								response = cdnResponse.Response
+							}
 						} else {
 							response, serveErr = m.FetchCDN(ctx, args["url"].(string))
 						}
