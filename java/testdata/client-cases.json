@@ -1974,19 +1974,64 @@
             "name": "asset-1.txt",
             "createdAt": 1760000000000,
             "content": {
-              "status": "stored"
+              "status": "stored",
+              "removalReason": null,
+              "updatedAt": null,
+              "safetyHold": null,
+              "format": null,
+              "extension": null,
+              "sizeInBytes": null,
+              "checksums": null,
+              "width": null,
+              "height": null,
+              "durationSeconds": null,
+              "pageCount": null,
+              "perceptualHash": null,
+              "perceptualHashQuality": null,
+              "metadata": null,
+              "extractedText": null,
+              "rendered": null,
+              "hls": null,
+              "preview": null
             },
             "upload": {
-              "status": "completed"
+              "status": "completed",
+              "updatedAt": null,
+              "partsReceived": null
             },
             "classification": {
               "status": "completed",
               "moderation": {
                 "decision": "allowed",
                 "flaggedCategories": [],
-                "regions": []
-              }
-            }
+                "regions": [],
+                "manualReviews": [],
+                "automatedStatus": null,
+                "source": null,
+                "policy": null,
+                "pendingReview": null,
+                "rule": null,
+                "explanationComplete": null,
+                "categories": null,
+                "raw": null,
+                "timeline": null
+              },
+              "failureReason": null,
+              "updatedAt": null,
+              "completedAt": null,
+              "progress": null,
+              "testInput": false,
+              "ocr": null,
+              "personDetection": null,
+              "faceDetection": null,
+              "linkDetection": null
+            },
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+            "type": "image",
+            "parentPages": [],
+            "metadata": [],
+            "tags": [],
+            "visibility": "public"
           },
           "headers": {
             "x-request-id": "req-1",
@@ -2006,19 +2051,64 @@
               "name": "asset-1.txt",
               "createdAt": 1760000000000,
               "content": {
-                "status": "stored"
+                "status": "stored",
+                "removalReason": null,
+                "updatedAt": null,
+                "safetyHold": null,
+                "format": null,
+                "extension": null,
+                "sizeInBytes": null,
+                "checksums": null,
+                "width": null,
+                "height": null,
+                "durationSeconds": null,
+                "pageCount": null,
+                "perceptualHash": null,
+                "perceptualHashQuality": null,
+                "metadata": null,
+                "extractedText": null,
+                "rendered": null,
+                "hls": null,
+                "preview": null
               },
               "upload": {
-                "status": "completed"
+                "status": "completed",
+                "updatedAt": null,
+                "partsReceived": null
               },
               "classification": {
                 "status": "completed",
                 "moderation": {
                   "decision": "allowed",
                   "flaggedCategories": [],
-                  "regions": []
-                }
-              }
+                  "regions": [],
+                  "manualReviews": [],
+                  "automatedStatus": null,
+                  "source": null,
+                  "policy": null,
+                  "pendingReview": null,
+                  "rule": null,
+                  "explanationComplete": null,
+                  "categories": null,
+                  "raw": null,
+                  "timeline": null
+                },
+                "failureReason": null,
+                "updatedAt": null,
+                "completedAt": null,
+                "progress": null,
+                "testInput": false,
+                "ocr": null,
+                "personDetection": null,
+                "faceDetection": null,
+                "linkDetection": null
+              },
+              "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+              "type": "image",
+              "parentPages": [],
+              "metadata": [],
+              "tags": [],
+              "visibility": "public"
             }
           }
         }

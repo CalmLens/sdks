@@ -955,7 +955,7 @@
         "javascript": "events.list",
         "python": "events.iter",
         "go": "Events.ListAll",
-        "rust": "events().pages",
+        "rust": "events().iterate",
         "java": "events().iterate",
         "ruby": "events.list",
         "php": "events->each"
