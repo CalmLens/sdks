@@ -384,8 +384,7 @@ class ContractTest < Minitest::Test
     'pretty_print' => 'shows the client without its API key in pp',
     'project_id' => 'the project the client was made for',
     'base_url' => 'the API base URL the client was made with',
-    'cdn_base_url' => 'the CDN base URL the client was made with',
-    'request' => 'the raw request escape hatch, which surface.json lists no capability for'
+    'cdn_base_url' => 'the CDN base URL the client was made with'
   }.freeze
 
   # The public methods a class defines itself and inherits from CalmLens classes, not Object's.
