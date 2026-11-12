@@ -60,7 +60,7 @@ module ClientCaseSupport
     end
 
     args = args.merge('requestOptions' => options) unless options.empty?
-    invoke(client, step['operation'], args)
+    invoke(client, step['operation'], args, stop_after: step['stopAfter'])
   end
 
   # Reads an upload form as the API does: exactly an `options` part, then a `file` part, then the

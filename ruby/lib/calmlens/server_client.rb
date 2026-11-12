@@ -159,11 +159,11 @@ module CalmLens
     # consecutive requests, in order. {#lenses} manages lenses one by one.
     # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, transform:, ...}]`, each served unless `active: false`
     # @return [Array<Lens>] the saved lenses, in the given order.
-    def ensure_lenses(**) = @lenses.ensure_lenses(**)
+    def ensure_lenses(**) = @lenses.__send__(:ensure_lenses, **)
 
     # Creates or updates one lens. Takes one lens definition as keywords; see {#ensure_lenses}.
     # @return [Lens] the saved lens
-    def ensure_lens(**definition) = @lenses.ensure_lens(**definition)
+    def ensure_lens(**) = @lenses.__send__(:ensure_lens, **)
 
     # Sends a request to any API path with the client's authentication, retries and error mapping,
     # for endpoints this release has no method for. Reads are retried; writes only with

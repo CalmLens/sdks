@@ -194,6 +194,7 @@ class ContractTest < Minitest::Test
 
   def check_error(wanted, error, saved, label)
     assert_equal wanted.slice('code', 'status'), { 'code' => error.code, 'status' => error.status }, label
+    ERROR_KINDS.fetch(wanted['kind']).each { |kind| assert_kind_of kind, error, "#{label} is #{wanted['kind']}" } if wanted.key?('kind')
     assert_equal wanted['retryAfter'], error.retry_after, "#{label}: retryAfter" if wanted.key?('retryAfter')
     # `details` lists only the keys to compare, and objects in them (such as each of a validation
     # error's `issues`) only the fields to compare.
@@ -375,6 +376,38 @@ class ContractTest < Minitest::Test
     assert present?(capability, SURFACE), "missing #{capability['id']} (#{capability['names']['ruby']})"
   end
   each_case('surface', SURFACE['capabilities']) { |capability| capability['id'] }
+
+  # Public methods of the client and its resources that are plumbing, not API capabilities.
+  PLUMBING = {
+    'close' => 'closes the pooled connections',
+    'inspect' => 'shows the client without its API key',
+    'pretty_print' => 'shows the client without its API key in pp',
+    'project_id' => 'the project the client was made for',
+    'base_url' => 'the API base URL the client was made with',
+    'cdn_base_url' => 'the CDN base URL the client was made with',
+    'request' => 'the raw request escape hatch, which surface.json lists no capability for'
+  }.freeze
+
+  # The public methods a class defines itself and inherits from CalmLens classes, not Object's.
+  def own_methods(object)
+    object.class.ancestors.take_while { |ancestor| ancestor != CalmLens::Resource && ancestor != Object }
+          .flat_map { |ancestor| ancestor.public_instance_methods(false) }.uniq.map(&:to_s)
+  end
+
+  # Every public method of the client and its resources is a `method` capability or plumbing, so a
+  # method the API dropped can't stay.
+  def test_every_public_client_method_is_a_capability_or_plumbing
+    named = SURFACE['capabilities'].select { |capability| capability['kind'] == 'method' }.map { |capability| capability['names']['ruby'] }
+    methods = own_methods(client)
+    resources = methods.select { |name| client.method(name).arity.zero? && client.public_send(name).is_a?(CalmLens::Resource) }
+    listed = (methods - resources) + resources.flat_map do |resource|
+      own_methods(client.public_send(resource)).map do |name|
+        "#{resource}.#{name}"
+      end
+    end
+    assert_empty listed - named - PLUMBING.keys, 'public methods no capability names'
+    assert_empty PLUMBING.keys - listed, 'plumbing the client no longer has'
+  end
 
   ERROR_KINDS = error_kind_classes
 

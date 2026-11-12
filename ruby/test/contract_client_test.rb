@@ -62,11 +62,17 @@ class ContractClientTest < Minitest::Test
 
   # Calls an operation named like the JavaScript client's method, with JavaScript option names. An
   # iterator lists and pages with {Page#auto_paging_each}; its result is what it yields, in order.
-  def invoke(client, operation, args, nested: :camel)
+  # `stop_after` stops iterating after that many items, as a caller breaking out of the loop would.
+  def invoke(client, operation, args, nested: :camel, stop_after: nil)
     return call_operation(client, operation, args, nested: nested) unless ITERATORS.key?(operation)
 
     page = call_operation(client, list_operation(operation), args, nested: nested)
-    collect { |items| page.auto_paging_each { |item| items << item } }
+    collect do |items|
+      page.auto_paging_each do |item|
+        items << item
+        break if stop_after && items.size >= stop_after
+      end
+    end
   end
 
   # Translates JavaScript-only options: waitForDecision's milliseconds.

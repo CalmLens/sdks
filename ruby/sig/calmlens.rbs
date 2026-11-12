@@ -295,8 +295,8 @@ module CalmLens
 
   class Lenses < Resource
     # ServerClient#ensure_lenses and #ensure_lens call these.
-    def ensure_lenses: (lenses: Array[lens_definition], ?request_options: request_options) -> Array[Lens]
-    def ensure_lens: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
+    private def ensure_lenses: (lenses: Array[lens_definition], ?request_options: request_options) -> Array[Lens]
+    private def ensure_lens: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
     def list: (?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options) -> LensPage
     def create: (identifier: String, name: String, type: lens_type, ?active: bool, ?description: String?, ?transform: image_transform_options_input?, ?request_options: request_options) -> Lens
     def retrieve: (String lens_id, ?request_options: request_options) -> Lens

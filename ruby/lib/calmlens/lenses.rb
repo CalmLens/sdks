@@ -67,20 +67,19 @@ module CalmLens
       end
     end
 
-    # Lens definitions are sent as given, nil fields included.
-    # @api private
+    private
+
+    # Lens definitions are sent as given, nil fields included. ServerClient#ensure_lenses calls it.
     def ensure_lenses(**options)
       call(options, __method__, keep_nil: true, prefix: nil) do |api, request|
         @session.ensure_lenses(api['lenses'], request).map { |lens| build(Lens, lens) }
       end
     end
 
-    # @api private
+    # ServerClient#ensure_lens calls it.
     def ensure_lens(**definition)
       call(definition, __method__, keep_nil: true, prefix: nil) { |api, request| build(Lens, @session.ensure_lenses([api], request).first) }
     end
-
-    private
 
     def lens_path(api) = "/lenses/#{Internal.segment(api['lensId'])}"
   end
