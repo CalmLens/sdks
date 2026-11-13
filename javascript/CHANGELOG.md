@@ -1,3 +1,79 @@
+## 0.26.0
+
+### Minor Changes
+
+- 1bee633: `calmlens plan`, `apply`, `trigger` and `listen` take `--json`, which prints JSON on standard output
+  (for `listen`, one line per delivery attempt) and the readable output on standard error.
+  `calmlens plan --detailed-exitcode` exits 2 when the project would change. `--log-level` (or
+  `CALMLENS_LOG`) logs the CLI's CalmLens requests to standard error. `--profile <name>` (or
+  `CALMLENS_PROFILE`) keeps a separate login per profile, so several projects can be signed in at
+  once.
+
+  `CalmLensProvider` (React and React Native), `provideCalmLens` (Vue) and `setCalmLensContext`
+  (Svelte) give every uploader beneath them the same `uploadPresetId`, `tokenUrl`, `token`,
+  `baseUrl` or `createClient`.
+
+  The type declarations need TypeScript 5.9 or later, which every build now checks.
+- 954be6b: `CalmLensServerClient` reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_BASE_URL`
+  from the environment when you leave them out, in runtimes that have one, so
+  `new CalmLensServerClient()` is enough on a configured server. `appInfo: { name, version, url }`
+  appends your app to the user agent.
+
+  Every method that sends a request takes optional request options after its own options:
+  `signal`, `timeoutMs`, `maxRetries`, `idempotencyKey`, `headers`, and `extraQuery` and `extraBody`
+  for API fields this SDK version doesn't know yet. They replace `withRequestOptions`, which is
+  removed: pass `{ signal, timeoutMs }` to the call instead of deriving a client.
+
+  `client.request(method, path, { query, body, headers })` sends any API request with the client's
+  key, retries and error handling.
+
+  Set `CALMLENS_LOG=info` or `debug` (or the `logLevel` option, with an optional `logger`) to log
+  retries, failures or every attempt, and pass `onAttempt` to receive each attempt's operation,
+  path, status, request ID, duration and retry delay. Neither ever includes the API key, upload
+  tokens, query strings or bodies.
+
+  The `calmlens` CLI reads the API base URL from `CALMLENS_BASE_URL`, the name the SDKs use, instead
+  of `CALMLENS_API_URL`.
+- 55174f7: Match the JavaScript types to what the API sends and accepts. `Asset.visibility` is always
+  present and never `null`. `assets.listChildren` requires its options, which hold the asset ID.
+  Upload options accept `null` for `authorId` and `context`, as the API does. Member event facts
+  list the `reviewer` role.
+- ed09b69: Errors now have a class for each kind of failure, all extending `CalmLensError`:
+  `CalmLensApiError` and its `CalmLensBadRequestError`, `CalmLensAuthenticationError`,
+  `CalmLensPermissionDeniedError`, `CalmLensNotFoundError`, `CalmLensConflictError`,
+  `CalmLensPayloadTooLargeError`, `CalmLensUnprocessableEntityError`, `CalmLensRateLimitError`
+  and `CalmLensServerError`, plus `CalmLensConnectionError`, `CalmLensTimeoutError`,
+  `CalmLensCancelledError`, `CalmLensInvalidArgumentError` (and its `CalmLensConfigurationError`),
+  `CalmLensInvalidResponseError` and `CalmLensWebhookVerificationError`. `error.kind` names the kind
+  and `error.isKind(kind)` checks it. `instanceof` works across copies of the SDK. API errors keep
+  the response body as text in `error.body`, up to 4 KiB.
+- f3e80fd: Every `list` method now returns a page you can await or iterate. Await it for one page, which has
+  `hasNextPage()` and `getNextPage()`. Iterate it with `for await` to get every item across pages,
+  or call `autoPagingToArray({ limit })` to collect up to 10,000 items. The separate iterators are
+  gone: replace `assets.iterate(options)` with `assets.list(options)`, and likewise `iterateChildren`
+  with `listChildren`, `iterateTimeline` with `listTimeline`, `iterateEntries` with `listEntries`,
+  and `folders`, `hashLists`, `policies`, `lenses` and `uploadPresets` `.iterate` with `.list`.
+  `events.pages(options)` is replaced by `events.list(options)`: iterating it yields every event
+  waiting after the cursor, and `getNextPage()` walks it page by page.
+
+  Results of successful calls now carry `lastResponse`, with the HTTP `status`, `requestId`,
+  `headers` and, for uploads, the `idempotencyKey`. It isn't enumerable, so `JSON.stringify` and
+  spreading leave it out. Methods declare it as `CalmLensResponse<T>`.
+
+  `hls.js` and `pdfjs-dist` are now optional peer dependencies, so a server install no longer
+  downloads them. Web apps that use the UI components install them alongside the SDK:
+  `npm install calmlens hls.js pdfjs-dist`. React Native apps don't need them.
+- 747237b: Align text classification options across languages: `visibility` is available in every SDK,
+  and Python declares upload and text `tags`. Python's asset-ID option types now require `assetId`,
+  matching the existing runtime requirement. Ruby declares the existing `link_checking_enabled`
+  project setting. Rust's `search_indexing_budget_units` now accepts `f64`, matching the API's
+  numeric budget; change integer literals assigned to it to floating-point literals.
+
+### Patch Changes
+
+- a53bad2: Aborting a request's own `signal` now also cancels the wait before a retry, so the call fails with
+  `sdk/cancelled` at once instead of after the retry delay.
+
 ## 0.25.0
 
 ### Minor Changes
