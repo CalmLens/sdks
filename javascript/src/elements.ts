@@ -126,6 +126,16 @@ const BaseElement = (
   typeof HTMLElement === "undefined" ? class {} : HTMLElement
 ) as typeof HTMLElement;
 
+interface UploadRow {
+  element: HTMLLIElement;
+  progress: HTMLDivElement;
+  bar: HTMLDivElement;
+  status: HTMLParagraphElement;
+  chooseAnother: HTMLButtonElement;
+  retry: HTMLButtonElement;
+  remove: HTMLButtonElement;
+}
+
 /**
  * `<calmlens-uploader upload-preset-id="…" token-url="/api/upload-token">` uploads through an
  * upload preset and dispatches `calmlens-uploaded` with `{ assetId, status, file }` for each
@@ -159,6 +169,7 @@ export class CalmLensUploaderElement extends BaseElement {
   #unsubscribe?: () => void;
   #dragging = false;
   #input?: HTMLInputElement;
+  #rows = new Map<string, UploadRow>();
 
   /** The upload token, or a function returning one per file, instead of `token-url`. */
   get token(): UploadControllerOptions["token"] {
@@ -348,6 +359,7 @@ export class CalmLensUploaderElement extends BaseElement {
       const files = event.clipboardData?.files;
       if (!this.hasAttribute("disabled") && files?.length) this.controller.addFiles(files);
     });
+    this.#rows.clear();
     this.replaceChildren(zone, input, el("ul", { class: "calmlens-uploads", hidden: true }));
     this.#renderItems();
   }
@@ -356,104 +368,112 @@ export class CalmLensUploaderElement extends BaseElement {
     if (!this.hasAttribute("disabled")) this.#input?.click();
   }
 
+  #createRow(item: UploadItem<File>, view: ReturnType<typeof describeUploadItem>): UploadRow {
+    const thumbnail = item.previewUrl
+      ? el("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
+      : fileThumbnail(view.fileIcon);
+    const bar = el("div", { class: "calmlens-progress__bar" });
+    const progress = el(
+      "div",
+      {
+        class: "calmlens-progress",
+        role: "progressbar",
+        "aria-valuemin": 0,
+        "aria-valuemax": 100,
+      },
+      [bar],
+    );
+    const status = el("p", { class: "calmlens-upload__message", role: "status" });
+    const chooseAnother = el("button", {
+      type: "button",
+      class: "calmlens-button",
+      "data-variant": "outline",
+      "data-size": "small",
+    });
+    chooseAnother.addEventListener("click", () => this.#openPicker());
+    const retry = el("button", { type: "button", class: "calmlens-icon-button" }, [icon("retry")]);
+    retry.addEventListener("click", () => this.controller.retry(item.key));
+    const remove = el("button", { type: "button", class: "calmlens-icon-button" }, [
+      icon("remove"),
+    ]);
+    remove.addEventListener("click", () => this.controller.remove(item.key));
+    const element = el("li", { class: "calmlens-upload", "data-key": item.key }, [
+      thumbnail,
+      el("div", { class: "calmlens-upload__body" }, [
+        el("span", { class: "calmlens-upload__name" }, [item.file.name]),
+        el("span", { class: "calmlens-upload__size" }, [view.size]),
+        progress,
+        status,
+      ]),
+      el("div", { class: "calmlens-upload__actions" }, [chooseAnother, retry, remove]),
+    ]);
+    return { element, progress, bar, status, chooseAnother, retry, remove };
+  }
+
   #renderItems() {
     const list = this.querySelector<HTMLUListElement>(":scope > .calmlens-uploads");
     const zone = this.querySelector<HTMLElement>(":scope > .calmlens-dropzone");
     if (!list || !zone) return;
+
     const messages = resolveMessages(this.#messages);
     const snapshot = this.controller.getSnapshot();
-    const { items } = snapshot;
     const view = describeUploader(snapshot, this.controller.options, messages);
-    zone.hidden = !view.showDropzone;
-    list.hidden = items.length === 0;
-    // Rows are rebuilt on each change except their thumbnails, so previews don't flash.
-    const thumbnails = new Map(
-      [...list.querySelectorAll<HTMLElement>(".calmlens-upload")].map((row) => [
-        row.dataset.key,
-        row.querySelector(".calmlens-upload__thumb"),
-      ]),
-    );
     const disabled = this.hasAttribute("disabled");
-    list.replaceChildren(
-      ...items.map((item) => {
-        const itemView = describeUploadItem(item, messages);
-        const thumbnail =
-          thumbnails.get(item.key) ??
-          (item.previewUrl
-            ? el("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
-            : fileThumbnail(itemView.fileIcon));
-        const bar = el("div", { class: "calmlens-progress__bar" });
-        if (itemView.progressPercent !== undefined)
-          bar.style.width = `${itemView.progressPercent}%`;
-        const chooseAnother =
-          !view.showDropzone &&
-          el(
-            "button",
-            {
-              type: "button",
-              class: "calmlens-button",
-              "data-variant": "outline",
-              "data-size": "small",
-              disabled,
-            },
-            [messages.chooseAnother],
-          );
-        if (chooseAnother) chooseAnother.addEventListener("click", () => this.#openPicker());
-        const retry =
-          itemView.canRetry &&
-          el(
-            "button",
-            {
-              type: "button",
-              class: "calmlens-icon-button",
-              "aria-label": messages.retry,
-              title: messages.retry,
-            },
-            [icon("retry")],
-          );
-        if (retry) retry.addEventListener("click", () => this.controller.retry(item.key));
-        const remove = el(
-          "button",
-          {
-            type: "button",
-            class: "calmlens-icon-button",
-            "aria-label": itemView.removeLabel,
-            title: itemView.removeLabel,
-          },
-          [icon("remove")],
-        );
-        remove.addEventListener("click", () => this.controller.remove(item.key));
-        const row = el(
-          "li",
-          { class: "calmlens-upload", "data-stage": item.stage, "data-outcome": itemView.outcome },
-          [
-            thumbnail,
-            el("div", { class: "calmlens-upload__body" }, [
-              el("span", { class: "calmlens-upload__name" }, [item.file.name]),
-              el("span", { class: "calmlens-upload__size" }, [itemView.size]),
-              itemView.busy &&
-                el(
-                  "div",
-                  {
-                    class: "calmlens-progress",
-                    role: "progressbar",
-                    "aria-label": itemView.message,
-                    "aria-valuemin": 0,
-                    "aria-valuemax": 100,
-                    "aria-valuenow": itemView.progressPercent,
-                  },
-                  [bar],
-                ),
-              itemView.message &&
-                el("p", { class: "calmlens-upload__message", role: "status" }, [itemView.message]),
-            ]),
-            el("div", { class: "calmlens-upload__actions" }, [chooseAnother, retry, remove]),
-          ],
-        );
-        row.dataset.key = item.key;
-        return row;
-      }),
-    );
+    const active = this.ownerDocument.activeElement;
+    const focusIndex = [...this.#rows.values()].findIndex((row) => row.element.contains(active));
+    const pickerFocused = zone.contains(active);
+
+    zone.hidden = !view.showDropzone;
+    list.hidden = snapshot.items.length === 0;
+    // The controller appends new items and retains the order of surviving items.
+    const keys = new Set(snapshot.items.map((item) => item.key));
+    for (const [key, row] of this.#rows) {
+      if (keys.has(key)) continue;
+      row.element.remove();
+      this.#rows.delete(key);
+    }
+
+    for (const item of snapshot.items) {
+      const itemView = describeUploadItem(item, messages);
+      let row = this.#rows.get(item.key);
+      if (!row) {
+        row = this.#createRow(item, itemView);
+        this.#rows.set(item.key, row);
+        list.append(row.element);
+      }
+      row.element.dataset.stage = item.stage;
+      if (itemView.outcome) row.element.dataset.outcome = itemView.outcome;
+      else delete row.element.dataset.outcome;
+      row.progress.hidden = !itemView.busy;
+      row.progress.setAttribute("aria-label", itemView.message);
+      if (itemView.progressPercent === undefined) row.progress.removeAttribute("aria-valuenow");
+      else row.progress.setAttribute("aria-valuenow", String(itemView.progressPercent));
+      row.bar.style.width =
+        itemView.progressPercent === undefined ? "" : `${itemView.progressPercent}%`;
+      row.status.hidden = !itemView.message;
+      if (row.status.textContent !== itemView.message) row.status.textContent = itemView.message;
+      row.chooseAnother.hidden = view.showDropzone;
+      row.chooseAnother.disabled = disabled;
+      if (row.chooseAnother.textContent !== messages.chooseAnother)
+        row.chooseAnother.textContent = messages.chooseAnother;
+      row.retry.hidden = !itemView.canRetry;
+      row.retry.setAttribute("aria-label", messages.retry);
+      row.retry.title = messages.retry;
+      row.remove.setAttribute("aria-label", itemView.removeLabel);
+      row.remove.title = itemView.removeLabel;
+    }
+
+    if (pickerFocused && zone.hidden) {
+      this.#rows.values().next().value?.chooseAnother.focus();
+    } else if (
+      focusIndex >= 0 &&
+      active instanceof HTMLButtonElement &&
+      (!list.contains(active) || active.hidden || active.disabled)
+    ) {
+      const rows = [...this.#rows.values()];
+      const fallback = rows[Math.min(focusIndex, rows.length - 1)]?.remove;
+      (fallback ?? zone.querySelector("button"))?.focus();
+    }
   }
 }
 

@@ -62,6 +62,36 @@ const mockPreset = (
     }),
 });
 
+it("keeps Web Component upload controls focused through progress and moves focus after removal", async () => {
+  const uploader = document.createElement("calmlens-uploader");
+  uploader.setAttribute("multiple", "");
+  uploader.messages = messages;
+  const progress = new Map<string, (sent: number, total: number) => void>();
+  uploader.upload = (file, { onProgress, signal }) => {
+    progress.set(file.name, onProgress);
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  };
+  document.body.append(uploader);
+  try {
+    uploader.controller.addFiles([photo("first.png"), photo("second.png")]);
+    await waitFor(() => expect([...progress.keys()]).toEqual(["first.png", "second.png"]));
+    const view = within(uploader);
+    const first = view.getByRole("button", { name: "msg:cancel first.png" });
+    const second = view.getByRole("button", { name: "msg:cancel second.png" });
+    first.focus();
+    progress.get("first.png")!(1, 4);
+    progress.get("second.png")!(2, 4);
+    expect(document.activeElement).toBe(first);
+    first.click();
+    expect(view.queryByRole("button", { name: "msg:cancel first.png" })).toBeNull();
+    expect(document.activeElement).toBe(second);
+  } finally {
+    uploader.remove();
+  }
+});
+
 for (const binding of BINDINGS) {
   describe.skipIf(!binding.mountProvidedUploader)(`${binding.name} provider`, () => {
     it("gives the uploader beneath it the upload preset and client", async () => {

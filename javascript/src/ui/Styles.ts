@@ -29,7 +29,8 @@ export const CALMLENS_STYLES = `
 }
 .calmlens-uploader *, .calmlens-asset * { box-sizing: border-box; }
 .calmlens-uploader { display: grid; gap: 12px; }
-.calmlens-uploader > [hidden] { display: none; }
+.calmlens-uploader > [hidden],
+.calmlens-uploader .calmlens-upload [hidden] { display: none; }
 .calmlens-dropzone {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
   padding: 40px 24px; text-align: center;
