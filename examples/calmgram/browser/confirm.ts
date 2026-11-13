@@ -35,7 +35,9 @@ dialog?.addEventListener("close", () => {
   if (form && dialog.returnValue === "confirm") form.submit();
 });
 
-// A click on the backdrop lands on the dialog itself, outside its content.
-dialog?.addEventListener("click", (event) => {
-  if (event.target === dialog) dialog.close();
-});
+if (dialog && !("closedBy" in HTMLDialogElement.prototype)) {
+  // Older browsers need a handler for backdrop clicks.
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+}

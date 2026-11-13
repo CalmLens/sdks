@@ -234,23 +234,12 @@ export function CalmLensUploader({
                   <span className="calmlens-upload__name">{item.file.name}</span>
                   <span className="calmlens-upload__size">{itemView.size}</span>
                   {itemView.busy && (
-                    <div
+                    <progress
                       className="calmlens-progress"
-                      role="progressbar"
                       aria-label={itemView.message}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={itemView.progressPercent}
-                    >
-                      <div
-                        className="calmlens-progress__bar"
-                        style={
-                          itemView.progressPercent === undefined
-                            ? undefined
-                            : { width: `${itemView.progressPercent}%` }
-                        }
-                      />
-                    </div>
+                      max={100}
+                      value={itemView.progressPercent}
+                    />
                   )}
                   {itemView.message && (
                     <p className="calmlens-upload__message" role="status">

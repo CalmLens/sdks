@@ -346,6 +346,16 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
       expect(field.value).toBe("2");
       expect(previous.disabled).toBe(false);
 
+      field.value = "3";
+      fireEvent.keyDown(field, { key: "Enter", isComposing: true });
+      expect(next.disabled).toBe(false);
+      fireEvent.keyDown(field, { key: "Enter", keyCode: 229 });
+      expect(next.disabled).toBe(false);
+      fireEvent.keyDown(field, { key: "Enter" });
+      await waitFor(() => expect(page(mounted!.container, 3).textContent).toContain("Hello three"));
+      previous.click();
+      await waitFor(() => expect(page(mounted!.container, 2).textContent).toContain("Hello two"));
+
       fireEvent.change(field, { target: { value: "3" } });
       await waitFor(() => expect(page(mounted!.container, 3).textContent).toContain("Hello three"));
       expect(next.disabled).toBe(true);

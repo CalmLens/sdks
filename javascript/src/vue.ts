@@ -327,26 +327,12 @@ export const CalmLensUploader = defineComponent({
                     h("span", { class: "calmlens-upload__name" }, item.file.name),
                     h("span", { class: "calmlens-upload__size" }, itemView.size),
                     itemView.busy &&
-                      h(
-                        "div",
-                        {
-                          class: "calmlens-progress",
-                          role: "progressbar",
-                          "aria-label": itemView.message,
-                          "aria-valuemin": 0,
-                          "aria-valuemax": 100,
-                          "aria-valuenow": itemView.progressPercent,
-                        },
-                        [
-                          h("div", {
-                            class: "calmlens-progress__bar",
-                            style:
-                              itemView.progressPercent === undefined
-                                ? undefined
-                                : { width: `${itemView.progressPercent}%` },
-                          }),
-                        ],
-                      ),
+                      h("progress", {
+                        class: "calmlens-progress",
+                        "aria-label": itemView.message,
+                        max: 100,
+                        value: itemView.progressPercent,
+                      }),
                     itemView.message &&
                       h(
                         "p",

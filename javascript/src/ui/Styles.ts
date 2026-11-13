@@ -102,16 +102,31 @@ export const CALMLENS_STYLES = `
 .calmlens-upload__size { font-size: 0.875em; color: var(--calmlens-muted); }
 .calmlens-upload__message { font-size: 0.875em; margin: 0; }
 .calmlens-progress {
-  height: 4px; border-radius: 2px; overflow: hidden; background: var(--calmlens-border); position: relative;
+  appearance: none; display: block; inline-size: 100%; block-size: 4px;
+  border: 0; border-radius: 2px; overflow: clip; background: var(--calmlens-border);
+  container-type: inline-size;
 }
-.calmlens-progress__bar {
-  position: absolute; inset: 0 auto 0 0; background: var(--calmlens-accent); border-radius: inherit;
-  transition: width 150ms;
+.calmlens-progress::-webkit-progress-bar { background: transparent; }
+.calmlens-progress::-webkit-progress-value {
+  background: var(--calmlens-accent); border-radius: 2px; animation: var(--calmlens-progress-animation, none);
 }
-.calmlens-progress:not([aria-valuenow]) .calmlens-progress__bar {
-  width: 35%; animation: calmlens-indeterminate 1.1s ease-in-out infinite;
+.calmlens-progress::-moz-progress-bar {
+  background: var(--calmlens-accent); border-radius: 2px; animation: var(--calmlens-progress-animation, none);
 }
-@keyframes calmlens-indeterminate { from { left: -35%; } to { left: 100%; } }
+.calmlens-progress:indeterminate {
+  --calmlens-progress-animation: calmlens-indeterminate 1.1s ease-in-out infinite;
+}
+.calmlens-progress:indeterminate:where(:dir(rtl)) {
+  --calmlens-progress-animation: calmlens-indeterminate 1.1s ease-in-out infinite reverse;
+}
+@keyframes calmlens-indeterminate {
+  from, to { inline-size: 35%; margin-right: auto; }
+  from { translate: -100%; }
+  to { translate: 100cqi; }
+}
+@keyframes calmlens-indeterminate-still {
+  from, to { inline-size: 35%; margin-inline: auto; }
+}
 .calmlens-upload__actions { display: flex; gap: 8px; align-items: center; }
 .calmlens-icon-button {
   display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
@@ -119,8 +134,10 @@ export const CALMLENS_STYLES = `
 }
 .calmlens-icon-button:hover { background: color-mix(in srgb, var(--calmlens-accent) 8%, transparent); border-color: var(--calmlens-border); }
 @media (prefers-reduced-motion: reduce) {
-  .calmlens-progress__bar, .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-asset__content { transition: none; }
-  .calmlens-progress:not([aria-valuenow]) .calmlens-progress__bar { animation: none; left: 0; width: 100%; }
+  .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-asset__content { transition: none; }
+  .calmlens-progress:indeterminate {
+    --calmlens-progress-animation: calmlens-indeterminate-still 1s both;
+  }
 }
 
 .calmlens-asset {

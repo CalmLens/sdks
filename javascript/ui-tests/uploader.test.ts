@@ -256,25 +256,33 @@ for (const binding of BINDINGS) {
     });
 
     it("shows the bytes sent while a file uploads", async () => {
-      let finish = () => {};
+      const started = Promise.withResolvers<(sent: number, total: number) => void>();
+      const result = Promise.withResolvers<{ assetId: string; status: "allowed" }>();
       mounted = binding.mountUploader({
         upload: (_file, { onProgress }) => {
-          onProgress(1, 4);
-          return new Promise((resolve) => {
-            finish = () => resolve({ assetId: "a1", status: "allowed" });
-          });
+          onProgress(0, 0);
+          started.resolve(onProgress);
+          return result.promise;
         },
         messages,
       });
       binding.pick(mounted, [photo()]);
 
-      await waitFor(() =>
-        expect(
-          within(mounted!.container).getByRole("progressbar").getAttribute("aria-valuenow"),
-        ).toBe("25"),
-      );
-      finish();
-      await waitFor(() => expect(within(mounted!.container).queryByRole("progressbar")).toBeNull());
+      const progress = await started.promise;
+      const view = within(mounted.container);
+      const value = (bar: HTMLElement) =>
+        bar instanceof HTMLProgressElement
+          ? bar.position < 0
+            ? null
+            : bar.value
+          : bar.hasAttribute("aria-valuenow")
+            ? Number(bar.getAttribute("aria-valuenow"))
+            : null;
+      await waitFor(() => expect(value(view.getByRole("progressbar"))).toBeNull());
+      progress(1, 4);
+      await waitFor(() => expect(value(view.getByRole("progressbar"))).toBe(25));
+      result.resolve({ assetId: "a1", status: "allowed" });
+      await waitFor(() => expect(view.queryByRole("progressbar")).toBeNull());
     });
 
     it("uploads every file picked at once", async () => {

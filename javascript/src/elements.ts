@@ -128,8 +128,7 @@ const BaseElement = (
 
 interface UploadRow {
   element: HTMLLIElement;
-  progress: HTMLDivElement;
-  bar: HTMLDivElement;
+  progress: HTMLProgressElement;
   status: HTMLParagraphElement;
   chooseAnother: HTMLButtonElement;
   retry: HTMLButtonElement;
@@ -372,17 +371,7 @@ export class CalmLensUploaderElement extends BaseElement {
     const thumbnail = item.previewUrl
       ? el("img", { class: "calmlens-upload__thumb", src: item.previewUrl, alt: "" })
       : fileThumbnail(view.fileIcon);
-    const bar = el("div", { class: "calmlens-progress__bar" });
-    const progress = el(
-      "div",
-      {
-        class: "calmlens-progress",
-        role: "progressbar",
-        "aria-valuemin": 0,
-        "aria-valuemax": 100,
-      },
-      [bar],
-    );
+    const progress = el("progress", { class: "calmlens-progress", max: 100 });
     const status = el("p", { class: "calmlens-upload__message", role: "status" });
     const chooseAnother = el("button", {
       type: "button",
@@ -407,7 +396,7 @@ export class CalmLensUploaderElement extends BaseElement {
       ]),
       el("div", { class: "calmlens-upload__actions" }, [chooseAnother, retry, remove]),
     ]);
-    return { element, progress, bar, status, chooseAnother, retry, remove };
+    return { element, progress, status, chooseAnother, retry, remove };
   }
 
   #renderItems() {
@@ -446,10 +435,8 @@ export class CalmLensUploaderElement extends BaseElement {
       else delete row.element.dataset.outcome;
       row.progress.hidden = !itemView.busy;
       row.progress.setAttribute("aria-label", itemView.message);
-      if (itemView.progressPercent === undefined) row.progress.removeAttribute("aria-valuenow");
-      else row.progress.setAttribute("aria-valuenow", String(itemView.progressPercent));
-      row.bar.style.width =
-        itemView.progressPercent === undefined ? "" : `${itemView.progressPercent}%`;
+      if (itemView.progressPercent === undefined) row.progress.removeAttribute("value");
+      else row.progress.value = itemView.progressPercent;
       row.status.hidden = !itemView.message;
       if (row.status.textContent !== itemView.message) row.status.textContent = itemView.message;
       row.chooseAnother.hidden = view.showDropzone;

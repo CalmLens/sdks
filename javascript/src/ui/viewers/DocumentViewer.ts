@@ -176,7 +176,11 @@ class DocumentViewer extends ViewerBase<DocumentViewerOptions> {
     toolbar.insertBefore(next, count.nextSibling);
     page.addEventListener("change", () => this.#go(Number(page.value)));
     page.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") this.#go(Number(page.value));
+      if (event.key !== "Enter") return;
+      // The number input can also commit a change as Enter's default action.
+      event.preventDefault();
+      // Safari can report the IME confirmation as key code 229 after compositionend.
+      if (!event.isComposing && event.keyCode !== 229) this.#go(Number(page.value));
     });
     zoomOut.addEventListener("click", () => this.#setZoom(this.#scale / ZOOM_STEP));
     zoomIn.addEventListener("click", () => this.#setZoom(this.#scale * ZOOM_STEP));

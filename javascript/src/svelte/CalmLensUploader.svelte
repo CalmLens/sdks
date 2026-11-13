@@ -118,21 +118,17 @@
             <span class="calmlens-upload__name">{item.file.name}</span>
             <span class="calmlens-upload__size">{itemView.size}</span>
             {#if itemView.busy}
-              <div
-                class="calmlens-progress"
-                role="progressbar"
-                aria-label={itemView.message}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={itemView.progressPercent}
-              >
-                <div
-                  class="calmlens-progress__bar"
-                  style:width={itemView.progressPercent === undefined
-                    ? undefined
-                    : `${itemView.progressPercent}%`}
-                ></div>
-              </div>
+              {#if itemView.progressPercent === undefined}
+                <progress class="calmlens-progress" aria-label={itemView.message} max={100}
+                ></progress>
+              {:else}
+                <progress
+                  class="calmlens-progress"
+                  aria-label={itemView.message}
+                  max={100}
+                  value={itemView.progressPercent}
+                ></progress>
+              {/if}
             {/if}
             {#if itemView.message}
               <p class="calmlens-upload__message" role="status">{itemView.message}</p>

@@ -177,6 +177,7 @@ export const PostButton = (props: {
 const ConfirmDialog = () => (
   <dialog
     id="confirm-dialog"
+    closedby="any"
     aria-labelledby="confirm-title"
     aria-describedby="confirm-description"
     class="m-auto w-[calc(100%-32px)] max-w-[400px] rounded-xl border border-line bg-surface p-0 text-fg shadow-xl backdrop:bg-black/50"
