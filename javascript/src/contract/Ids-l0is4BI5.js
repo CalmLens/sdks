@@ -7893,6 +7893,40 @@ const metaStore = (meta) => {
 	}
 	module.exports = escapeString;
 })))();
+// packages/zodbase/src/ZodUtils.ts
+const isZodTypeExtends = (type, zodType) => {
+	if (type instanceof zodType) return type;
+	if (type.def.type === "union") {
+		for (const option of type.def.options) if (isZodTypeExtends(option, zodType)) return option;
+		return false;
+	}
+	const rootType = type.def.innerType ?? type.def.in;
+	if (rootType) return isZodTypeExtends(rootType, zodType);
+	return false;
+};
+createMetaType({
+	id: "foreignKey",
+	check: (type) => {
+		if (isZodTypeExtends(type, zod.ZodString) || isZodTypeExtends(type, zod.ZodNumber)) return { success: true };
+		return {
+			success: false,
+			message: "Foreign key must be a string or number"
+		};
+	}
+});
+createMetaType({
+	id: "primaryKey",
+	check: (type) => {
+		if (isZodTypeExtends(type, zod.ZodString) || isZodTypeExtends(type, zod.ZodNumber)) return { success: true };
+		return {
+			success: false,
+			message: "Primary key must be a string or number"
+		};
+	}
+});
+createMetaType({ id: "updatedAt" });
+createMetaType({ id: "monotonicTimestamp" });
+createMetaType({ id: "backfill" });
 // packages/zodbase/src/index.browser.ts
 const noop = () => {};
 const primaryKey = noop;
