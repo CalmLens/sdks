@@ -16,8 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - run: python -m pip install ./python
-      - run: python -m unittest discover -v
+      - name: Install SDK
+        run: python -m pip install ./python
+      - name: Tests
+        run: python -m unittest discover -v
         working-directory: examples/link-board-python
   go:
     runs-on: ubuntu-latest
@@ -30,10 +32,14 @@ jobs:
         with:
           go-version: 1.25.x
           cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go test -race ./...
-      - run: go vet ./...
-      - run: go build -o /tmp/calmlens-voice-clips .
+      - name: Format Check
+        run: test -z "$(gofmt -l .)"
+      - name: Tests
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build -o /tmp/calmlens-voice-clips .
   ruby-example:
     runs-on: ubuntu-latest
     defaults:
@@ -46,7 +52,8 @@ jobs:
           ruby-version: "3.3"
           working-directory: examples/comment-thread-ruby
           bundler-cache: true
-      - run: bundle exec ruby -W app_test.rb
+      - name: Tests
+        run: bundle exec ruby -W app_test.rb
   java-example:
     runs-on: ubuntu-latest
     steps:
@@ -68,11 +75,15 @@ jobs:
         working-directory: examples/media-library-rust
     steps:
       - uses: actions/checkout@v4
-      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Install Toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
           --component clippy
-      - run: cargo +stable fmt --check
-      - run: cargo +stable test --locked
-      - run: cargo +stable clippy --locked --all-targets -- -D warnings
+      - name: Format Check
+        run: cargo +stable fmt --check
+      - name: Tests
+        run: cargo +stable test --locked
+      - name: Clippy
+        run: cargo +stable clippy --locked --all-targets -- -D warnings
   javascript:
     runs-on: ubuntu-latest
     steps:
@@ -85,26 +96,36 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run --cwd javascript build
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build SDK
+        run: bun run --cwd javascript build
+      - name: Install Calmgram
+        run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/calmgram
-      - run: bun run check && bun run build && bun run test
+      - name: Calmgram
+        run: bun run check && bun run build && bun run test
         working-directory: examples/calmgram
-      - run: bun run sdk && bun run test
+      - name: Feedback Form
+        run: bun run sdk && bun run test
         working-directory: examples/feedback-form-static
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install Mobile Uploads
+        run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/mobile-uploads-expo
-      - run: |
+      - name: Mobile Uploads
+        run: |
           bun run check
           bun run test
           bunx --no-install expo export --platform ios --platform android
         working-directory: examples/mobile-uploads-expo
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install UI Components
+        run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/ui-components
-      - run: bun run check
+      - name: UI Components Check
+        run: bun run check
         working-directory: examples/ui-components
-      - run: bun run build
+      - name: UI Components Build
+        run: bun run build
         working-directory: examples/ui-components
 
   widget-playground:
@@ -122,15 +143,21 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
         working-directory: .
-      - run: bun run --cwd javascript build
+      - name: Build SDK
+        run: bun run --cwd javascript build
         working-directory: .
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run check && bun run build
-      - run: bunx playwright install --with-deps chromium firefox webkit
+      - name: Install Playground
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Check and Build
+        run: bun run check && bun run build
+      - name: Install Browsers
+        run: bunx playwright install --with-deps chromium firefox webkit
       # Every library tab against the mock API and CDN, in Chromium, Firefox and WebKit.
-      - run: bun run test:e2e
+      - name: E2E Tests
+        run: bun run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -150,9 +177,12 @@ jobs:
           tools: composer:v2
           extensions: curl, mbstring, dom, xml, xmlwriter
           coverage: none
-      - run: composer validate --strict
-      - run: composer install --no-interaction --prefer-dist
-      - run: composer test
+      - name: Validate
+        run: composer validate --strict
+      - name: Install
+        run: composer install --no-interaction --prefer-dist
+      - name: Tests
+        run: composer test
 
   php-chirp:
     runs-on: ubuntu-latest
@@ -167,6 +197,9 @@ jobs:
           tools: composer:v2
           extensions: curl, mbstring, dom, xml, xmlwriter, fileinfo, gd
           coverage: none
-      - run: composer validate --strict
-      - run: composer install --no-interaction --prefer-dist
-      - run: composer test
+      - name: Validate
+        run: composer validate --strict
+      - name: Install
+        run: composer install --no-interaction --prefer-dist
+      - name: Tests
+        run: composer test

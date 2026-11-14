@@ -21,10 +21,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.3"
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run release:check
-      - run: bun run release:test
-      - run: node --test scripts/check-sdk-release-tag.test.mjs
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Release Check
+        run: bun run release:check
+      - name: Release Tests
+        run: bun run release:test
+      - name: Release Tag Tests
+        run: node --test scripts/check-sdk-release-tag.test.mjs
   python:
     runs-on: ubuntu-latest
     strategy:
@@ -37,13 +41,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install ./python
-      - run: python -m unittest discover -s python/tests -v
+      - name: Install SDK
+        run: python -m pip install ./python
+      - name: Unit Tests
+        run: python -m unittest discover -s python/tests -v
       - name: Type-check (mypy --strict)
         if: matrix.python == '3.14'
         working-directory: python
         run: python -m pip install mypy==2.4.0 && python -m mypy
-      - run: python -m pip wheel --no-deps ./python --wheel-dir /tmp/calmlens-dist
+      - name: Build Wheel
+        run: python -m pip wheel --no-deps ./python --wheel-dir /tmp/calmlens-dist
   go:
     runs-on: ubuntu-latest
     strategy:
@@ -60,9 +67,12 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go test -race ./...
-      - run: go vet ./...
+      - name: Format Check
+        run: test -z "$(gofmt -l .)"
+      - name: Tests
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
   javascript:
     runs-on: ubuntu-latest
     strategy:
@@ -80,16 +90,23 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run --cwd javascript check
-      - run: bun run --cwd javascript test
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Check
+        run: bun run --cwd javascript check
+      - name: Tests
+        run: bun run --cwd javascript test
       # The React, Vue, Svelte and web component bindings, with the UI libraries installed apart.
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install UI Tests
+        run: bun install --frozen-lockfile --ignore-scripts
         working-directory: javascript/ui-tests
-      - run: bun run check && bun run test
+      - name: UI Tests
+        run: bun run check && bun run test
         working-directory: javascript/ui-tests
-      - run: bun run --cwd javascript build
-      - run: >
+      - name: Build
+        run: bun run --cwd javascript build
+      - name: Import Check
+        run: >
           node -e "const { CalmLensServerClient } =
           require('@calmlens/sdk/server'); new CalmLensServerClient({ apiKey:
           'k', projectId: 'p' })"
@@ -119,7 +136,8 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: maven
-      - run: mvn -B verify
+      - name: Verify
+        run: mvn -B verify
         working-directory: java
   rust:
     runs-on: ubuntu-latest
@@ -130,21 +148,28 @@ jobs:
           - stable
     steps:
       - uses: actions/checkout@v4
-      - run: rustup toolchain install ${{ matrix.rust }} --profile minimal --component
+      - name: Install Toolchain
+        run: rustup toolchain install ${{ matrix.rust }} --profile minimal --component
           rustfmt --component clippy
-      - run: cargo +${{ matrix.rust }} fmt --check
+      - name: Format Check
+        run: cargo +${{ matrix.rust }} fmt --check
         working-directory: rust
-      - run: cargo +${{ matrix.rust }} test --locked
+      - name: Tests
+        run: cargo +${{ matrix.rust }} test --locked
         working-directory: rust
-      - run: cargo +${{ matrix.rust }} clippy --locked --all-targets -- -D warnings
+      - name: Clippy
+        run: cargo +${{ matrix.rust }} clippy --locked --all-targets -- -D warnings
         working-directory: rust
-      - run: cargo +${{ matrix.rust }} clippy --locked --no-default-features -- -D
+      - name: Clippy Without Default Features
+        run: cargo +${{ matrix.rust }} clippy --locked --no-default-features -- -D
           warnings
         working-directory: rust
-      - run: cargo +${{ matrix.rust }} clippy --locked --no-default-features --features
+      - name: Clippy Blocking Native TLS
+        run: cargo +${{ matrix.rust }} clippy --locked --no-default-features --features
           blocking,native-tls -- -D warnings
         working-directory: rust
-      - run: cargo +${{ matrix.rust }} doc --locked --no-deps --features
+      - name: Docs
+        run: cargo +${{ matrix.rust }} doc --locked --no-deps --features
           blocking,testing
         working-directory: rust
         env:
@@ -162,15 +187,19 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-      - run: bundle install
+      - name: Install
+        run: bundle install
         working-directory: ruby
-      - run: bundle exec ruby -W -Ilib -e 'Dir["test/*_test.rb"].sort.each { |file|
+      - name: Tests
+        run: bundle exec ruby -W -Ilib -e 'Dir["test/*_test.rb"].sort.each { |file|
           require_relative file }'
         working-directory: ruby
-      - run: bundle exec rubocop
+      - name: Rubocop
+        run: bundle exec rubocop
         if: matrix.ruby == '4.0'
         working-directory: ruby
-      - run: >
+      - name: Gem Install Check
+        run: >
           gem build calmlens.gemspec -o calmlens.gem && gem install
           ./calmlens.gem && ruby -rcalmlens -e
           'CalmLens::ServerClient.new(api_key: "test", project_id:
@@ -196,10 +225,15 @@ jobs:
           tools: composer:v2
           extensions: curl, mbstring, dom, xml, xmlwriter
           coverage: none
-      - run: composer validate --strict && composer validate --strict ../composer.json
-      - run: |
+      - name: Validate
+        run: composer validate --strict && composer validate --strict ../composer.json
+      - name: Install Guzzle
+        run: |
           composer update --no-interaction --prefer-dist --with-all-dependencies --with "guzzlehttp/guzzle:^${{ matrix.guzzle }}.0"
           composer show guzzlehttp/guzzle | grep -E '^versions +: \* ${{ matrix.guzzle }}\.'
-      - run: composer check
-      - run: composer test
-      - run: composer archive --format=zip --dir=/tmp/calmlens-php-dist
+      - name: Check
+        run: composer check
+      - name: Tests
+        run: composer test
+      - name: Archive
+        run: composer archive --format=zip --dir=/tmp/calmlens-php-dist
