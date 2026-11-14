@@ -1,5 +1,12 @@
 # @calmlens/sdk-rust
 
+## 0.26.1
+
+### Patch Changes
+
+- eb7f1f8: Contains the changes listed under 0.26.0, which this release is the first to publish to the
+  package registry.
+
 ## 0.26.0
 
 ### Minor Changes
