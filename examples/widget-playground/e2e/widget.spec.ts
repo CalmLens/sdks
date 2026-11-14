@@ -64,10 +64,11 @@ for (const tab of TABS) {
         const state = window as unknown as { partialProgress: number[] };
         state.partialProgress = [];
         new MutationObserver(() => {
-          for (const bar of document.querySelectorAll(
-            "[role=tabpanel] [role=progressbar][aria-valuenow]",
+          // The uploader's native progress bar is determinate once it has a value.
+          for (const bar of document.querySelectorAll<HTMLProgressElement>(
+            "[role=tabpanel] progress[value]",
           )) {
-            const value = Number(bar.getAttribute("aria-valuenow"));
+            const value = (bar.value / bar.max) * 100;
             if (value > 0 && value < 100 && value !== state.partialProgress.at(-1))
               state.partialProgress.push(value);
           }
@@ -75,7 +76,7 @@ for (const tab of TABS) {
           subtree: true,
           childList: true,
           attributes: true,
-          attributeFilter: ["aria-valuenow"],
+          attributeFilter: ["value"],
         });
       });
 
