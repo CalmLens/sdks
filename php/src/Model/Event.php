@@ -41,7 +41,6 @@ final class Event extends CalmLensObject
     public const TYPE_ASSET_DELETED = 'asset.deleted';
     public const TYPE_ASSET_CONTENT_REMOVED = 'asset.content-removed';
     public const TYPE_ASSET_RETRIED = 'asset.retried';
-    public const TYPE_ASSET_RERUN_REQUESTED = 'asset.rerun-requested';
     public const TYPE_ASSET_REVIEW_REQUESTED = 'asset.review-requested';
     public const TYPE_ASSET_REVIEW_COMPLETED = 'asset.review-completed';
     public const TYPE_ASSET_HASH_MATCHED = 'asset.hash-matched';

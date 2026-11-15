@@ -230,8 +230,6 @@ export type MockModerationTrigger =
   | "upload"
   /** `assets.retry` queued a failed asset again. */
   | "retry"
-  /** `assets.explain` with `rerun: true` queued the asset again. */
-  | "rerun"
   /** `completeProcessing(assetId)` finished processing without a decision of its own. */
   | "complete";
 
@@ -244,14 +242,14 @@ export interface MockModerationInput {
   trigger: MockModerationTrigger;
   /**
    * `true` when the API would queue the work rather than answer with the decision: queued
-   * uploads, retries, reruns and `completeProcessing`.
+   * uploads, retries and `completeProcessing`.
    */
   queued: boolean;
 }
 
 /**
  * Decides an asset the mock moderates: a status or a `mockDecision(...)`, or a promise of one.
- * Without it, queued uploads, retries and reruns stay `pending` and everything else is `allowed`.
+ * Without it, queued uploads and retries stay `pending` and everything else is `allowed`.
  */
 export type MockModerate = (
   input: MockModerationInput,

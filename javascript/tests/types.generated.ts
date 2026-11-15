@@ -109,13 +109,6 @@ type T_assets_retry___schema0 =
   | null
   | T_assets_retry___schema0[]
   | { [key: string]: T_assets_retry___schema0 };
-type T_assets_explain___schema0 =
-  | string
-  | number
-  | boolean
-  | null
-  | T_assets_explain___schema0[]
-  | { [key: string]: T_assets_explain___schema0 };
 type T_assets_decide___schema0 =
   | string
   | number
@@ -1601,49 +1594,6 @@ export function checkTypes(): void {
   >();
   noMismatches<
     InputDifferences<
-      Options<CalmLensServerClient["assets"]["explain"]>,
-      { assetId: string; rerun?: boolean },
-      "assets.explain options $"
-    >
-  >();
-  noMismatches<
-    Differences<
-      Result<CalmLensServerClient["assets"]["explain"]>,
-      {
-        id: string;
-        projectId: string;
-        parentId?: string | null;
-        folderId?: string | null;
-        uploadPresetId?: string | null;
-        createdAt: number;
-        updatedAt?: number;
-        type:
-          | "image"
-          | "video"
-          | "audio"
-          | "plaintext-document"
-          | "multimedia-document"
-          | "website"
-          | "file";
-        name: string;
-        description?: string | null;
-        externalId?: string | null;
-        externalUrl?: string | null;
-        authorId?: string | null;
-        context?: T_shared_2 | null;
-        parentPages: number[];
-        metadata: { id: string; value: T_assets_explain___schema0 }[];
-        tags: string[];
-        visibility: "public" | "private";
-        upload: T_shared_3;
-        classification: T_shared_4;
-        content: T_shared_36;
-      },
-      "assets.explain result $"
-    >
-  >();
-  noMismatches<
-    InputDifferences<
       Options<CalmLensServerClient["assets"]["decide"]>,
       {
         assetId: string;
@@ -1834,7 +1784,6 @@ export function checkTypes(): void {
           | "asset.deleted"
           | "asset.content-removed"
           | "asset.retried"
-          | "asset.rerun-requested"
           | "asset.review-requested"
           | "asset.review-completed"
           | "asset.hash-matched"
@@ -2180,29 +2129,6 @@ export function checkTypes(): void {
               facts: (
                 | { key: "asset-name"; value: string | null; url?: string }
                 | T_shared_48
-                | { key: "test"; value: boolean; url?: string }
-              )[];
-              createdAt: number;
-            }
-          | {
-              id: string;
-              projectId: string;
-              actor: { type: "user" | "api-key" | "automated" | "system"; id: string | null };
-              type: "asset.rerun-requested";
-              severity: "low" | "high";
-              title: string;
-              description?: string | null;
-              assetId?: string | null;
-              assetSequence?: number | null;
-              asset?: T_shared_45 | null;
-              facts: (
-                | { key: "asset-name"; value: string | null; url?: string }
-                | T_shared_48
-                | {
-                    key: "moderation-status";
-                    value: "allowed" | "limited" | "age-restricted" | "blocked" | "purged";
-                    url?: string;
-                  }
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2583,7 +2509,6 @@ export function checkTypes(): void {
           | "asset.deleted"
           | "asset.content-removed"
           | "asset.retried"
-          | "asset.rerun-requested"
           | "asset.review-requested"
           | "asset.review-completed"
           | "asset.hash-matched"

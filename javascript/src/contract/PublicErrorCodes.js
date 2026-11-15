@@ -1,11 +1,11 @@
-// node_modules/sendable-error/esm/Consts.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
-// node_modules/sendable-error/esm/Utils.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
-// node_modules/sendable-error/esm/ErrorCode.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -52,7 +52,7 @@ var ErrorCode = class ErrorCode {
 		return this.getId();
 	}
 };
-// node_modules/sendable-error/esm/Logging.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -69,7 +69,7 @@ let currentLogger = defaultErrorLogger;
 const getErrorLogger = () => {
 	return currentLogger;
 };
-// node_modules/sendable-error/esm/SendableError.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;
@@ -608,21 +608,6 @@ const PUBLIC_ERROR_CODES = {
 	ASSET_CONTENT_PURGED: new ErrorCode({
 		id: "asset/content-purged",
 		defaultMessage: "This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.",
-		status: 409
-	}),
-	ASSET_NOT_DECIDED: new ErrorCode({
-		id: "asset/not-decided",
-		defaultMessage: "This asset has no automatic moderation decision to explain yet.",
-		status: 409
-	}),
-	ASSET_POLICY_CHANGED: new ErrorCode({
-		id: "asset/policy-changed",
-		defaultMessage: "The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.",
-		status: 409
-	}),
-	ASSET_REVIEWED: new ErrorCode({
-		id: "asset/reviewed",
-		defaultMessage: "A reviewer has decided this asset, so its moderation can't be re-run.",
 		status: 409
 	}),
 	SUPPORT_TICKET_NOT_FOUND: new ErrorCode({

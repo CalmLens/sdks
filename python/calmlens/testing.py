@@ -75,10 +75,9 @@ _MOCK_OUTCOMES = ("pending", "failed", "allowed", "limited", "age-restricted", "
 #: removes the content).
 MockAssetOutcome = Literal["pending", "failed", "allowed", "limited", "age-restricted", "blocked", "purged"]
 #: Why the mock is moderating an asset: ``upload`` (``assets.create``, ``assets.classify``,
-#: ``text.classify`` or a final multipart part), ``retry`` (``assets.retry``), ``rerun``
-#: (``assets.explain`` with ``rerun=True``) or ``complete`` (``complete_processing`` without a
-#: decision of its own).
-MockModerationTrigger = Literal["upload", "retry", "rerun", "complete"]
+#: ``text.classify`` or a final multipart part), ``retry`` (``assets.retry``) or ``complete``
+#: (``complete_processing`` without a decision of its own).
+MockModerationTrigger = Literal["upload", "retry", "complete"]
 
 #: Why a decision waits for human review: ``sampled``, or ``uncertain`` about some categories.
 MockPendingReviewReason = Literal["sampled", "uncertain"]
@@ -230,13 +229,12 @@ class MockModerationContent:
 @dataclass(frozen=True)
 class MockModerationInput:
     """What ``mock_options["moderate"]`` receives for each asset the mock moderates."""
-    #: A copy of the asset as stored: still processing, or for a re-run, with the decision it keeps
-    #: until this one replaces it.
+    #: A copy of the asset as stored, still processing.
     asset: Asset
     content: MockModerationContent
     trigger: MockModerationTrigger
     #: True when the API would queue the work rather than answer with the decision: queued
-    #: uploads, retries, reruns and ``complete_processing``.
+    #: uploads, retries and ``complete_processing``.
     queued: bool
 
 
@@ -662,11 +660,9 @@ class MockOptions(TypedDict, total=False):
     now: Callable[[], int]
     #: Decides each asset the mock moderates, given a :class:`MockModerationInput`: return a
     #: status or a ``mock_decision(...)``. Called when an upload completes (trigger ``upload``),
-    #: on ``assets.retry`` (``retry``), ``assets.explain`` with ``rerun=True`` (``rerun``) and
-    #: ``complete_processing`` without a decision (``complete``). Defaults to
-    #: :func:`default_moderate`: queued work stays ``pending`` and everything else is ``allowed``.
-    #: A ``pending`` re-run keeps the asset's decision until ``complete_processing``, and a
-    #: ``failed`` one keeps it.
+    #: on ``assets.retry`` (``retry``) and ``complete_processing`` without a decision
+    #: (``complete``). Defaults to :func:`default_moderate`: queued work stays ``pending`` and
+    #: everything else is ``allowed``.
     moderate: MockModerate
 
 
@@ -709,7 +705,7 @@ _OPERATIONS = frozenset({
     "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
     "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.iterateTimeline", "assets.create",
     "assets.classify", "assets.uploadPart",
-    "assets.move", "assets.retry", "assets.explain", "assets.decide",
+    "assets.move", "assets.retry", "assets.decide",
     "assets.removeContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list",
     "events.pages", "folders.list", "folders.iterate", "folders.retrieve", "folders.create", "folders.update",
     "folders.delete", "folders.move", "hashLists.list", "hashLists.iterate", "hashLists.retrieve", "hashLists.create",
@@ -1130,9 +1126,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._requests: list[MockRequest] = []
         self._errors: list[BaseException] = []
         self._pending_failures: list[_PendingFailure] = []
-        # Decided assets whose re-run (``assets.explain`` with ``rerun=True``) is still queued: they
-        # keep their decision until ``complete_processing`` decides them.
-        self._reruns: set[str] = set()
         self._grants = _grants_of(self.api_key)
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
@@ -1245,21 +1238,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
         A decided asset gets its report and the ``asset.classified`` and ``asset.<status>``
         events; ``failed`` records ``asset.failed``. No manual review is recorded. Raises
         ``asset/not-found`` for an unknown asset and ``sdk/invalid-argument`` for one that isn't
-        processing. A decided asset whose re-run is still queued counts as processing: the decision
-        replaces its old one, unless it is ``pending`` or ``failed``."""
+        processing."""
         with self._state_lock:
             asset = self.database_storage.assets.get(asset_id)
             if not asset or asset["projectId"] != self.project_id:
                 raise _error(error_codes.ASSET_NOT_FOUND, "Asset not found",
                                     status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
-            rerun = asset_id in self._reruns
-            if not rerun and asset["classification"]["status"] != "processing":
+            if asset["classification"]["status"] != "processing":
                 raise _invalid(f"asset {asset_id} isn't processing")
-            settled = None if decision is None else _to_decision(decision)
-            if rerun:
-                self._settle_rerun(asset, "complete", settled)
-            else:
-                self._moderate_stored(asset, "complete", settled)
+            self._moderate_stored(asset, "complete", None if decision is None else _to_decision(decision))
             return Asset(asset)
 
     def set_api_key_grants(self, grants: list[MockApiKeyGrant]) -> None:
@@ -1320,8 +1307,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
         review, then (for ``purged``) the content removal and its event, then ``asset.<decision>``.
         Either way the review is the mock API key's, which has no ID; the event's actor is the API
         key for a decision through the API and a reviewer for the test hook's."""
-        # Like the API: a queued re-run no longer replaces a reviewed decision.
-        self._reruns.discard(record["id"])
         self._apply_outcome(record, decision, "requested")
         now = self.now()
         # Like the API: the human review queue's decision settles its review, one through the API
@@ -1488,7 +1473,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 else ["assets." + by_method.get(method, "")]
         return {"content": ["assets.removeContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
                 "part": ["assets.uploadPart"], "move": ["assets.move"],
-                "retry": ["assets.retry"], "explain": ["assets.explain"],
+                "retry": ["assets.retry"],
                 "decision": ["assets.decide"]}.get(suffix, [])
 
     def _serve(self, request: TransportRequest, timeout: float) -> _Response:
@@ -2003,18 +1988,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._decided(asset, settled)
         self._record_processing_events(asset, settled)
 
-    def _settle_rerun(self, asset: dict[str, Any], trigger: MockModerationTrigger,
-                      decision: MockDecision | None = None) -> None:
-        """Apply a re-run's decision to a decided asset like the pipeline: ``pending`` stays queued
-        for ``complete_processing``, ``failed`` keeps the asset's decision, and any other replaces it
-        with the pipeline's events."""
-        settled = decision if decision is not None else self._decision_for(asset, trigger, True)
-        self._reruns.discard(asset["id"])
-        if settled.status == "pending":
-            self._reruns.add(asset["id"])
-        elif settled.status != "failed":
-            self._moderate_stored(asset, trigger, settled)
-
     def _record_uploaded(self, asset: Mapping[str, Any], snapshot: dict[str, Any]) -> None:
         """``asset.uploaded``, as the API records it when an upload completes, with the asset as
         it was before moderation."""
@@ -2151,28 +2124,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return asset
         if suffix == "decision":
             return self._decide_request(asset, body)
-        if suffix == "explain":
-            if asset["classification"]["status"] != "completed":
-                raise _Failure(error_codes.ASSET_NOT_DECIDED)
-            moderation = asset["classification"]["moderation"]
-            if not body.get("rerun"):
-                # Like the API: the evidence is completed and every action stays as decided.
-                if moderation.get("explanationComplete") is False:
-                    moderation["explanationComplete"] = True
-                    asset["updatedAt"] = now
-                return asset
-            if moderation.get("manualReviews"):
-                raise _Failure(error_codes.ASSET_REVIEWED)
-            if asset["content"]["status"] == "removed":
-                raise _Failure(error_codes.ASSET_CONTENT_UNAVAILABLE)
-            # Like the API: the request is recorded, and the asset returns as it was. It keeps its
-            # decision while it's moderated again under the current policy.
-            self.enqueue_event("asset.rerun-requested", asset_id=asset["id"], facts=([
-                _asset_name_fact(asset), {"key": "asset-type", "value": asset["type"]},
-                {"key": "moderation-status", "value": moderation["decision"]}]))
-            response = copy.deepcopy(asset)
-            self._settle_rerun(asset, "rerun")
-            return response
         if suffix == "move":
             if body["folderId"]:
                 self._folder(body["folderId"])

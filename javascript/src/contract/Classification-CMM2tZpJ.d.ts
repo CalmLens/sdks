@@ -1072,7 +1072,12 @@ declare const CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA: z.ZodEnum<{
   unavailable: "unavailable";
 }>;
 type ClassificationNotEvaluatedReason = z.infer<typeof CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA>;
-declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
+/**
+ * Qualifier results keyed by qualifier. Keys from removed or renamed qualifiers are dropped rather
+ * than failing the report; known keys are still validated. Typed as the strict schema: the filter
+ * changes neither the accepted shape of known keys nor the JSON schema.
+ */
+declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "criminal-activity-alcohol": "criminal-activity-alcohol";
   "criminal-activity-coded-incitement": "criminal-activity-coded-incitement";
   "criminal-activity-csam": "criminal-activity-csam";
@@ -1229,12 +1234,6 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
     unavailable: "unavailable";
   }>;
 }, z.core.$strict>], "status">>;
-/**
- * Qualifier results keyed by qualifier. Keys from removed or renamed qualifiers are dropped rather
- * than failing the report; known keys are still validated. Typed as the strict schema: the filter
- * changes neither the accepted shape of known keys nor the JSON schema.
- */
-declare const CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA: typeof STRICT_QUALIFIER_RESULTS_SCHEMA;
 type ClassificationQualifierResults = z.infer<typeof CLASSIFICATION_QUALIFIER_RESULTS_SCHEMA>;
 declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.ZodObject<{
   status: z.ZodLiteral<"evaluated">;

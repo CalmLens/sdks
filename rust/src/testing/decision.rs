@@ -400,19 +400,16 @@ pub enum MockModerationTrigger {
     Upload,
     /// `assets().retry` queued a failed asset again.
     Retry,
-    /// `assets().explain` with `rerun` queued the asset again.
-    Rerun,
     /// [`complete_processing`](super::MockServerClient::complete_processing) finished processing
     /// without a decision of its own.
     Complete,
 }
 impl MockModerationTrigger {
-    /// `upload`, `retry`, `rerun` or `complete`.
+    /// `upload`, `retry` or `complete`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Upload => "upload",
             Self::Retry => "retry",
-            Self::Rerun => "rerun",
             Self::Complete => "complete",
         }
     }
@@ -441,7 +438,7 @@ pub struct MockModerationInput {
     /// Why it is being moderated.
     pub trigger: MockModerationTrigger,
     /// `true` when the API would queue the work rather than answer with the decision: queued
-    /// uploads, retries, reruns and `complete`.
+    /// uploads, retries and `complete`.
     pub queued: bool,
 }
 impl MockModerationInput {

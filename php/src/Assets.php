@@ -223,28 +223,6 @@ final class Assets extends Resource
     }
 
     /**
-     * Completes the policy evidence behind a decided asset's moderation decision: the report's
-     * `classification.moderation.explanationComplete` becomes `true` and every action stays as decided.
-     * With `'rerun' => true` the asset is moderated again with the project's current policy and an
-     * `asset.rerun-requested` event is recorded; use it when the policy changed since the decision
-     * (`asset/policy-changed`). The asset returns unchanged: it keeps its decision until the
-     * re-run's is stored, reported by `asset.classified` and `asset.<status>` events, and a failed
-     * re-run keeps it. A reviewed asset fails with `asset/reviewed`, and one whose content is gone
-     * with `asset/content-unavailable`.
-     *
-     * @param array{assetId: string, rerun?: bool} $params
-     * @param RequestOptions $requestOptions
-     * @return Asset
-     */
-    public function explain(array $params, array $requestOptions = []): Asset
-    {
-        [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        $path = $this->path($api, 'assets', 'assetId');
-        $body = !empty($api['rerun']) ? ['rerun' => true] : new \stdClass();
-        return $this->model(Asset::class, $this->session->request('POST', $path . '/explain', body: $body, options: $request));
-    }
-
-    /**
      * Removes the asset's stored content, including the original, rendered files, extracted text
      * and placeholder, and keeps the asset record, metadata and classification results. The
      * returned asset has `content.status` `removed` and `content.removalReason` `requested`; the

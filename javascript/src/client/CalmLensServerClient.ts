@@ -58,7 +58,6 @@ import type {
   EnsureMetadataFieldsOptions,
   EnsureUploadPresetsOptions,
   EnsureUploadPresetsResponse,
-  ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
   GetAssetInfoOptions,
@@ -756,32 +755,6 @@ export default class CalmLensServerClient {
           "POST",
           `/assets/${requireId(assetId, "Asset ID")}/decision`,
           { body },
-        );
-      },
-
-      /**
-       * Completes the policy evidence behind a decided asset's moderation decision: its
-       * `classification.moderation.explanationComplete` becomes `true` and every action stays as
-       * decided. With `rerun: true` the asset is moderated again with the project's current policy
-       * and an `asset.rerun-requested` event is recorded; use it when the policy has changed since
-       * the decision (`asset/policy-changed`). The asset returns unchanged: it keeps its decision
-       * until the re-run's is stored, reported by `asset.classified` and `asset.<status>` events,
-       * and a failed re-run keeps it. A reviewed asset fails with `asset/reviewed`, and one whose
-       * content is gone with `asset/content-unavailable`.
-       */
-      explain: async (
-        options: ExplainAssetOptions,
-        requestOptions?: RequestOptions,
-      ): Promise<CalmLensResponse<Asset>> => {
-        const { assetId, rerun } = checked("assets.explain", options);
-        return this.#send(
-          "assets.explain",
-          requestOptions,
-          "POST",
-          `/assets/${requireId(assetId, "Asset ID")}/explain`,
-          {
-            body: rerun ? { rerun } : {},
-          },
         );
       },
 

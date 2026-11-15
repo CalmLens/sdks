@@ -1,2 +1,2 @@
-import { t as UploadPreset } from "./UploadPreset-BE_IH6Ym.js";
+import { t as UploadPreset } from "./UploadPreset-Cj1V2snD.js";
 export type { UploadPreset };

@@ -130,12 +130,6 @@ error_codes! {
     AssetContentUnavailable = "asset/content-unavailable", 409;
     /// `asset/content-purged` (HTTP 409): This asset's content was purged, so it can only be blocked. Upload it again to have it moderated afresh.
     AssetContentPurged = "asset/content-purged", 409;
-    /// `asset/not-decided` (HTTP 409): This asset has no automatic moderation decision to explain yet.
-    AssetNotDecided = "asset/not-decided", 409;
-    /// `asset/policy-changed` (HTTP 409): The project's moderation policy has changed since this decision, so it can't be explained as made. Re-run moderation with the current policy instead.
-    AssetPolicyChanged = "asset/policy-changed", 409;
-    /// `asset/reviewed` (HTTP 409): A reviewer has decided this asset, so its moderation can't be re-run.
-    AssetReviewed = "asset/reviewed", 409;
     /// `support-ticket/not-found` (HTTP 404): Support ticket not found.
     SupportTicketNotFound = "support-ticket/not-found", 404;
     /// `asset/duplicate-external-id` (HTTP 409): An asset with this externalId already exists in the project.

@@ -568,8 +568,6 @@ string_enum! {
         AssetContentRemoved = "asset.content-removed",
         /// `asset.retried`.
         AssetRetried = "asset.retried",
-        /// `asset.rerun-requested`.
-        AssetRerunRequested = "asset.rerun-requested",
         /// `asset.review-requested`.
         AssetReviewRequested = "asset.review-requested",
         /// A queued review completed, including confirmations.
@@ -1967,49 +1965,6 @@ impl UpdateAsset {
     /// Clears `visibility`: sends `null`, where leaving it out keeps the current value.
     pub fn clear_visibility(mut self) -> Self {
         self.visibility = Patch::Null;
-        self
-    }
-}
-
-/// Options for [`AssetsClient::explain`](crate::AssetsClient::explain).
-#[cfg_attr(
-    feature = "strict-contract",
-    macro_rules_attribute::macro_rules_derive(described)
-)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct ExplainAsset {
-    /// The asset ID.
-    #[serde(skip_serializing)]
-    pub asset_id: String,
-    /// Moderates the asset again with the project's current policy instead of explaining the
-    /// decision as made.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub rerun: bool,
-}
-impl ExplainAsset {
-    /// Every field empty, for the constructors to fill in.
-    #[allow(dead_code)]
-    pub(crate) fn blank() -> Self {
-        Self {
-            asset_id: Default::default(),
-            rerun: Default::default(),
-        }
-    }
-}
-impl ExplainAsset {
-    /// Options with `asset_id`; set the rest with the methods below.
-    pub fn new(asset_id: impl Into<String>) -> Self {
-        Self {
-            asset_id: asset_id.into(),
-            rerun: Default::default(),
-        }
-    }
-    /// Moderates the asset again with the project's current policy instead of explaining the
-    /// decision as made.
-    pub fn rerun(mut self, value: bool) -> Self {
-        self.rerun = value;
         self
     }
 }
@@ -3669,7 +3624,7 @@ pub struct PolicyRuleSnapshot {
     pub action: FlaggedContentAction,
 }
 
-/// Historical category settings for explaining the decision.
+/// The category settings recorded with the decision.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)

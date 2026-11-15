@@ -284,27 +284,6 @@ public final class CalmLensServerClientAsync {
     public CompletableFuture<Asset> decide(String assetId, AssetDecideParams params, @Nullable RequestOptions requestOptions) { return run(() -> sync.assets().decide(assetId, params, requestOptions)); }
 
     /**
-     * {@link CalmLensServerClient.AssetService#explain(String)}, run on the async executor.
-     *
-     * @return the result, or the exception the call throws
-     */
-    public CompletableFuture<Asset> explain(String assetId) { return run(() -> sync.assets().explain(assetId)); }
-
-    /**
-     * {@link CalmLensServerClient.AssetService#explain(String, AssetExplainParams)}, run on the async executor.
-     *
-     * @return the result, or the exception the call throws
-     */
-    public CompletableFuture<Asset> explain(String assetId, @Nullable AssetExplainParams params) { return run(() -> sync.assets().explain(assetId, params)); }
-
-    /**
-     * {@link CalmLensServerClient.AssetService#explain(String, AssetExplainParams, RequestOptions)}, run on the async executor.
-     *
-     * @return the result, or the exception the call throws
-     */
-    public CompletableFuture<Asset> explain(String assetId, @Nullable AssetExplainParams params, @Nullable RequestOptions requestOptions) { return run(() -> sync.assets().explain(assetId, params, requestOptions)); }
-
-    /**
      * {@link CalmLensServerClient.AssetService#removeContent(String)}, run on the async executor.
      *
      * @return the result, or the exception the call throws

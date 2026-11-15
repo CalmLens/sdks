@@ -104,11 +104,6 @@ export function checkSignatures(client: CalmLensServerClient): void {
   // @ts-expect-error assets.retry requires assetId
   void client.assets.retry({});
   void client.assets.retry({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"});
-  void client.assets.explain({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"});
-  // @ts-expect-error assets.explain requires assetId
-  void client.assets.explain({});
-  void client.assets.explain({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"});
-  void client.assets.explain({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","rerun":true});
   void client.assets.decide({"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","decision":"blocked","note":"Spam"});
   // @ts-expect-error assets.decide requires assetId
   void client.assets.decide({"decision":"blocked","note":"Spam"});
@@ -344,7 +339,6 @@ export function checkSignatures(client: CalmLensServerClient): void {
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.deleted"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.content-removed"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.retried"]});
-  void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.rerun-requested"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.review-requested"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.review-completed"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.hash-matched"]});

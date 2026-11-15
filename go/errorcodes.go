@@ -135,12 +135,6 @@ const (
 	CodeAssetContentUnavailable ErrorCode = "asset/content-unavailable"
 	// CodeAssetContentPurged is returned with HTTP 409.
 	CodeAssetContentPurged ErrorCode = "asset/content-purged"
-	// CodeAssetNotDecided is returned with HTTP 409.
-	CodeAssetNotDecided ErrorCode = "asset/not-decided"
-	// CodeAssetPolicyChanged is returned with HTTP 409.
-	CodeAssetPolicyChanged ErrorCode = "asset/policy-changed"
-	// CodeAssetReviewed is returned with HTTP 409.
-	CodeAssetReviewed ErrorCode = "asset/reviewed"
 	// CodeSupportTicketNotFound is returned with HTTP 404.
 	CodeSupportTicketNotFound ErrorCode = "support-ticket/not-found"
 	// CodeDuplicateExternalID is returned with HTTP 409.
@@ -313,9 +307,6 @@ var publicErrorStatuses = map[ErrorCode]int{
 	CodeAssetNotRetryable:                 409,
 	CodeAssetContentUnavailable:           409,
 	CodeAssetContentPurged:                409,
-	CodeAssetNotDecided:                   409,
-	CodeAssetPolicyChanged:                409,
-	CodeAssetReviewed:                     409,
 	CodeSupportTicketNotFound:             404,
 	CodeDuplicateExternalID:               409,
 	CodeFolderNotFound:                    404,

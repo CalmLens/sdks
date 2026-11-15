@@ -48,7 +48,7 @@ import java.util.function.LongSupplier;
  * stored bytes. The project starts on the organisation's own General preset policy; presets have one release whose
  * settings give every category its default action and no rules, and policies never decide uploads. It does not classify content: {@link Options#moderate} decides each upload from the
  * asset, its content and why it is moderated, with a status or a {@link MockDecision}. Without it,
- * queued uploads ({@code assets.create}), retries and reruns stay {@code pending} until {@link
+ * queued uploads ({@code assets.create}) and retries stay {@code pending} until {@link
  * #completeProcessing}, and {@code assets.classify} and {@code text.classify} are {@code allowed}.
  * Like the pipeline, a finished upload records {@code asset.uploaded}, then {@code asset.classified}
  * and the automated {@code asset.<status>} (or {@code asset.failed}). Finished processing removes
@@ -171,8 +171,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     UPLOAD("upload"),
     /** {@code assets.retry} queued a failed asset again. */
     RETRY("retry"),
-    /** {@code assets.explain} with {@code rerun} queued the asset again. */
-    RERUN("rerun"),
     /** {@link MockCalmLensServerClient#completeProcessing(String)} finished processing without a decision of its own. */
     COMPLETE("complete");
 
@@ -205,7 +203,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * @param content its uploaded content
    * @param trigger why it is moderated
    * @param queued true when the API would queue the work rather than answer with the decision:
-   *     queued uploads, retries, reruns and {@link MockCalmLensServerClient#completeProcessing(String)}
+   *     queued uploads, retries and {@link MockCalmLensServerClient#completeProcessing(String)}
    */
   public record ModerationInput(Asset asset, Content content, Trigger trigger, boolean queued) {}
 
@@ -226,10 +224,9 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
     /**
      * Decides each asset the mock moderates: uploads ({@code assets.create}, {@code
-     * assets.classify}, {@code text.classify} and final parts), retries, reruns and {@link
+     * assets.classify}, {@code text.classify} and final parts), retries and {@link
      * #completeProcessing(String)} without a decision. Return {@code MockDecision.of("pending")} to
-     * leave the asset processing; for a rerun it keeps the asset's decision until {@link
-     * #completeProcessing(String)}, and a {@code failed} rerun keeps it.
+     * leave the asset processing.
      *
      * @param value returns the decision for each input
      * @return these options
@@ -678,8 +675,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     review.addProperty("reviewedAt", now);
     review.addProperty("applied", true);
     asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
-    // Like the API: a queued re-run no longer replaces a reviewed decision.
-    api.reruns.remove(assetId);
     String name = MockApi.str(asset, "name"), type = MockApi.str(asset, "type");
     if (outcome == Outcome.PURGED)
       api.recordEvent("asset.content-removed", "low", MockApi.USER_ACTOR, asset, List.of(EventFact.of("asset-name", name, "https://calmlens.com/go/asset/" + assetId), EventFact.of("asset-type", type, null)));
@@ -696,9 +691,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * pipeline's events ({@code asset.classified} and the automated {@code asset.<status>}, or
    * {@code asset.failed}) and no manual review.
    *
-   * @param assetId a stored asset whose classification is {@code processing}, or a decided one
-   *     whose re-run is still queued: the decision replaces its old one unless it is {@code
-   *     pending} or {@code failed}
+   * @param assetId a stored asset whose classification is {@code processing}
    * @return the asset
    * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
    * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when it isn't processing
@@ -708,9 +701,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /**
    * Finishes processing a pending asset with {@code decision}, as the moderation pipeline would.
    *
-   * @param assetId a stored asset whose classification is {@code processing}, or a decided one
-   *     whose re-run is still queued: the decision replaces its old one unless it is {@code
-   *     pending} or {@code failed}
+   * @param assetId a stored asset whose classification is {@code processing}
    * @param decision the decision, or null to ask {@link Options#moderate}
    * @return the asset
    * @throws ApiException {@link ErrorCodes#ASSET_NOT_FOUND} when the asset is not stored
@@ -718,11 +709,9 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    */
   public synchronized Asset completeProcessing(String assetId, MockDecision decision) {
     JsonObject asset = stored(assetId);
-    boolean rerun = api.reruns.contains(assetId);
-    if (!rerun && !"processing".equals(MockApi.str(asset.getAsJsonObject("classification"), "status")))
+    if (!"processing".equals(MockApi.str(asset.getAsJsonObject("classification"), "status")))
       throw CalmLensException.of(ErrorCodes.SDK_INVALID_ARGUMENT, "Asset " + assetId + " isn't processing");
-    if (rerun) api.settleRerun(asset, Trigger.COMPLETE, decision);
-    else api.moderateStored(asset, Trigger.COMPLETE, decision);
+    api.moderateStored(asset, Trigger.COMPLETE, decision);
     return Json.GSON.fromJson(asset, Asset.class);
   }
 

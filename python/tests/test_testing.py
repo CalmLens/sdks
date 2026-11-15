@@ -284,38 +284,6 @@ class MockTests(unittest.TestCase):
                               [(issue["path"], issue["code"]) for issue in raised.exception.details["issues"]]),
                              (error_codes.INVALID_REQUEST, [(path, code)]))
 
-    def test_explaining_completes_evidence_and_rerun_replaces_the_decision_only_with_a_new_one(self):
-        rerun_outcome = ["allowed"]
-        c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "moderate": lambda moderation: (
-            "blocked" if moderation.trigger == "upload" else rerun_outcome[0])})
-        asset = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"},
-                                  processing_options={"retainContent": True})
-        moderation = c.database_storage.assets[asset["id"]]["classification"]["moderation"]
-        moderation["explanationComplete"] = False
-        explained = c.assets.explain(asset_id=asset["id"])
-        self.assertEqual((explained["classification"]["moderation"]["explanationComplete"],
-                          explained["classification"]["moderation"]["decision"]), (True, "blocked"))
-        moderation["manualReviews"] = [{"decision": "blocked"}]
-        with self.assertRaises(CalmLensAPIError) as raised:
-            c.assets.explain(asset_id=asset["id"], rerun=True)
-        self.assertEqual(raised.exception.code, error_codes.ASSET_REVIEWED)
-        moderation["manualReviews"] = []
-        # The response is the asset as the re-run found it; the new decision follows.
-        rerun = c.assets.explain(asset_id=asset['id'], rerun=True)
-        self.assertEqual((rerun["classification"]["status"], rerun["classification"]["moderation"]["decision"]),
-                         ("completed", "blocked"))
-        self.assertEqual(c.assets.retrieve(asset_id=asset["id"])["classification"]["moderation"]["decision"], "allowed")
-        # A failed re-run keeps the decision and records no processing events.
-        rerun_outcome[0] = "failed"
-        c.assets.explain(asset_id=asset["id"], rerun=True)
-        stored = c.assets.retrieve(asset_id=asset["id"])
-        self.assertEqual((stored["classification"]["status"], stored["classification"]["moderation"]["decision"]),
-                         ("completed", "allowed"))
-        self.assertEqual(c.database_storage.events[-1]["type"], "asset.rerun-requested")
-        with self.assertRaises(CalmLensError) as raised:
-            c.complete_processing(asset["id"])
-        self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
-
     def test_refuses_raw_uploads_of_types_the_api_refuses_and_stores_nothing(self):
         # The client refuses these before sending, so the request goes straight to the mock's transport.
         fixture = Path(__file__).resolve().parents[2] / "go" / "testdata" / "upload-mime-types.json"

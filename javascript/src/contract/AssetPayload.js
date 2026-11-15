@@ -11,8 +11,9 @@ const getRawBase64 = (value) => {
 	return value.slice(markerIndex + 8);
 };
 const validateBase64PayloadString = (payload, options) => {
-	const raw = getRawBase64(payload.base64).replace(/\s/g, "");
-	if (options?.multipart && raw.length % 4 !== 0) return {
+	const raw = getRawBase64(payload.base64);
+	const whitespace = /\s/.test(raw) ? raw.match(/\s/g)?.length ?? 0 : 0;
+	if (options?.multipart && (raw.length - whitespace) % 4 !== 0) return {
 		ok: false,
 		error: BASE64_PART_BOUNDARY_ERROR
 	};
@@ -29,7 +30,7 @@ const assetToData = (payload) => {
 	if (payload.uint8Array !== void 0) return Uint8Array.from(payload.uint8Array);
 	if (payload.base64 === void 0) throw new Error("Invalid asset payload");
 	const raw = getRawBase64(payload.base64);
-	if (typeof Buffer !== "undefined") return Uint8Array.from(Buffer.from(raw, "base64"));
+	if (typeof Buffer !== "undefined") return Buffer.from(raw, "base64");
 	const binary = atob(raw);
 	return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };

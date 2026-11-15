@@ -140,12 +140,6 @@ public final class ErrorCodes {
   public static final String ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable";
   /** {@code asset/content-purged} (HTTP 409). */
   public static final String ASSET_CONTENT_PURGED = "asset/content-purged";
-  /** {@code asset/not-decided} (HTTP 409). */
-  public static final String ASSET_NOT_DECIDED = "asset/not-decided";
-  /** {@code asset/policy-changed} (HTTP 409). */
-  public static final String ASSET_POLICY_CHANGED = "asset/policy-changed";
-  /** {@code asset/reviewed} (HTTP 409). */
-  public static final String ASSET_REVIEWED = "asset/reviewed";
   /** {@code support-ticket/not-found} (HTTP 404). */
   public static final String SUPPORT_TICKET_NOT_FOUND = "support-ticket/not-found";
   /** {@code asset/duplicate-external-id} (HTTP 409). */
@@ -340,9 +334,6 @@ public final class ErrorCodes {
       Map.entry(ASSET_NOT_RETRYABLE, 409),
       Map.entry(ASSET_CONTENT_UNAVAILABLE, 409),
       Map.entry(ASSET_CONTENT_PURGED, 409),
-      Map.entry(ASSET_NOT_DECIDED, 409),
-      Map.entry(ASSET_POLICY_CHANGED, 409),
-      Map.entry(ASSET_REVIEWED, 409),
       Map.entry(SUPPORT_TICKET_NOT_FOUND, 404),
       Map.entry(DUPLICATE_EXTERNAL_ID, 409),
       Map.entry(FOLDER_NOT_FOUND, 404),

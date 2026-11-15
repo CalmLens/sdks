@@ -20,7 +20,6 @@ module CalmLens
       'assets.each' => %w[cursor filter pageSize sort].freeze,
       'assets.eachChild' => %w[assetId cursor pageSize sort].freeze,
       'assets.eachTimelineSegment' => %w[assetId cursor pageSize].freeze,
-      'assets.explain' => %w[assetId rerun].freeze,
       'assets.list' => %w[cursor filter pageSize sort].freeze,
       'assets.listChildren' => %w[assetId cursor pageSize sort].freeze,
       'assets.listTimeline' => %w[assetId cursor pageSize].freeze,

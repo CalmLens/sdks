@@ -139,7 +139,6 @@ fn declared(client: &ServerClient, name: &str) -> Option<Declared> {
         "assets().delete" => op(|o| async move { c.assets().delete(o).await }),
         "assets().move_asset" => op(|o| async move { c.assets().move_asset(o).await }),
         "assets().retry" => op(|o| async move { c.assets().retry(o).await }),
-        "assets().explain" => op(|o| async move { c.assets().explain(o).await }),
         "assets().decide" => op(|o| async move { c.assets().decide(o).await }),
         "assets().batch" => op(|o| async move { c.assets().batch(o).await }),
         "cdn().sign_asset_url" => op(|o| async move { c.cdn().sign_asset_url(o).await }),

@@ -1149,14 +1149,6 @@ type DecideAssetOptions struct {
 	Params       `json:"-"`
 }
 
-// ExplainAssetOptions selects the asset AssetsService.Explain explains. Rerun moderates it again
-// with the project's current policy instead of explaining the decision as made.
-type ExplainAssetOptions struct {
-	AssetID string
-	Rerun   bool
-	Params  `json:"-"`
-}
-
 // WaitForDecisionOptions selects the asset AssetsService.WaitForDecision waits for.
 type WaitForDecisionOptions struct {
 	AssetID string

@@ -105,25 +105,6 @@ func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) 
 	return s.assetRequest(ctx, "POST", options.AssetID, "/decision", options)
 }
 
-// Explain completes the policy evidence behind a decided asset's moderation decision: the report's
-// ExplanationComplete becomes true and every action stays as decided. With Rerun the
-// asset is moderated again with the project's current policy, and an EventAssetRerunRequested
-// event is recorded; use it when the policy changed since the decision (CodeAssetPolicyChanged).
-// The asset returns unchanged: it keeps its decision until the re-run's is stored, reported by
-// EventAssetClassified and asset.<status> events, and a failed re-run keeps it. A reviewed asset
-// fails with CodeAssetReviewed, and one whose content is gone with CodeAssetContentUnavailable.
-func (s *AssetsService) Explain(ctx context.Context, options ExplainAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withCall(ctx, "assets.explain", options.Params)
-	if paramsErr != nil {
-		return nil, paramsErr
-	}
-	body := JSON{}
-	if options.Rerun {
-		body["rerun"] = true
-	}
-	return s.assetRequest(ctx, "POST", options.AssetID, "/explain", body)
-}
-
 // DefaultDecisionTimeout is how long WaitForDecision waits when no Timeout is given.
 const DefaultDecisionTimeout = 60 * time.Second
 

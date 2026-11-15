@@ -14,7 +14,7 @@ module CalmLens
   # By default the stand-in is stateful: uploads create assets you can retrieve, list, filter,
   # search, move and delete, folders and hash lists behave like the API's, the CDN serves stored bytes, and errors use
   # the API's codes, HTTP statuses and body shape. It does not classify content: the `moderate:`
-  # callback decides each upload, retry and rerun with a status or a {MockDecision}, and the events
+  # callback decides each upload and retry with a status or a {MockDecision}, and the events
   # feed gets the pipeline's `asset.uploaded`, `asset.classified`, `asset.<status>` and `asset.failed`
   # events. Without it, queued uploads stay `pending` until {#complete_processing} and the rest are
   # `allowed`. Content retention follows upload, preset and project settings; when disabled, content is removed
@@ -81,7 +81,7 @@ module CalmLens
     REQUEST_FAILURES = %w[transport-error timeout].freeze
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
     OPERATIONS = { assets: %i[search list retrieve list_children list_timeline update create classify upload_part move
-                              retry explain decide wait_for_decision remove_content delete batch],
+                              retry decide wait_for_decision remove_content delete batch],
                    folders: %i[list retrieve create update delete move],
                    hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
                    policies: %i[list retrieve retrieve_assigned create update reset upgrade set_automatic_updates delete
@@ -165,10 +165,8 @@ module CalmLens
     #   {MockModerationInput} (the stored asset, its content, the trigger and whether the API would
     #   queue the work) and returns a status from {MockDecision::STATUSES} or a {MockDecision}. It is
     #   called on uploads (`assets.create`, `assets.classify`, `text.classify` and a final part:
-    #   trigger `upload`), `assets.retry` (`retry`), `assets.explain` with `rerun: true` (`rerun`) and
-    #   {#complete_processing} without a decision (`complete`). `pending` leaves the asset processing;
-    #   for a re-run it keeps the asset's decision until {#complete_processing}, and a failed re-run
-    #   keeps it.
+    #   trigger `upload`), `assets.retry` (`retry`) and {#complete_processing} without a decision
+    #   (`complete`). `pending` leaves the asset processing.
     #   Without it, queued work other than `complete` stays `pending` and the rest is `allowed`. It
     #   runs while the mock handles a request, so it must not call the mock.
     # @param max_retries [Integer] retries after a retryable failure; 0 by default, so a simulated
@@ -223,8 +221,7 @@ module CalmLens
     # @param decision [String, MockDecision, nil] a status from {MockDecision::STATUSES} or a {MockDecision}
     # @return [Asset]
     # @raise [APIError] `asset/not-found` for an unknown asset
-    # @raise [InvalidArgumentError] when the asset isn't processing or awaiting a queued re-run, or for
-    #   an unknown decision
+    # @raise [InvalidArgumentError] when the asset isn't processing, or for an unknown decision
     def complete_processing(asset_id, decision = nil)
       Asset.new(@mock_lock.synchronize { @fake.complete_processing(asset_id, decision) } || raise(not_found))
     end

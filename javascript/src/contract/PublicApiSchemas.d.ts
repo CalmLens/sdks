@@ -1,13 +1,13 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
-import "./Asset-B7lrHe68.js";
+import "./Asset-fBl1Vw-k.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-C0t0Yxlc.js";
+import { r as TypedEvent } from "./Event-C0e4ODal.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
-import { o as EventType } from "./EventCatalog-CUiUuEsU.js";
+import { o as EventType } from "./EventCatalog-DLPS4Fo_.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
-import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-B5EvQesr.js";
-import "./PublicErrorCodes-DW2iVL1b.js";
+import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-RcONpNbl.js";
+import "./PublicErrorCodes-se5X1hdL.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -4142,7 +4142,6 @@ declare const GET_EVENTS_QUERY_SCHEMA: zod.ZodObject<{
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
-    "asset.rerun-requested": "asset.rerun-requested";
     "asset.retried": "asset.retried";
     "asset.review-completed": "asset.review-completed";
     "asset.review-requested": "asset.review-requested";

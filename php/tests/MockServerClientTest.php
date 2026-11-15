@@ -354,37 +354,6 @@ final class MockServerClientTest extends TestCase
         }
     }
 
-    public function testExplainCompletesTheEvidenceAndRerunModeratesAgain(): void
-    {
-        // Uploads are blocked; a rerun stays pending until completeProcessing, keeping the decision.
-        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->trigger === 'upload' ? 'blocked' : 'pending');
-        $client = $mock->client();
-        $asset = self::image($mock);
-        $mock->assets[$asset['id']]['classification']['moderation']['explanationComplete'] = false;
-        $explained = $client->assets->explain(['assetId' => $asset['id']]);
-        self::assertSame([true, 'blocked'], [$explained['classification']['moderation']['explanationComplete'],
-            $explained['classification']['moderation']['decision']]);
-        $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [['decision' => 'blocked']];
-        self::assertSame(ErrorCodes::ASSET_REVIEWED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true])));
-        $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [];
-        $rerun = $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true]);
-        self::assertSame(['completed', 'blocked'], [$rerun['classification']['status'], $rerun['classification']['moderation']['decision']]);
-        // A failed re-run keeps the decision and leaves nothing to complete.
-        $kept = $mock->completeProcessing($asset['id'], 'failed');
-        self::assertSame(['completed', 'blocked'], [$kept['classification']['status'], $kept['classification']['moderation']['decision']]);
-        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->completeProcessing($asset['id'])));
-    }
-
-    public function testRerunReplacesTheDecisionOnlyAfterAnsweringWithTheAssetAsItWas(): void
-    {
-        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->trigger === 'upload' ? 'blocked' : 'allowed');
-        $client = $mock->client();
-        $asset = self::image($mock);
-        $rerun = $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true]);
-        self::assertSame('blocked', $rerun['classification']['moderation']['decision']);
-        self::assertSame('allowed', $client->assets->retrieve(['assetId' => $asset['id']])['classification']['moderation']['decision']);
-    }
-
     public function testWaitForDecisionKeepsWaitingWhileQueuedOrProcessingEvenOnceDecided(): void
     {
         $mock = new MockServerClient();

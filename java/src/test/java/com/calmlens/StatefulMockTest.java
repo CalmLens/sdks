@@ -35,8 +35,6 @@ class StatefulMockTest {
         .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true).build());
   }
 
-  private static AssetExplainParams rerun() { return AssetExplainParams.builder().setRerun(true).build(); }
-
   private static Optional<AssetModerationDecision> decision(Asset asset) { return asset.getClassification().getModeration().getDecision(); }
 
   /**
@@ -94,45 +92,6 @@ class StatefulMockTest {
     assertEquals(List.of("catalogue", "backpacks"), mock.client().assets().retrieve(uploaded.getId()).getTags());
     // Like the API, the processing options an asset was uploaded with are not returned.
     mock.withStorage(storage -> assertFalse(storage.assets.get(uploaded.getId()).has("processingOptions")));
-  }
-
-  @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> MockDecision.of(input.queued() ? "pending" : "blocked")));
-    Asset asset = mock.client().assets().classify(kept("photo.png").build());
-    mock.withStorage(storage -> storage.assets.get(asset.getId()).getAsJsonObject("classification").getAsJsonObject("moderation")
-        .addProperty("explanationComplete", false));
-    Asset explained = mock.client().assets().explain(asset.getId());
-    assertEquals(Optional.of(true), explained.getClassification().getModeration().getExplanationComplete());
-    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), explained.getClassification().getModeration().getDecision());
-
-    // A queued re-run keeps the decision until it is decided.
-    Asset rerun = mock.client().assets().explain(asset.getId(), rerun());
-    assertSame(AssetClassificationStatus.COMPLETED, rerun.getClassification().getStatus());
-    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), rerun.getClassification().getModeration().getDecision());
-
-    // A reviewer's decision stands: the queued re-run no longer replaces it.
-    mock.decide(asset.getId(), Outcome.ALLOWED);
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.getId())).getCode());
-    assertEquals(Optional.of(AssetModerationDecision.ALLOWED), mock.client().assets().retrieve(asset.getId()).getClassification().getModeration().getDecision());
-    assertEquals(ErrorCodes.ASSET_REVIEWED, assertThrows(ApiException.class,
-        () -> mock.client().assets().explain(asset.getId(), rerun())).getCode());
-  }
-
-  @Test void rerunReplacesTheDecisionOnlyWithANewOne() {
-    AtomicInteger reruns = new AtomicInteger();
-    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input ->
-        MockDecision.of(input.trigger() != MockCalmLensServerClient.Trigger.RERUN ? "allowed" : reruns.incrementAndGet() == 1 ? "blocked" : "failed")));
-    Asset asset = mock.client().assets().classify(kept("photo.png").build());
-    // The response is the asset as the re-run found it; the new decision follows.
-    Asset rerun = mock.client().assets().explain(asset.getId(), rerun());
-    assertEquals(Optional.of(AssetModerationDecision.ALLOWED), rerun.getClassification().getModeration().getDecision());
-    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), mock.client().assets().retrieve(asset.getId()).getClassification().getModeration().getDecision());
-    // A failed re-run keeps the decision.
-    mock.client().assets().explain(asset.getId(), rerun());
-    Asset stored = mock.client().assets().retrieve(asset.getId());
-    assertSame(AssetClassificationStatus.COMPLETED, stored.getClassification().getStatus());
-    assertEquals(Optional.of(AssetModerationDecision.BLOCKED), stored.getClassification().getModeration().getDecision());
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.getId())).getCode());
   }
 
   @Test void moderateGetsAMultipartUploadOnceItsFinalPartArrives() {

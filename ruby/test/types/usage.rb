@@ -65,7 +65,6 @@ matched = results.items.map { |result| [result.asset.id, result.score, result.ma
 updated = client.assets.update(uploaded.id, tags: %w[a b], description: nil)
 client.assets.move(updated.id, folder_id: nil)
 client.assets.retry(updated.id)
-client.assets.explain(updated.id, rerun: true)
 client.assets.decide(updated.id, decision: 'blocked', note: 'Spam')
 client.assets.decide(updated.id, decision: 'purged', note: 'Illegal', confirm_purge: true)
 client.assets.wait_for_decision(uploaded.id, timeout: 30).classification.moderation.decision

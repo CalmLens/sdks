@@ -55,8 +55,6 @@ const (
 	TriggerUpload = "upload"
 	// TriggerRetry is Assets.Retry queueing a failed asset again.
 	TriggerRetry = "retry"
-	// TriggerRerun is Assets.Explain with Rerun queueing the asset again.
-	TriggerRerun = "rerun"
 	// TriggerComplete is CompleteProcessing without a decision of its own.
 	TriggerComplete = "complete"
 )
@@ -75,10 +73,10 @@ type ModerationInput struct {
 	// Asset is the asset as stored, still processing.
 	Asset   *calmlens.Asset
 	Content ModerationContent
-	// Trigger is TriggerUpload, TriggerRetry, TriggerRerun or TriggerComplete.
+	// Trigger is TriggerUpload, TriggerRetry or TriggerComplete.
 	Trigger string
 	// Queued is true when the API would queue the work rather than answer with the decision:
-	// queued uploads, retries, reruns and CompleteProcessing.
+	// queued uploads, retries and CompleteProcessing.
 	Queued bool
 }
 

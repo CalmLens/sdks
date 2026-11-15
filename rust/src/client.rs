@@ -1814,22 +1814,6 @@ impl AssetsClient<'_> {
             .json(&options)?;
         self.0.call(request).await
     }
-    /// Completes the policy evidence behind a decided asset's moderation decision: the report's
-    /// `moderation.explanationComplete` becomes `true` and every action stays as decided. With `rerun` the asset
-    /// is moderated again with the project's current policy, and an `asset.rerun-requested` event
-    /// is recorded; use it when the policy changed since the decision (`asset/policy-changed`).
-    /// The asset returns unchanged: it keeps its decision until the re-run's is stored, reported
-    /// by `asset.classified` and `asset.<status>` events, and a failed re-run keeps it. A reviewed
-    /// asset fails with `asset/reviewed`, and one whose content is gone with
-    /// `asset/content-unavailable`.
-    pub async fn explain(&self, options: ExplainAsset) -> Result<Asset> {
-        let path = format!("/assets/{}/explain", id(&options.asset_id)?);
-        let request = self
-            .0
-            .prepare_for("assets.explain", Method::POST, &path, &[])?
-            .json(&options)?;
-        self.0.call(request).await
-    }
     /// Removes the stored content (`DELETE /assets/:assetId/content`), including the content
     /// derived from it in child assets, keeping the asset record, metadata and classification
     /// results. The returned asset's `content.status` is `Removed` with `removal_reason`

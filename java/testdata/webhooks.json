@@ -2071,66 +2071,6 @@
       "isTest": true
     },
     {
-      "name": "every event type: asset.rerun-requested",
-      "body": "{\"id\":\"evt_assetrerunrequestedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.rerun-requested\",\"severity\":\"low\",\"title\":\"beach.jpg re-run requested\",\"description\":\"Moderation was requested again under the current policy. The asset keeps its decision until the re-run decides it.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"moderation-status\",\"value\":\"limited\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
-      "secret": "key",
-      "timestamp": "1700000000",
-      "signature": "v1=f5034f46febbdf6e7de9b23b30f004c85f5b4746feb91848c0487e17dce3380d",
-      "now": 1700000000,
-      "expected": {
-        "id": "evt_assetrerunrequestedx",
-        "projectId": "project-1",
-        "actor": {
-          "type": "api-key",
-          "id": "key_9Pt3Wm6Rk2Lx8Qv4Nb7C"
-        },
-        "type": "asset.rerun-requested",
-        "severity": "low",
-        "title": "beach.jpg re-run requested",
-        "description": "Moderation was requested again under the current policy. The asset keeps its decision until the re-run decides it.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-        "assetSequence": 1,
-        "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
-          "externalId": "post-123",
-          "uploadPresetId": null,
-          "upload": {
-            "status": "completed"
-          },
-          "classification": {
-            "status": "completed",
-            "testInput": false,
-            "moderation": {
-              "decision": "limited"
-            }
-          },
-          "content": {
-            "status": "stored"
-          }
-        },
-        "facts": [
-          {
-            "key": "asset-name",
-            "value": "beach.jpg"
-          },
-          {
-            "key": "asset-type",
-            "value": "image"
-          },
-          {
-            "key": "moderation-status",
-            "value": "limited"
-          },
-          {
-            "key": "test",
-            "value": true
-          }
-        ],
-        "createdAt": 1700000000000
-      },
-      "isTest": true
-    },
-    {
       "name": "every event type: asset.review-requested",
       "body": "{\"id\":\"evt_assetreviewrequested\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.review-requested\",\"severity\":\"low\",\"title\":\"beach.jpg is waiting for review\",\"description\":\"Its decision was uncertain for harassment, so it was added to the human review queue.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"automated-status\",\"value\":\"allowed\"},{\"key\":\"review-reason\",\"value\":\"uncertain\"},{\"key\":\"uncertain-categories\",\"value\":[\"harassment\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",

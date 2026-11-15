@@ -1,7 +1,8 @@
-import { n as idField } from "./Ids-l0is4BI5.js";
+import { n as idField } from "./Ids-C2cLdFM0.js";
+import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
 import * as zod from "zod";
 // packages/shared/src/Permissions.ts
-const ACTION_SCHEMA = zod.enum([
+const ACTION_SCHEMA = lazySchema(() => zod.enum([
 	"assets:read",
 	"assets:download",
 	"assets:create",
@@ -33,7 +34,7 @@ const ACTION_SCHEMA = zod.enum([
 	"reviews:read",
 	"reviews:write",
 	"project:manage"
-]);
+]));
 const PROJECT_ACTIONS = [...[
 	"settings",
 	"members",
@@ -49,19 +50,19 @@ const PROJECT_ACTIONS = [...[
 const isProjectAction = (action) => PROJECT_ACTIONS.includes(action);
 /** The actions that include `action`: its feature's write action and project:manage. */
 const actionsImplying = (action) => !isProjectAction(action) || action === "project:manage" ? [] : action.endsWith(":read") ? [action.replace(/:read$/, ":write"), "project:manage"] : ["project:manage"];
-const GRANT_SCHEMA = zod.object({
+const GRANT_SCHEMA = lazySchema(() => zod.object({
 	actions: zod.array(ACTION_SCHEMA),
 	folderId: idField("fldr").nullable(),
 	includeSubfolders: zod.boolean()
-}).strict().refine((g) => g.folderId === null || !g.actions.some(isProjectAction), "Project configuration permissions require project scope");
-const GRANTS_SCHEMA = zod.array(GRANT_SCHEMA).max(100);
-const ACCESS_ROLE_SCHEMA = zod.enum([
+}).strict().refine((g) => g.folderId === null || !g.actions.some(isProjectAction), "Project configuration permissions require project scope"));
+const GRANTS_SCHEMA = lazySchema(() => zod.array(GRANT_SCHEMA).max(100));
+const ACCESS_ROLE_SCHEMA = lazySchema(() => zod.enum([
 	"admin",
 	"configurator",
 	"editor",
 	"viewer",
 	"custom"
-]);
+]));
 [...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
 [...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
 const permits = (grants, action, folderId, folders) => grants.some((grant) => {
@@ -77,12 +78,4 @@ const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	}
 	return false;
 });
-/**
-* What a person can let an AI assistant or the CLI do for them. `read` looks at assets, folders,
-* hash lists and events; `write` also creates, changes and deletes assets, folders and hash lists.
-* Members, API keys, connectors, sharing, downloads and project settings are never delegated.
-*/
-const AGENT_SCOPE_SCHEMA = zod.enum(["read", "write"]);
-zod.array(AGENT_SCOPE_SCHEMA).min(1).max(2);
-zod.enum(["active", "banned"]);
 export { GRANTS_SCHEMA as n, permits as r, ACCESS_ROLE_SCHEMA as t };

@@ -72,9 +72,6 @@ declare const PUBLIC_ERROR_CODES: {
   readonly ASSET_NOT_RETRYABLE: RequestErrorCode;
   readonly ASSET_CONTENT_UNAVAILABLE: RequestErrorCode;
   readonly ASSET_CONTENT_PURGED: RequestErrorCode;
-  readonly ASSET_NOT_DECIDED: RequestErrorCode;
-  readonly ASSET_POLICY_CHANGED: RequestErrorCode;
-  readonly ASSET_REVIEWED: RequestErrorCode;
   readonly SUPPORT_TICKET_NOT_FOUND: RequestErrorCode;
   readonly DUPLICATE_EXTERNAL_ID: RequestErrorCode;
   readonly FOLDER_NOT_FOUND: RequestErrorCode;

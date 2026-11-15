@@ -22,7 +22,6 @@ final class OptionKeys
         'assets.each' => ['cursor', 'filter', 'pageSize', 'sort'],
         'assets.eachChild' => ['assetId', 'cursor', 'pageSize', 'sort'],
         'assets.eachTimelineSegment' => ['assetId', 'cursor', 'pageSize'],
-        'assets.explain' => ['assetId', 'rerun'],
         'assets.list' => ['cursor', 'filter', 'pageSize', 'sort'],
         'assets.listChildren' => ['assetId', 'cursor', 'pageSize', 'sort'],
         'assets.listTimeline' => ['assetId', 'cursor', 'pageSize'],

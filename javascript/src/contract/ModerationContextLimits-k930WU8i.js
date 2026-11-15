@@ -1,8 +1,4 @@
 // packages/shared/src/ModerationContextLimits.ts
-/** The longest earlier post one request may send. */
-const MODERATION_CONTEXT_MAX_ITEM_CHARACTERS = 2e3;
-/** The most characters of earlier posts one request may send in total. */
-const MODERATION_CONTEXT_MAX_CHARACTERS = 1e4;
 /** The most recent earlier posts CalmLens uses. */
 const MODERATION_CONTEXT_USED_ITEMS = 5;
 /**
@@ -34,4 +30,4 @@ const selectModerationContextItems = (items) => {
 	}
 	return selected;
 };
-export { countModerationContextCharacters as a, MODERATION_CONTEXT_USED_ITEMS as i, MODERATION_CONTEXT_MAX_ITEM_CHARACTERS as n, selectModerationContextItems as o, MODERATION_CONTEXT_USED_CHARACTERS as r, MODERATION_CONTEXT_MAX_CHARACTERS as t };
+export { MODERATION_CONTEXT_USED_ITEMS as n, selectModerationContextItems as r, MODERATION_CONTEXT_USED_CHARACTERS as t };

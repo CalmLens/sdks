@@ -177,10 +177,6 @@ class AsyncAssets:
         """Like :meth:`calmlens.client.Assets.decide`, awaitable."""
         return await _run(lambda: self._sync.decide(asset_id=asset_id, decision=decision, note=note, confirm_purge=confirm_purge, options=options))
 
-    async def explain(self, *, asset_id: str, rerun: bool = _UNSET, options: RequestOptions | None = None) -> Asset:
-        """Like :meth:`calmlens.client.Assets.explain`, awaitable."""
-        return await _run(lambda: self._sync.explain(asset_id=asset_id, rerun=rerun, options=options))
-
     async def remove_content(self, *, asset_id: str, options: RequestOptions | None = None) -> Asset:
         """Like :meth:`calmlens.client.Assets.remove_content`, awaitable."""
         return await _run(lambda: self._sync.remove_content(asset_id=asset_id, options=options))

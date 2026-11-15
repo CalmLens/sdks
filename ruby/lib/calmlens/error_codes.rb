@@ -70,9 +70,6 @@ module CalmLens
     ASSET_NOT_RETRYABLE = 'asset/not-retryable'
     ASSET_CONTENT_UNAVAILABLE = 'asset/content-unavailable'
     ASSET_CONTENT_PURGED = 'asset/content-purged'
-    ASSET_NOT_DECIDED = 'asset/not-decided'
-    ASSET_POLICY_CHANGED = 'asset/policy-changed'
-    ASSET_REVIEWED = 'asset/reviewed'
     SUPPORT_TICKET_NOT_FOUND = 'support-ticket/not-found'
     DUPLICATE_EXTERNAL_ID = 'asset/duplicate-external-id'
     FOLDER_NOT_FOUND = 'folder/not-found'
@@ -193,9 +190,6 @@ module CalmLens
       'asset/not-retryable' => 409,
       'asset/content-unavailable' => 409,
       'asset/content-purged' => 409,
-      'asset/not-decided' => 409,
-      'asset/policy-changed' => 409,
-      'asset/reviewed' => 409,
       'support-ticket/not-found' => 404,
       'asset/duplicate-external-id' => 409,
       'folder/not-found' => 404,

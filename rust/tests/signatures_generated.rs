@@ -82,8 +82,6 @@ fn public_signatures(client: &ServerClient) {
     check(|options| async move { client.assets().list_timeline(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","cursor":"example"}"###, |options| { let _ = &options.cursor; });
     check(|options| async move { client.assets().list_timeline(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","pageSize":1}"###, |options| { let _ = &options.page_size; });
     check(|options| async move { client.assets().retry(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"}"###, |options| { let _ = &options.asset_id; });
-    check(|options| async move { client.assets().explain(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c"}"###, |options| { let _ = &options.asset_id; });
-    check(|options| async move { client.assets().explain(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","rerun":true}"###, |options| { let _ = &options.rerun; });
     check(|options| async move { client.assets().decide(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","decision":"blocked","note":"Spam"}"###, |options| { let _ = &options.asset_id; });
     check(|options| async move { client.assets().decide(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","decision":"purged","note":"Spam","confirmPurge":true}"###, |options| { let _ = &options.decision; });
     check(|options| async move { client.assets().decide(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","decision":"blocked","note":"example"}"###, |options| { let _ = &options.note; });
@@ -195,7 +193,6 @@ fn public_signatures(client: &ServerClient) {
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.deleted"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.content-removed"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.retried"]}"###, |options| { let _ = &options.types; });
-    check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.rerun-requested"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.review-requested"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.review-completed"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.hash-matched"]}"###, |options| { let _ = &options.types; });

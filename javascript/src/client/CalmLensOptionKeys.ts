@@ -8,7 +8,6 @@ export const SERVER_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "assets.create": ["authorId", "content", "context", "description", "externalId", "externalUrl", "folderId", "isFinal", "metadata", "name", "part", "processingOptions", "sizeInBytes", "tags", "totalSizeInBytes", "uploadPresetId", "url", "visibility"],
   "assets.decide": ["assetId", "confirmPurge", "decision", "note"],
   "assets.delete": ["assetId"],
-  "assets.explain": ["assetId", "rerun"],
   "assets.list": ["cursor", "filter", "pageSize", "sort"],
   "assets.listChildren": ["assetId", "cursor", "pageSize", "sort"],
   "assets.listTimeline": ["assetId", "cursor", "pageSize"],

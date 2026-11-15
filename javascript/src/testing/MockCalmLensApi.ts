@@ -96,7 +96,6 @@ const MOCK_OPERATIONS = [
   "assets.uploadPart",
   "assets.move",
   "assets.retry",
-  "assets.explain",
   "assets.decide",
   "assets.removeContent",
   "assets.delete",
@@ -809,8 +808,6 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       return ["assets.move"];
     case "retry":
       return ["assets.retry"];
-    case "explain":
-      return ["assets.explain"];
     case "decision":
       return ["assets.decide"];
   }
@@ -897,11 +894,6 @@ export class MockCalmLensApi {
   private readonly assetEventSequences = new Map<string, number>();
   /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
   private readonly processingOptions = new Map<string, ProcessingOptions>();
-  /**
-   * The decided assets whose re-run (`assets.explain` with `rerun`) is still queued; they keep
-   * their decision until `completeProcessing` decides them.
-   */
-  private readonly pendingReruns = new Set<string>();
   /** What each open multipart upload was started with, as the API saves it. */
   private readonly openUploads = new Map<string, { queue: boolean; totalSizeInBytes?: number }>();
   private readonly idempotentResults = new Map<
@@ -1027,15 +1019,11 @@ export class MockCalmLensApi {
     } catch (failure) {
       throw this.toError(failure);
     }
-    const rerun = this.pendingReruns.has(asset.id);
-    if (!rerun && asset.classification.status !== "processing") {
+    if (asset.classification.status !== "processing") {
       throw invalidArgument(`asset ${assetId} isn't processing`);
     }
     const settled = decision === undefined ? undefined : toDecision(decision);
-    if (!rerun) return structuredClone(await this.moderateStored(asset, "complete", settled));
-    return structuredClone(
-      await this.settleRerun(asset, settled ?? (await this.decisionFor(asset, "complete", true))),
-    );
+    return structuredClone(await this.moderateStored(asset, "complete", settled));
   }
 
   /**
@@ -1081,8 +1069,6 @@ export class MockCalmLensApi {
     decision: MockReviewDecision,
     review?: { note: string },
   ): Promise<Asset> {
-    // Like the API: a queued re-run no longer replaces a reviewed decision.
-    this.pendingReruns.delete(asset.id);
     const decided = await this.applyOutcome(asset, decision, "requested");
     const now = this.now();
     // Like the API: the human review queue's decision settles its review, one through the API
@@ -1487,8 +1473,6 @@ export class MockCalmLensApi {
           return [200, await this.moveAsset(id, this.json(request))];
         case "POST retry":
           return [200, await this.retryAsset(id)];
-        case "POST explain":
-          return [200, await this.explainAsset(id, this.json(request))];
         case "POST decision":
           return [200, await this.decideAsset(id, this.json(request))];
         case "DELETE content":
@@ -2053,52 +2037,6 @@ export class MockCalmLensApi {
     return this.moderateStored(retried, "retry");
   }
 
-  private async explainAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
-    const asset = await this.findOwnAsset(assetId);
-    if (asset.classification.status !== "completed") {
-      throw fail(API_ERROR_CODES.ASSET_NOT_DECIDED);
-    }
-    if (!body.rerun) {
-      // Like the API: the evidence is completed and every action stays as decided.
-      const policy = asset.classification.moderation;
-      if (policy?.explanationComplete !== false) return asset;
-      return this.databaseStorage.updateAsset({
-        ...asset,
-        updatedAt: this.now(),
-        classification: {
-          ...asset.classification,
-          moderation: {
-            ...asset.classification.moderation,
-            explanationComplete: true,
-          },
-        },
-      });
-    }
-    if (asset.classification.moderation.manualReviews.length) {
-      throw fail(API_ERROR_CODES.ASSET_REVIEWED);
-    }
-    if (asset.content.status === "removed") {
-      throw fail(API_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE);
-    }
-    // Like the API: the request is recorded, and the asset returns as it was. It keeps its
-    // decision while it's moderated again under the current policy.
-    this.pushEvent({
-      type: "asset.rerun-requested",
-      actor: MOCK_API_KEY_ACTOR,
-      severity: "low",
-      assetId: asset.id,
-      asset: toEventAsset(asset),
-      facts: [
-        assetNameFact(asset),
-        { key: "asset-type", value: asset.type },
-        { key: "moderation-status", value: asset.classification.moderation.decision },
-      ],
-    } as MockEventInput);
-    const response = structuredClone(asset);
-    await this.settleRerun(asset, await this.decisionFor(asset, "rerun", true));
-    return response;
-  }
-
   /**
    * Checks every asset like the API (an ID that is not an asset ID is
    * `validation/invalid-format`, an unknown
@@ -2651,21 +2589,6 @@ export class MockCalmLensApi {
     const stored = await this.databaseStorage.updateAsset(await this.decided(asset, decision));
     this.recordProcessingEvents(stored, decision);
     return stored;
-  }
-
-  /**
-   * Applies a re-run's `decision` to a decided asset like the pipeline: a `pending` decision stays
-   * queued for `completeProcessing`, a `failed` one keeps the asset's decision, and any other
-   * replaces it with the pipeline's events.
-   */
-  private async settleRerun(asset: Asset, decision: MockDecision): Promise<Asset> {
-    this.pendingReruns.delete(asset.id);
-    if (decision.status === "pending") {
-      this.pendingReruns.add(asset.id);
-      return asset;
-    }
-    if (decision.status === "failed") return asset;
-    return this.settle(asset, decision);
   }
 
   /** Asks `moderate` (unless `decision` is given) and settles a processing asset. */

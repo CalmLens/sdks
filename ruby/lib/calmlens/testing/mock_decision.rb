@@ -184,10 +184,10 @@ module CalmLens
   # - `asset` [Hash] the asset as stored, still processing (a copy).
   # - `content` [Content] the uploaded bytes and, for a `plaintext-document`, their text.
   # - `trigger` [String] why the mock is moderating it: `upload` (`assets.create`, `assets.classify`,
-  #   `text.classify` or a final part), `retry` (`assets.retry`), `rerun` (`assets.explain` with
-  #   `rerun: true`) or `complete` ({MockServerClient#complete_processing} without a decision).
+  #   `text.classify` or a final part), `retry` (`assets.retry`) or `complete`
+  #   ({MockServerClient#complete_processing} without a decision).
   # - `queued` [Boolean] true when the API would queue the work rather than answer with the
-  #   decision: queued uploads, retries, reruns and `complete`.
+  #   decision: queued uploads, retries and `complete`.
   MockModerationInput = Struct.new(:asset, :content, :trigger, :queued, keyword_init: true) do
     # @return [Boolean]
     def queued? = queued

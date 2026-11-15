@@ -96,7 +96,6 @@ export type {
   EnsureMetadataFieldsOptions,
   EnsureUploadPresetsOptions,
   EnsureUploadPresetsResponse,
-  ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
   GetAssetInfoOptions,

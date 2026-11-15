@@ -423,8 +423,6 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		options := into[DecideAssetOptions](t, args)
 		options.AssetID, _ = args["assetId"].(string)
 		return one(c.Assets.Decide(ctx, options))
-	case "assets.explain":
-		return one(c.Assets.Explain(ctx, into[ExplainAssetOptions](t, args)))
 	case "assets.removeContent":
 		return one(c.Assets.RemoveContent(ctx, into[AssetIDOptions](t, args)))
 	case "assets.delete":

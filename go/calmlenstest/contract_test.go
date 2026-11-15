@@ -772,8 +772,6 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		options := decode[calmlens.DecideAssetOptions](t, args)
 		options.AssetID, _ = args["assetId"].(string)
 		result, err = m.Assets.Decide(ctx, options)
-	case "assets.explain":
-		result, err = m.Assets.Explain(ctx, decode[calmlens.ExplainAssetOptions](t, args))
 	case "assets.removeContent":
 		result, err = m.Assets.RemoveContent(ctx, decode[calmlens.AssetIDOptions](t, args))
 	case "assets.delete":

@@ -1,4 +1,5 @@
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-CtB_d_2M.js";
+import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-DtKWaQMI.js";
 import * as z from "zod";
 // packages/shared/src/Messages.ts
 /**
@@ -1025,12 +1026,12 @@ function getModerationQualifierInfo(qualifier) {
 }
 // packages/shared/src/TestRegionalActions.ts
 /** Authenticated test inputs can add regional delivery restrictions without inventing evidence. */
-const TEST_REGIONAL_ACTIONS_SCHEMA = z.array(z.object({
+const TEST_REGIONAL_ACTIONS_SCHEMA = lazySchema(() => z.array(z.object({
 	region: JURISDICTION_SCHEMA.exclude(["global"]),
 	action: z.enum([
 		"limit",
 		"age-restrict",
 		"block"
 	])
-}).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once");
+}).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once"));
 export { msg as i, MODERATION_QUALIFIERS as n, getModerationQualifierInfo as r, TEST_REGIONAL_ACTIONS_SCHEMA as t };

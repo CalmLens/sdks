@@ -1,6 +1,7 @@
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-DUzwPr1a.js";
+import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
+import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-BUUx22MC.js";
 import * as z from "zod";
 // packages/shared/src/TestImageGrid.ts
 /**
@@ -476,21 +477,21 @@ const detectionShape = {
 const fitsImage = ({ box: [left, top, width, height] }) => left + width <= 1e4 && top + height <= 1e4;
 const BOX_MESSAGE = msg("A box must lie inside the image: left + width and top + height are at most 10000.");
 const ageYears = z.number().int().min(0).max(120);
-const TEST_DETECTED_PERSON_SCHEMA = z.object(detectionShape).strict().refine(fitsImage, BOX_MESSAGE);
-const TEST_DETECTED_FACE_SCHEMA = z.object({
+const TEST_DETECTED_PERSON_SCHEMA = lazySchema(() => z.object(detectionShape).strict().refine(fitsImage, BOX_MESSAGE));
+const TEST_DETECTED_FACE_SCHEMA = lazySchema(() => z.object({
 	...detectionShape,
 	age: z.union([z.enum(["adult", "minor"]), z.object({
 		low: ageYears,
 		high: ageYears
 	}).strict().refine(({ low, high }) => low <= high, msg("An age range's low must not be above its high."))]).optional()
-}).strict().refine(fitsImage, BOX_MESSAGE);
+}).strict().refine(fitsImage, BOX_MESSAGE));
 /** Person and face detection results a test image reports instead of running detection. */
-const TEST_DETECTIONS_SCHEMA = z.object({
+const TEST_DETECTIONS_SCHEMA = lazySchema(() => z.object({
 	people: z.union([z.array(TEST_DETECTED_PERSON_SCHEMA).max(32), z.literal("unavailable")]).optional(),
 	faces: z.union([z.array(TEST_DETECTED_FACE_SCHEMA).max(32), z.literal("unavailable")]).optional()
-}).strict();
+}).strict());
 /** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
-const TEST_INPUT_SCHEMA = z.object({
+const TEST_INPUT_SCHEMA = lazySchema(() => z.object({
 	regionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional(),
 	unassessedCategories: z.array(z.enum(CLASSIFICATION_CATEGORIES)).max(CLASSIFICATION_CATEGORIES.length).optional(),
 	instances: z.array(z.object({
@@ -520,7 +521,7 @@ const TEST_INPUT_SCHEMA = z.object({
 		code: "custom",
 		message: msg("An unassessed category cannot also have assessed instances.")
 	});
-});
+}));
 const TEST_INPUT_PRESETS = {
 	clean: { instances: [] },
 	limited: { instances: [{

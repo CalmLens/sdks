@@ -18,7 +18,6 @@ public enum EventType implements ApiEnum {
   ASSET_DELETED("asset.deleted"),
   ASSET_CONTENT_REMOVED("asset.content-removed"),
   ASSET_RETRIED("asset.retried"),
-  ASSET_RERUN_REQUESTED("asset.rerun-requested"),
   ASSET_REVIEW_REQUESTED("asset.review-requested"),
   ASSET_REVIEW_COMPLETED("asset.review-completed"),
   ASSET_HASH_MATCHED("asset.hash-matched"),

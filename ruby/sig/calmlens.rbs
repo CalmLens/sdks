@@ -250,7 +250,6 @@ module CalmLens
     def update: (String asset_id, ?name: String, ?description: String?, ?external_id: String?, ?external_url: String?, ?metadata: Array[metadata_item_input]?, ?tags: Array[String]?, ?visibility: asset_visibility?, ?request_options: request_options) -> Asset
     def retry: (String asset_id, ?request_options: request_options) -> Asset
     def decide: (String asset_id, decision: "allowed" | "limited" | "age-restricted" | "blocked" | "purged", note: String, ?confirm_purge: true, ?request_options: request_options) -> Asset
-    def explain: (String asset_id, ?rerun: bool, ?request_options: request_options) -> Asset
     def remove_content: (String asset_id, ?request_options: request_options) -> Asset
     def delete: (String asset_id, ?request_options: request_options) -> nil
     def batch: (asset_ids: Array[String], operation: asset_batch_operation, ?request_options: request_options) -> AssetBatch
@@ -562,7 +561,7 @@ module CalmLens
     # The stored asset as the API sends it, still processing.
     attr_accessor asset: Hash[String, untyped]
     attr_accessor content: Content
-    attr_accessor trigger: "upload" | "retry" | "rerun" | "complete"
+    attr_accessor trigger: "upload" | "retry" | "complete"
     attr_accessor queued: bool
     def queued?: () -> bool
   end

@@ -34,7 +34,7 @@ namespace CalmLens;
  * @phpstan-type LensType 'image'|'video'|'audio'|'document'|'website'
  * @phpstan-type EventType 'asset.uploaded'|'asset.classified'|'asset.region-restricted'|'asset.allowed'|'asset.limited'
  *     |'asset.age-restricted'|'asset.blocked'|'asset.purged'|'asset.failed'|'asset.progress-updated'
- *     |'asset.deleted'|'asset.content-removed'|'asset.retried'|'asset.rerun-requested'
+ *     |'asset.deleted'|'asset.content-removed'|'asset.retried'
  *     |'asset.review-requested'|'asset.review-completed'|'asset.hash-matched'
  *     |'usage.free-uploads-exhausted'|'usage.uploads-paused'|'upload-preset.daily-limit-reached'
  *     |'project.member-joined'|'project.member-removed'|'project.member-left'

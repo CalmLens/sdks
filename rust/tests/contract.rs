@@ -1678,7 +1678,6 @@ fn references() -> BTreeSet<&'static str> {
         "assets().batch" => ServerClient::assets, AssetsClient::batch;
         "assets().retry" => ServerClient::assets, AssetsClient::retry;
         "assets().decide" => ServerClient::assets, AssetsClient::decide;
-        "assets().explain" => ServerClient::assets, AssetsClient::explain;
         "assets().classify" => ServerClient::assets, AssetsClient::classify;
         "assets().update" => ServerClient::assets, AssetsClient::update;
         "assets().wait_for_decision" => ServerClient::assets, AssetsClient::wait_for_decision;

@@ -65,7 +65,7 @@ Treat a status you don't recognise, and a failed request, as not allowed.
 - [Sign upload tokens](https://calmlens.com/docs/sdk/python/reference#upload-tokens) for
   [upload presets](https://calmlens.com/docs/guides/upload-presets) used from browsers.
 - [Manage assets](https://calmlens.com/docs/sdk/python/reference#assets): list, search, update, move, retry,
-  page through an audio or video asset's findings timeline, record reviewer decisions, explain decisions and delete content.
+  page through an audio or video asset's findings timeline, record reviewer decisions and delete content.
 - [Organise assets in folders](https://calmlens.com/docs/sdk/python/reference#folders) and
   [compare uploads with hash lists](https://calmlens.com/docs/sdk/python/reference#hash-lists).
 - [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/python/reference#policies)

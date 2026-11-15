@@ -2134,21 +2134,6 @@ class Assets:
         _require(merged, "note")
         return _load(Asset, self._c._request("POST", path, body={k: v for k, v in merged.items() if k != "assetId"}))
 
-    def explain(self, *, asset_id: str,
-                rerun: bool = _UNSET, options: RequestOptions | None = None) -> Asset:
-        """Complete the policy evidence behind a decided asset's moderation decision: the report's
-        ``classification.moderation.explanationComplete`` becomes ``True`` and every action stays as
-        decided. With ``rerun=True`` the asset is moderated again with the project's current policy and
-        an ``asset.rerun-requested`` event is recorded; use it when the policy changed since the
-        decision (``asset/policy-changed``). The asset returns unchanged: it keeps its decision until
-        the re-run's is stored, reported by ``asset.classified`` and ``asset.<status>`` events, and a
-        failed re-run keeps it. A reviewed asset raises ``asset/reviewed``, and one whose content is
-        gone ``asset/content-unavailable``."""
-        merged = _merge("assets.explain", asset_id=asset_id, rerun=rerun)
-        body = {"rerun": True} if merged.get("rerun") else {}
-        return _load(Asset, self._c._request(
-            "POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/explain", body=body))
-
     def remove_content(self, *, asset_id: str, options: RequestOptions | None = None) -> Asset:
         """Remove stored content (source, preview and retained extracted text) but keep the
         asset record, metadata and classification results. The returned asset's ``content.status`` is

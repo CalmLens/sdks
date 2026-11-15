@@ -2203,47 +2203,6 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Completes the policy evidence behind a decided asset's moderation decision.
-     *
-     * @param assetId the asset
-     * @return the asset
-     * @see #explain(String, AssetExplainParams, RequestOptions)
-     */
-    public Asset explain(String assetId) { return explain(assetId, null, null); }
-
-    /**
-     * Completes the policy evidence behind a decided asset's moderation decision.
-     *
-     * @param assetId the asset
-     * @param params whether to moderate it again, or null
-     * @return the asset
-     * @see #explain(String, AssetExplainParams, RequestOptions)
-     */
-    public Asset explain(String assetId, @Nullable AssetExplainParams params) { return explain(assetId, params, null); }
-
-    /**
-     * Completes the policy evidence behind a decided asset's moderation decision: the report's
-     * {@code classification.moderation.explanationComplete} becomes {@code true} and every action
-     * stays as decided. With {@code rerun} the asset is moderated again with the project's current
-     * policy, and an {@code asset.rerun-requested} event is recorded; use it when the policy
-     * changed since the decision ({@code asset/policy-changed}). The asset returns unchanged: it
-     * keeps its decision until the re-run's is stored, reported by {@code asset.classified} and
-     * {@code asset.<status>} events, and a failed re-run keeps it. A reviewed asset fails with
-     * {@code asset/reviewed}, and one whose content is gone with {@code asset/content-unavailable}.
-     *
-     * @param assetId the asset
-     * @param params whether to moderate it again, or null
-     * @param requestOptions deadlines, retries and headers for this call
-     * @return the asset
-     */
-    public Asset explain(String assetId, @Nullable AssetExplainParams params, @Nullable RequestOptions requestOptions) {
-      CalmLensServerClient c = with(requestOptions, "assets.explain");
-      JsonObject body = encode(params);
-      if (body.has("rerun") && !body.get("rerun").isJsonNull() && !body.get("rerun").getAsBoolean()) body.remove("rerun");
-      return c.decode(c.json("POST", "/assets/" + id(assetId) + "/explain", null, body), Asset.class);
-    }
-
-    /**
      * Removes the asset's stored content (the CDN stops serving it); the record and report stay,
      * with {@code content.status} {@code removed} and {@code content.removalReason} {@code requested}.
      *

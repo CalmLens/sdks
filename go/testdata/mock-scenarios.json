@@ -5899,207 +5899,6 @@
       ]
     },
     {
-      "name": "explain needs a decision, and rerun moderates again unless reviewed or the content is gone",
-      "mock": {},
-      "steps": [
-        {
-          "operation": "projectSettings.update",
-          "args": {
-            "settings": {
-              "retainContent": false
-            }
-          },
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.create",
-          "args": {
-            "name": "queued.png",
-            "content": {
-              "base64": "aGVsbG8=",
-              "type": "image/png"
-            }
-          },
-          "save": "queued",
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "queued.id"
-            }
-          },
-          "expect": {
-            "error": {
-              "code": "asset/not-decided",
-              "status": 409,
-              "kind": "conflict"
-            }
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "queued.id"
-            },
-            "rerun": true
-          },
-          "expect": {
-            "error": {
-              "code": "asset/not-decided",
-              "status": 409,
-              "kind": "conflict"
-            }
-          }
-        },
-        {
-          "operation": "assets.classify",
-          "args": {
-            "name": "kept.png",
-            "content": {
-              "base64": "aGVsbG8=",
-              "type": "image/png"
-            },
-            "processingOptions": {
-              "retainContent": true
-            }
-          },
-          "save": "kept",
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "kept.id"
-            }
-          },
-          "expect": {
-            "sameAs": "kept",
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "kept.id"
-            },
-            "rerun": true
-          },
-          "expect": {
-            "sameAs": "kept",
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.classify",
-          "args": {
-            "name": "reviewed.png",
-            "content": {
-              "base64": "aGVsbG8=",
-              "type": "image/png"
-            },
-            "processingOptions": {
-              "retainContent": true
-            }
-          },
-          "save": "reviewed",
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "mock.decide",
-          "args": {
-            "assetId": {
-              "$ref": "reviewed.id"
-            },
-            "outcome": "allowed"
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "reviewed.id"
-            },
-            "rerun": true
-          },
-          "expect": {
-            "error": {
-              "code": "asset/reviewed",
-              "status": 409,
-              "kind": "conflict"
-            }
-          }
-        },
-        {
-          "operation": "assets.classify",
-          "args": {
-            "name": "temporary.png",
-            "content": {
-              "base64": "aGVsbG8=",
-              "type": "image/png"
-            }
-          },
-          "save": "temporary",
-          "expect": {
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "temporary.id"
-            },
-            "rerun": true
-          },
-          "expect": {
-            "error": {
-              "code": "asset/content-unavailable",
-              "status": 409,
-              "kind": "conflict"
-            }
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": {
-              "$ref": "temporary.id"
-            }
-          },
-          "expect": {
-            "sameAs": "temporary",
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.explain",
-          "args": {
-            "assetId": "asset_00000000000000000000"
-          },
-          "expect": {
-            "error": {
-              "code": "asset/not-found",
-              "status": 404,
-              "kind": "not-found"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "deleting content twice keeps the first removal, and a deleted asset is gone",
       "mock": {},
       "steps": [
@@ -10978,32 +10777,19 @@
           }
         },
         {
-          "operation": "assets.explain",
+          "operation": "assets.create",
           "args": {
-            "assetId": {
-              "$ref": "queued.id"
+            "name": "second.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
             },
-            "rerun": true
-          },
-          "expect": {
-            "result": {
-              "classification.status": "completed",
-              "classification.moderation.decision": "age-restricted"
-            },
-            "httpStatus": 200
-          }
-        },
-        {
-          "operation": "assets.retrieve",
-          "args": {
-            "assetId": {
-              "$ref": "queued.id"
+            "processingOptions": {
+              "retainContent": true
             }
           },
+          "save": "second",
           "expect": {
-            "result": {
-              "classification.moderation.decision": "age-restricted"
-            },
             "httpStatus": 200
           }
         },
@@ -11011,7 +10797,7 @@
           "operation": "mock.completeProcessing",
           "args": {
             "assetId": {
-              "$ref": "queued.id"
+              "$ref": "second.id"
             }
           },
           "expect": {
@@ -11170,46 +10956,18 @@
           }
         },
         {
-          "operation": "events.list",
-          "args": {
-            "cursor": {
-              "$ref": "feed.nextCursor"
-            }
-          },
-          "expect": {
-            "result": {
-              "items.length": 5,
-              "items.2.type": "asset.rerun-requested",
-              "items.2.actor.type": "api-key",
-              "items.2.facts": {
-                "$contains": {
-                  "key": "moderation-status",
-                  "value": "age-restricted"
-                }
-              },
-              "items.3.type": "asset.classified",
-              "items.4.type": "asset.allowed",
-              "items.4.actor": {
-                "type": "automated",
-                "id": null
-              }
-            },
-            "httpStatus": 200
-          }
-        },
-        {
           "operation": "mock.moderateCalls",
           "expect": {
             "result": {
               "length": 3,
               "0.trigger": "upload",
               "0.queued": true,
-              "1.trigger": "rerun",
+              "1.trigger": "upload",
               "1.queued": true,
               "2.trigger": "complete",
               "2.queued": true,
               "2.assetId": {
-                "$ref": "queued.id"
+                "$ref": "second.id"
               },
               "2.bytesBase64": "aGVsbG8="
             }
@@ -12990,13 +12748,6 @@
           "args": {
             "failure": "transport-error",
             "operation": "assets.retry"
-          }
-        },
-        {
-          "operation": "mock.failNext",
-          "args": {
-            "failure": "transport-error",
-            "operation": "assets.explain"
           }
         },
         {

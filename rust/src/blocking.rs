@@ -299,8 +299,6 @@ blocking_methods!(AssetsClient => assets {
     fn retry(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::decide`].
     fn decide(options: DecideAsset) -> Result<Asset>;
-    /// See [`crate::AssetsClient::explain`].
-    fn explain(options: ExplainAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::remove_content`].
     fn remove_content(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete`].
