@@ -2966,6 +2966,12 @@ impl Backend {
         let id = text(&asset["id"]);
         let status = text(&asset["classification"]["moderation"]["decision"]);
         let public = asset["visibility"] == "public";
+        // Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown
+        // asset does, before any access check and on every resource but /info, which reports it
+        // unavailable.
+        if resource != "info" && asset["content"]["status"] == "removed" {
+            return not_found();
+        }
         // A grant authorises a private asset without the API key.
         let can_download = || {
             grant.is_some()
@@ -3028,7 +3034,6 @@ impl Backend {
             || status == "blocked"
             || status == "purged"
             || asset["classification"]["status"] == "failed"
-            || asset["content"]["status"] == "removed"
             || (resource == "original" && stored.is_none())
         {
             return not_available();

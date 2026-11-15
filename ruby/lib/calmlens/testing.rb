@@ -20,7 +20,8 @@ module CalmLens
   # `allowed`. Content retention follows upload, preset and project settings; when disabled, content is removed
   # once classification is `completed`, as in the API.
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
-  # `asset/not-available` (403) for blocked, purged, failed or removed content,
+  # `asset/not-found` (404) for removed content, as for an unknown asset,
+  # `asset/not-available` (403) for blocked, purged or failed content,
   # `viewer/age-confirmation-required` (403) for an age-restricted asset without
   # `viewer_claims: {age_confirmed: true}`, whatever the key, and `auth/permission-denied` (403)
   # for a private asset unless `api_key` comes from {.create_api_key} with an `assets:download`

@@ -1825,13 +1825,15 @@ module CalmLens
         deliver(method, item, resource, params, selected ? options || {} : nil, authorised)
       end
 
-      # What a grant doesn't cover, or, like the CDN, a private asset for anyone without a grant or the
-      # project's API key: it answers as an unknown asset does, whatever its state, except for its
-      # info, which has its own rule. An error response, or nil.
+      # What a grant doesn't cover, or, like the CDN, removed content for anyone (isAssetContentNotKept)
+      # and a private asset for anyone without a grant or the project's API key: each answers as an
+      # unknown asset does, whatever its state, except for its info, which has its own rule. An error
+      # response, or nil.
       def refuse_viewer(item, resource, grant, headers)
         if resource == 'original' && grant && !grant[:original]
           return error(ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", status: 403)
         end
+        return asset_not_found if resource != 'info' && item['content']['status'] == 'removed'
         return if grant || item['visibility'] == 'public' || header(headers, 'X-Api-Key') == @api_key
 
         asset_not_found unless resource == 'info'
@@ -1940,8 +1942,7 @@ module CalmLens
       def refuse_delivery(item, resource, stored, params, authorised)
         moderation = item['classification']['moderation']['decision']
         if (resource == 'original' && stored.nil?) || item['upload']['status'] == 'uploading' ||
-           %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
-           item['content']['status'] == 'removed'
+           %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed'
           return not_available
         end
         if moderation == 'age-restricted' && !viewer_age_confirmed?(params)

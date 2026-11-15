@@ -3484,6 +3484,9 @@ export class MockCalmLensApi {
     const status = asset.classification.moderation.decision;
     const isHead = request.method === "HEAD";
     const { rendered, preview } = asset.content;
+    // Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown asset
+    // does, before any access check and on every resource but /info, which reports it unavailable.
+    if (resource !== "info" && asset.content.status === "removed") return notFound();
     // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
     // unknown asset does, whatever its state.
     if (asset.visibility !== "public" && !grant && !hasApiKey && resource !== "info") {
@@ -3510,14 +3513,13 @@ export class MockCalmLensApi {
     }
 
     // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-    // blocked or purged, failed processing or removed content.
+    // blocked or purged, failed processing, and an original with no bytes.
     const storedContent = await this.imageStorage.getContent(asset.id);
     if (
       asset.upload.status === "uploading" ||
       status === "purged" ||
       status === "blocked" ||
       asset.classification.status === "failed" ||
-      asset.content.status === "removed" ||
       (resource === "original" && !storedContent)
     ) {
       return notAvailable();

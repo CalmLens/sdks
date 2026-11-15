@@ -96,7 +96,7 @@ class MockTest < Minitest::Test
 
     removed = mock.assets.remove_content(asset['id'])
     assert_equal [nil, nil], removed['content'].values_at('rendered', 'preview')
-    assert_equal 'asset/not-available', JSON.parse(mock.cdn.serve(asset_id: asset['id'], resource: 'placeholder').body)['code']
+    assert_equal 'asset/not-found', JSON.parse(mock.cdn.serve(asset_id: asset['id'], resource: 'placeholder').body)['code']
   end
 
   def test_a_safety_hold_refuses_every_cdn_resource_and_the_timeline

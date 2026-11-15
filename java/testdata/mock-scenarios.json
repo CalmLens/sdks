@@ -1849,7 +1849,7 @@
       ]
     },
     {
-      "name": "purging removes the content and the CDN refuses it",
+      "name": "purging removes the content and the CDN answers it as an unknown asset",
       "mock": {
         "apiKeyGrants": [
           {
@@ -1897,8 +1897,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },
@@ -1912,8 +1912,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },
@@ -1992,8 +1992,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         }
@@ -2088,8 +2088,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },
@@ -2119,8 +2119,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         }
@@ -9868,8 +9868,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },
@@ -9903,8 +9903,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },
@@ -9945,8 +9945,8 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "asset/not-available"
+              "status": 404,
+              "code": "asset/not-found"
             }
           }
         },

@@ -2692,6 +2692,9 @@ final class MockApi {
     JsonObject content = asset.getAsJsonObject("content");
     JsonObject rendered = content.get("rendered") instanceof JsonObject value ? value : null;
     JsonObject preview = content.get("preview") instanceof JsonObject value ? value : null;
+    // Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown asset
+    // does, before any access check and on every resource but /info, which reports it unavailable.
+    if (!resource.equals("info") && "removed".equals(str(content, "status"))) return error(notFound);
     // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
     // unknown asset does, whatever its state. Its placeholder requires download access.
     if (!isPublic && grant == null && apiKey == null && !resource.equals("info")) return error(notFound);
@@ -2709,11 +2712,11 @@ final class MockApi {
           !isPublic || "blocked".equals(status) ? "private, no-store" : "public, no-cache", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
     }
     // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-    // blocked or purged, failed processing or removed content, and an original without its bytes.
+    // blocked or purged, failed processing, and an original without its bytes.
     MockCalmLensServerClient.StoredContent stored = storage.content.get(str(asset, "id"));
     if ("uploading".equals(str(asset.getAsJsonObject("upload"), "status")) || "purged".equals(status) || "blocked".equals(status)
         || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
-        || "removed".equals(str(content, "status")) || resource.equals("original") && stored == null)
+        || resource.equals("original") && stored == null)
       return error(notAvailable);
     // Then access: age-restricted assets need viewerClaims.ageConfirmed whatever the key, and
     // private assets need an API key with assets:download for the asset's folder.

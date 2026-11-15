@@ -51,13 +51,13 @@ use Psr\Http\Message\ResponseInterface;
  * `automated` moderation for the pipeline's decisions, and a `user` for `decide`. The project starts on the organisation's own
  * General preset policy, `live`; the mock's presets have one release (version 1), every category at its default action with no rules, and policies never decide uploads.
  *
- * Like the CDN, a private asset requested with neither the API key nor a grant from
- * `cdn->signAssetUrl` answers as an unknown asset does, 404 `asset/not-found`, whatever its state;
- * `fetchCdn` loads a URL without the key, as a browser would. Its placeholder and
+ * Like the CDN, an asset whose content was removed answers every resource but `info` as an unknown
+ * asset does, 404 `asset/not-found`, and so does a private asset requested with neither the API key
+ * nor a grant from `cdn->signAssetUrl`, whatever its state; `fetchCdn` loads a URL without the key,
+ * as a browser would. Its placeholder and
  * `info` also require a grant or download permission. Otherwise a safety hold refuses every resource, the placeholder
  * included, with 403 `asset/not-available`. Then it checks delivery: blocked, purged and failed
- * assets, and assets whose content was removed or is still uploading, return 403
- * `asset/not-available`. Then access: an age-restricted asset requested without
+ * assets, and assets still uploading, return 403 `asset/not-available`. Then access: an age-restricted asset requested without
  * `'viewerClaims' => ['ageConfirmed' => true]` returns 403 `viewer/age-confirmation-required`, and
  * a private asset requested with the API key needs an `assets:download` grant for its folder (403
  * `auth/permission-denied`). Then whether the asset has the resource (404
@@ -2768,6 +2768,11 @@ final class MockServerClient
         if ($resource === 'original' && $grant !== null && !$grant['original']) {
             return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, 'message' => "This signed asset URL doesn't grant the original file"]);
         }
+        // Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown asset
+        // does, before any access check and on every resource but info, which reports it unavailable.
+        if ($resource !== 'info' && $asset['content']['status'] === 'removed') {
+            return $notFound();
+        }
         // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
         // unknown asset does, whatever its state. Its placeholder requires download access, and its info has its own rule.
         if ($asset['visibility'] !== 'public' && $grant === null && !$keyed && $resource !== 'info') {
@@ -2801,7 +2806,7 @@ final class MockServerClient
         // Delivery checks come first and refuse everyone, like the CDN.
         $stored = $this->content[$asset['id']] ?? null;
         if ($asset['upload']['status'] === 'uploading' || in_array($status, ['blocked', 'purged'], true)
-            || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed'
+            || $asset['classification']['status'] === 'failed'
             || ($resource === 'original' && $stored === null)) {
             return $notAvailable();
         }

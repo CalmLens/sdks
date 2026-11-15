@@ -2921,6 +2921,11 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	canDownload := func() bool {
 		return grant != nil || m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key"))
 	}
+	// Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown asset
+	// does, before any access check and on every resource but /info, which reports it unavailable.
+	if resource != calmlens.ResourceInfo && text(section(asset, "content")["status"]) == string(calmlens.ContentStatusRemoved) {
+		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
+	}
 	// Like the CDN, a private asset answers anyone without a grant or the project's API key as an
 	// unknown asset does, whatever its state. Its placeholder requires download access.
 	if text(asset["visibility"]) != string(calmlens.VisibilityPublic) && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
@@ -2963,12 +2968,11 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		return http.StatusOK, png, "image/png"
 	}
 	// Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-	// blocked or purged, failed processing or removed content, and an original with no bytes.
+	// blocked or purged, failed processing, and an original with no bytes.
 	stored := m.ImageStorage.Content[text(asset["id"])]
 	if resource == calmlens.ResourceOriginal && stored == nil || section(asset, "upload")["status"] == "uploading" ||
 		moderation == string(calmlens.ModerationStatusBlocked) || moderation == string(calmlens.ModerationStatusPurged) ||
-		text(section(asset, "classification")["status"]) == string(calmlens.ClassificationStatusFailed) ||
-		text(content["status"]) == string(calmlens.ContentStatusRemoved) {
+		text(section(asset, "classification")["status"]) == string(calmlens.ClassificationStatusFailed) {
 		return notAvailable()
 	}
 	// Then access: an age-restricted asset needs viewerClaims.ageConfirmed=true whatever the key,

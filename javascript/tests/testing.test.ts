@@ -957,7 +957,8 @@ describe("MockCalmLensServerClient", () => {
       removalReason: "requested",
       updatedAt: 1_700_000_000_000,
     });
-    expect((await client.cdn.serve({ assetId: asset.id })).status).toBe(403);
+    const served = await client.cdn.serve({ assetId: asset.id });
+    expect([served.status, (await served.json()).code]).toEqual([404, "asset/not-found"]);
     expect((await client.assets.retrieve({ assetId: asset.id })).content.removalReason).toBe(
       "requested",
     );

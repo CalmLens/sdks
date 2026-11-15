@@ -2804,6 +2804,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if resource == "original" and grant is not None and not grant[1]:
                 return self._failure_response(_Failure(
                     error_codes.SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", 403))
+            # Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown
+            # asset does, before any access check and on every resource but /info, which reports it
+            # unavailable.
+            if resource != "info" and asset["content"]["status"] == "removed":
+                return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             # A grant authorises a private asset without the API key.
             authorised = grant is not None or (with_api_key and self._can_download(asset.get("folderId")))
             # Like the CDN, a private asset answers anyone without a grant or the project's API key
@@ -2833,11 +2838,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     if asset["visibility"] != "public" or status == "blocked" else "public, no-cache",
                     "Cache-Tag": f"asset-{asset['id']}", "ETag": f'"{thumbhash}"'})
             # Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-            # blocked or purged, failed processing or removed content.
+            # blocked or purged, failed processing, and an original with no bytes.
             stored = self.image_storage.content.get(asset["id"])
             if (asset["upload"]["status"] == "uploading" or status in ("blocked", "purged")
                     or asset["classification"]["status"] == "failed"
-                    or asset["content"]["status"] == "removed" or (resource == "original" and stored is None)):
+                    or (resource == "original" and stored is None)):
                 return self._failure_response(not_available)
             # Then access: age-restricted assets need ``viewerClaims.ageConfirmed=true`` whatever
             # the key, and private assets need the download permission for the asset's folder.
