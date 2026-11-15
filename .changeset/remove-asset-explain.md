@@ -1,11 +1,11 @@
 ---
-"@calmlens/sdk": minor
-"@calmlens/sdk-python": minor
-"@calmlens/sdk-ruby": minor
-"@calmlens/sdk-rust": minor
-"@calmlens/sdk-java": minor
-"@calmlens/sdk-go": minor
-"@calmlens/sdk-php": minor
+"@calmlens/sdk": patch
+"@calmlens/sdk-python": patch
+"@calmlens/sdk-ruby": patch
+"@calmlens/sdk-rust": patch
+"@calmlens/sdk-java": patch
+"@calmlens/sdk-go": patch
+"@calmlens/sdk-php": patch
 ---
 
 `assets.explain` is removed, with its `rerun` option, as the API no longer explains or re-runs a

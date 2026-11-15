@@ -4,10 +4,11 @@
 // naming every language) and, for JavaScript, the exports of the `src/contract` type modules.
 // It is compared with the surface of the SDK's previous release:
 //
-// - a removed item, or one whose name or kind changed, is breaking: a major release, or a minor
-//   release while the version is 0.x;
-// - an added item is a new feature: a minor release, or a patch release while the version is 0.x;
+// - a removed item, or one whose name or kind changed, is breaking: a major release;
+// - an added item is a new feature: a minor release;
 // - anything else may be a patch release.
+//
+// While the version is 0.x any change may be a patch release.
 //
 // The previous release is the SDK's release tag (`javascript/v<version>`, `cli-v<version>`,
 // `go/v<version>`, PHP's `v<version>`) or, for the SDKs tagged by the private application, the
@@ -63,9 +64,9 @@ export function bumpVersion(version, level) {
 
 /** The smallest bump from `from` that covers the changes, as semantic versioning asks. */
 export function requiredLevel(from, { breaking, added }) {
-  const initial = parse(from)[0] === 0;
-  if (breaking.length) return initial ? "minor" : "major";
-  if (added.length) return initial ? "patch" : "minor";
+  if (parse(from)[0] === 0) return "patch";
+  if (breaking.length) return "major";
+  if (added.length) return "minor";
   return "patch";
 }
 
