@@ -280,7 +280,7 @@ class DocumentViewer extends ViewerBase<DocumentViewerOptions> {
       const page = await document.getPage(pageNumber);
       if (render !== this.#renders) return;
       const natural = page.getViewport({ scale: 1 });
-      const available = controls.pages.clientWidth - 32;
+      const available = controls.pages.clientWidth;
       const scale = this.#zoom ?? (available > 0 ? available / natural.width : 1);
       this.#scale = scale;
       controls.zoomLevel.textContent = formatViewerMessage(messages.zoomLevel, {

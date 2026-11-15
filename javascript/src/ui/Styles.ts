@@ -160,8 +160,8 @@ export const CALMLENS_STYLES = `
 /* Documents, text and spreadsheets fill the box with their viewer; a document shows its first
    page's still and an open link until the viewer loads. */
 .calmlens-asset__viewer { position: absolute; inset: 0; }
-.calmlens-asset:not([data-sized])[data-kind="document"], .calmlens-asset:not([data-sized])[data-kind="text"],
-.calmlens-asset:not([data-sized])[data-kind="spreadsheet"] { height: 480px; }
+/* A default height only: any height the page gives the element (a class, a style) wins. */
+:where(.calmlens-asset:not([data-sized]):is([data-kind="document"], [data-kind="text"], [data-kind="spreadsheet"])) { height: 480px; }
 .calmlens-asset[data-kind="document"] .calmlens-asset__content { opacity: 1; }
 .calmlens-asset__open { position: absolute; right: 8px; bottom: 8px; text-decoration: none; }
 /* A website's screenshot scrolls beneath the link to its page. */

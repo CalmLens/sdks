@@ -65,7 +65,8 @@ export const VIEWER_STYLES = `
   margin: 0 auto; padding: 20px 24px; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: inherit; font-size: 1rem; line-height: 1.6;
 }
-.calmlens-viewer__pages { flex: 1; min-height: 0; overflow: auto; padding: 16px; text-align: center; }
+/* Fit to width, the page fills the viewer edge to edge; zoomed out, it sits centred. */
+.calmlens-viewer__pages { flex: 1; min-height: 0; overflow: auto; text-align: center; }
 .calmlens-viewer__page { display: inline-block; position: relative; vertical-align: top; }
 .calmlens-viewer__page canvas { display: block; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); }
 .calmlens-viewer__page-field { width: 4.5em; min-height: 36px; padding: 4px 6px; font: inherit; border: 1px solid var(--calmlens-border); border-radius: calc(var(--calmlens-radius) / 2); background: transparent; color: inherit; }
