@@ -618,7 +618,15 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       style={[
         assetStyles.asset,
         ratio !== undefined && [assetStyles.sized, { aspectRatio: ratio }],
-        { backgroundColor: state.info?.content?.preview?.averageColor ?? theme.surface },
+        // The average colour stands in while the content loads; transparent content and notices
+        // show the surface.
+        {
+          backgroundColor:
+            (current === "loading" &&
+              view.kind !== "unavailable" &&
+              state.info?.content?.preview?.averageColor) ||
+            theme.surface,
+        },
         style,
       ]}
     >

@@ -666,7 +666,9 @@ export class CalmLensAssetElement extends BaseElement {
     const ratio = getAssetAspectRatio(view, state.info, numberAttribute(this, "aspect-ratio"));
     this.style.aspectRatio = ratio ? String(ratio) : "";
     this.toggleAttribute("data-sized", Boolean(ratio));
-    this.style.backgroundColor = state.info?.content?.preview?.averageColor ?? "";
+    const averageColor = state.info?.content?.preview?.averageColor;
+    if (averageColor) this.style.setProperty("--calmlens-average-color", averageColor);
+    else this.style.removeProperty("--calmlens-average-color");
     this.style.setProperty("--calmlens-fit", this.getAttribute("fit"));
     this.dataset.kind = view.kind;
     this.toggleAttribute("aria-busy", view.kind === "pending");

@@ -192,7 +192,7 @@
   data-sized={ratio ? "" : undefined}
   aria-busy={view.kind === "pending" ? "true" : undefined}
   style:aspect-ratio={ratio}
-  style:background-color={sessionState.info?.content?.preview?.averageColor ?? undefined}
+  style:--calmlens-average-color={sessionState.info?.content?.preview?.averageColor ?? undefined}
   style:--calmlens-fit={fit}
 >
   {#if placeholderUrl}

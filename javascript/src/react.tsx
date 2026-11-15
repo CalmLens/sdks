@@ -526,7 +526,7 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       style={
         {
           aspectRatio: ratio,
-          backgroundColor: state.info?.content?.preview?.averageColor ?? undefined,
+          "--calmlens-average-color": state.info?.content?.preview?.averageColor ?? undefined,
           "--calmlens-fit": fit,
           ...style,
         } as CSSProperties

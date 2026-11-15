@@ -144,6 +144,8 @@ export const CALMLENS_STYLES = `
   position: relative; display: block; overflow: hidden; margin: 0; border-radius: var(--calmlens-media-radius, 0);
   background: var(--calmlens-surface);
 }
+/* The average colour stands in while the content loads; transparent content and notices show the surface. */
+.calmlens-asset:not([data-state="loaded"], [data-state="error"], [data-kind="unavailable"]) { background-color: var(--calmlens-average-color, var(--calmlens-surface)); }
 .calmlens-asset__placeholder, .calmlens-asset__content {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--calmlens-fit, contain);
   object-position: var(--calmlens-position, center);
@@ -189,7 +191,9 @@ export const CALMLENS_STYLES = `
 }
 .calmlens-asset__notice p { margin: 0; display: flex; gap: 6px; align-items: center; }
 /* Thumbnails keep the notice's icon and leave its text to screen readers. */
-.calmlens-asset[data-sized] { container-type: inline-size; }
+/* A notice has no content of its own to size the box, so it can always measure its width. */
+.calmlens-asset[data-sized], .calmlens-asset[data-kind="unavailable"], .calmlens-asset[data-kind="age-restricted"],
+.calmlens-asset[data-state="error"] { container-type: inline-size; }
 @container (max-width: 119px) {
   .calmlens-asset__label, .calmlens-asset__notice > strong, .calmlens-asset__notice > p:not(:has(svg)) {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;

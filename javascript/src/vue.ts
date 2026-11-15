@@ -619,7 +619,8 @@ export const CalmLensAsset = defineComponent({
           "aria-busy": current.kind === "pending" ? "true" : undefined,
           style: {
             aspectRatio: ratio,
-            backgroundColor: state.value.info?.content?.preview?.averageColor ?? undefined,
+            "--calmlens-average-color":
+              state.value.info?.content?.preview?.averageColor ?? undefined,
             "--calmlens-fit": props.fit,
           },
         },
