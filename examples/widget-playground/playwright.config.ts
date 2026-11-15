@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { firefoxExecutablePath } from "./e2e/firefoxExecutable";
 
 const port = 6420;
 
@@ -11,7 +12,13 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${port}`, trace: "retain-on-failure" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        launchOptions: { executablePath: firefoxExecutablePath() },
+      },
+    },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
   webServer: {
