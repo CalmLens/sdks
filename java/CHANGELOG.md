@@ -11,6 +11,11 @@
 
 ### Minor Changes
 
+- 73d8a70: An asset's moderation decision is read from `classification.moderation.decision`, which
+  replaces `classification.moderation.status`, as in the API. It is `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged`, or `null` while the asset has no decision, such as
+  right after an upload that doesn't wait for one. `classification.status` reports processing
+  progress and failure.
 - c1c8135: Redesign the Java SDK so new API fields and values arrive without breaking your code.
   - **Packages and module.** The SDK is the module `com.calmlens` (`requires com.calmlens;`). Request params are in `com.calmlens.params`, response models and enums are top-level classes in `com.calmlens.models`, exceptions are in `com.calmlens.exception`, and `MockCalmLensServerClient`, `MockDecision` and `TestInputs` are in `com.calmlens.testing`. `Models` is gone. Public types carry JSpecify nullness annotations, so Kotlin sees which values can be null.
   - **Client setup.** `CalmLensServerClient.fromEnv()` reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_BASE_URL` (or the `calmlens.apiKey`, `calmlens.projectId` and `calmlens.baseUrl` system properties). `builder()` takes no arguments: set `apiKey(...)` and `projectId(...)`, and `build()` refuses a missing one. `appInfo(name, version, url)` names your integration in the `User-Agent`.

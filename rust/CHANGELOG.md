@@ -11,6 +11,11 @@
 
 ### Minor Changes
 
+- 73d8a70: An asset's moderation decision is read from `classification.moderation.decision`, which
+  replaces `classification.moderation.status`, as in the API. It is `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged`, or `null` while the asset has no decision, such as
+  right after an upload that doesn't wait for one. `classification.status` reports processing
+  progress and failure.
 - b4a0e71: Options types are `#[non_exhaustive]`, so a minor release can add an option. Build them with
   `new`, which takes the required fields, and a chained setter per optional field, such as
   `UpdateAsset::new(id).name("Holiday").clear_description()`; `clear_*` sends `null`. Path ID

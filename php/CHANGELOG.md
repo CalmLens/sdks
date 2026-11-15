@@ -11,6 +11,11 @@
 
 ### Minor Changes
 
+- 73d8a70: An asset's moderation decision is read from `classification.moderation.decision`, which
+  replaces `classification.moderation.status`, as in the API. It is `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged`, or `null` while the asset has no decision, such as
+  right after an upload that doesn't wait for one. `classification.status` reports processing
+  progress and failure.
 - 3902b57: Results are now objects. Every method returns a model from `CalmLens\Model`, such as `Asset`,
   `Folder`, `Lens`, `Policy` or `Event`, instead of an associative array. Read a field as a property
   (`$asset->classification->moderation->decision`) or as an array key, iterate over its fields, or

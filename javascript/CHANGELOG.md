@@ -9,6 +9,14 @@
 
 ### Minor Changes
 
+- 73d8a70: An asset's moderation decision is read from `classification.moderation.decision`, which
+  replaces `classification.moderation.status`, as in the API. It is `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged`, or `null` while the asset has no decision, such as
+  right after an upload that doesn't wait for one. `classification.status` reports processing
+  progress and failure.
+
+  Earlier versions expect `classification.moderation.status` and reject every asset response from
+  the current API with `sdk/invalid-response`, so upgrade to 0.26.1 or later.
 - 1bee633: `calmlens plan`, `apply`, `trigger` and `listen` take `--json`, which prints JSON on standard output
   (for `listen`, one line per delivery attempt) and the readable output on standard error.
   `calmlens plan --detailed-exitcode` exits 2 when the project would change. `--log-level` (or

@@ -8,6 +8,11 @@ No changes in this release.
 
 ### Minor Changes
 
+- 73d8a70: An asset's moderation decision is read from `classification.moderation.decision`, which
+  replaces `classification.moderation.status`, as in the API. It is `allowed`, `limited`,
+  `age-restricted`, `blocked` or `purged`, or `null` while the asset has no decision, such as
+  right after an upload that doesn't wait for one. `classification.status` reports processing
+  progress and failure.
 - 50cf9a4: Match the Go types to what the API sends and accepts. A page's `NextCursor` is a `*string`, nil on
   the last page, except `EventsPage.NextCursor`, which is always set. `Policy.UpdatedAt` and
   `UploadPreset.UpdatedAt` are `*int64`. `ProjectSettingsInput.HumanReview` takes a
