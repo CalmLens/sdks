@@ -20,7 +20,7 @@ jobs:
           node-version: 24
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
       - name: Install
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Release Check
@@ -89,7 +89,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - name: Install
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Check

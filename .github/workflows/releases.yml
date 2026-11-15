@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
       - run: bun install --frozen-lockfile --ignore-scripts
       - uses: changesets/action@v2.1.2
         with:
