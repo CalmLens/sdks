@@ -4,10 +4,10 @@ import "./Media-B2PMcUf7.js";
 import "./ModerationContextLimits-k930WU8i.js";
 import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
-import { i as msg, n as MODERATION_QUALIFIERS } from "./TestRegionalActions-BUUx22MC.js";
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-DtKWaQMI.js";
-import { t as ACCESS_ROLE_SCHEMA } from "./Permissions-CpTuYHjn.js";
+import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
+import { i as msg, n as MODERATION_QUALIFIERS } from "./TestRegionalActions-BhyWuU49.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-CQN8qnzX.js";
+import { t as ACCESS_ROLE_SCHEMA } from "./Permissions-CzuRcPMS.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -22,8 +22,8 @@ const ACTOR_TYPES = [
 	"automated",
 	"system"
 ];
-const ACTOR_TYPE_SCHEMA = lazySchema(() => zod.enum(ACTOR_TYPES));
-const ACTOR_SCHEMA = lazySchema(() => zod.object({
+const ACTOR_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(ACTOR_TYPES));
+const ACTOR_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	type: ACTOR_TYPE_SCHEMA,
 	id: zod.string().nullable().describe("The user's or API key's ID. `null` for `automated` and `system`, and when the ID was not recorded.")
 }).strict().meta(metaStore([docPropertyInfo({
@@ -38,7 +38,7 @@ const ACTOR_SCHEMA = lazySchema(() => zod.object({
 * (`age-restricted`), not served (`blocked`), or not served with its stored content deleted
 * (`purged`).
 */
-const ASSET_MODERATION_DECISION_SCHEMA = lazySchema(() => zod.enum([
+const ASSET_MODERATION_DECISION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"allowed",
 	"limited",
 	"age-restricted",
@@ -72,7 +72,7 @@ const saneStringField = (options) => {
 * What a match does: `flag` reports it on the asset and in an event without changing the
 * decision, `block` also blocks close matches.
 */
-const HASH_LIST_ACTION_SCHEMA = lazySchema(() => zod.enum(["flag", "block"]));
+const HASH_LIST_ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(["flag", "block"]));
 // packages/shared/src/LinkSafety.ts
 /**
 * Link safety (preview, `ENABLE_LINK_SAFETY`): where the links in an asset lead. It is its own
@@ -93,7 +93,7 @@ const LINK_SAFETY_VERDICTS = [
 	"malware",
 	"unresolved"
 ];
-const LINK_SAFETY_VERDICT_SCHEMA = lazySchema(() => zod.enum(LINK_SAFETY_VERDICTS));
+const LINK_SAFETY_VERDICT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(LINK_SAFETY_VERDICTS));
 /** The verdicts a policy can act on, in the order the portal and docs list them. */
 const FLAGGED_LINK_VERDICTS = [
 	"phishing",
@@ -109,9 +109,9 @@ const LINK_SAFETY_ACTIONS = [
 	"age-restrict",
 	"block"
 ];
-const LINK_SAFETY_ACTION_SCHEMA = lazySchema(() => zod.enum(LINK_SAFETY_ACTIONS));
+const LINK_SAFETY_ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(LINK_SAFETY_ACTIONS));
 const DOMAIN_PATTERN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
-const LINK_SAFETY_SETTINGS_SCHEMA = lazySchema(() => zod.object({
+const LINK_SAFETY_SETTINGS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	verdictActions: zod.partialRecord(zod.enum(FLAGGED_LINK_VERDICTS), LINK_SAFETY_ACTION_SCHEMA).meta({ description: "What happens to an asset with a link of each verdict. A verdict left out is allowed." }),
 	offPlatformLinks: zod.object({
 		action: LINK_SAFETY_ACTION_SCHEMA.exclude(["allow"]),
@@ -187,7 +187,7 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 * (`age-restrict`: `viewerClaims.ageConfirmed: true`), stop delivering it
 * (`block`), or stop delivering it and delete its stored content (`purge`).
 */
-const POLICY_ACTION_SCHEMA = lazySchema(() => zod.enum([
+const POLICY_ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"allow",
 	"limit",
 	"age-restrict",
@@ -203,12 +203,12 @@ const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
 	message: msg("The exclusions prevent this rule from ever matching"),
 	path: ["unless"]
 });
-const POLICY_ALLOWANCE_SCHEMA = lazySchema(() => policyRuleSchema("Qualifiers describing the content this allowance covers. Every selected qualifier must hold on the same instance. Eligible allowances may jointly cover all qualifying content.", "Softer than the category action: what happens to content the allowance covers.").refine((rule) => !rule.unless?.length, {
+const POLICY_ALLOWANCE_SCHEMA = /* @__PURE__ */ lazySchema(() => policyRuleSchema("Qualifiers describing the content this allowance covers. Every selected qualifier must hold on the same instance. Eligible allowances may jointly cover all qualifying content.", "Softer than the category action: what happens to content the allowance covers.").refine((rule) => !rule.unless?.length, {
 	message: msg("Only restrictions can have exclusions"),
 	path: ["unless"]
 }));
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
-const POLICY_RESTRICTION_SCHEMA = lazySchema(() => policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action."));
+const POLICY_RESTRICTION_SCHEMA = /* @__PURE__ */ lazySchema(() => policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action."));
 /** The built-in policies (`BUILT_IN_MODERATION_PROFILES`), in the order the portal offers them. */
 const POLICY_PRESET_IDS = [
 	"general-community",
@@ -355,7 +355,7 @@ const PRODUCTS = {
 };
 PRODUCTS.imageTransformed, PRODUCTS.websiteIngestion, PRODUCTS.linkChecking, PRODUCTS.textClassificationTokens, PRODUCTS.imageClassification, PRODUCTS.assetStorageGb, PRODUCTS.assetSearch, PRODUCTS.assetMediaSearchIndexing, PRODUCTS.assetRead, PRODUCTS.ocrClassification, PRODUCTS.personDetection, PRODUCTS.faceDetection, PRODUCTS.streamEncoding;
 // packages/shared/src/ProcessingFeatures.ts
-const PROVENANCE_SIGNAL_SCHEMA = lazySchema(() => zod.object({
+const PROVENANCE_SIGNAL_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	kind: zod.enum([
 		"c2pa",
 		"iptc-digital-source-type",
@@ -372,7 +372,7 @@ zod.enum([
 	"unknown"
 ]).describe("What the metadata says: `ai-generated`, `ai-edited` (a composite or edit made with AI), or `unknown` when the file carries no AI provenance. `unknown` doesn't mean a person made it: screenshots and re-saved images lose their metadata."), zod.array(PROVENANCE_SIGNAL_SCHEMA);
 // packages/shared/src/Classification.ts
-const CLASSIFICATION_CATEGORY_SCHEMA = lazySchema(() => zod.enum(CLASSIFICATION_CATEGORIES));
+const CLASSIFICATION_CATEGORY_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(CLASSIFICATION_CATEGORIES));
 msg("Sexual Content"), MODERATION_CATEGORY_DEFINITIONS.sexual.summary, msg("Violence"), MODERATION_CATEGORY_DEFINITIONS.violence.summary, msg("Self-Harm"), MODERATION_CATEGORY_DEFINITIONS["self-harm"].summary, msg("Harassment & Bullying"), MODERATION_CATEGORY_DEFINITIONS.harassment.summary, msg("Hate & Identity Abuse"), MODERATION_CATEGORY_DEFINITIONS.hate.summary, msg("Personal Information"), MODERATION_CATEGORY_DEFINITIONS["personal-information"].summary, msg("Profanity"), MODERATION_CATEGORY_DEFINITIONS.profanity.summary, msg("Criminal & Dangerous Activity"), MODERATION_CATEGORY_DEFINITIONS["criminal-activity"].summary;
 new Set(MODERATION_QUALIFIERS);
 const POLICY_SCORE_DESCRIPTION = "How strongly the content meets the policy, from 0 to 1: the category score, lowered by allowances that cover the content and raised to the presence score of a restriction.";
@@ -384,19 +384,19 @@ const DECISION_SOURCES = [
 	"mandatory-rule",
 	"link-safety"
 ];
-const CATEGORY_SETTINGS_SNAPSHOT_SCHEMA = lazySchema(() => zod.object({
+const CATEGORY_SETTINGS_SNAPSHOT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	action: POLICY_ACTION_SCHEMA,
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 }).strict().optional().describe("The category's default action and rules in force at decision time."));
-const RULE_INDEXES_SCHEMA = lazySchema(() => zod.array(zod.number().int().nonnegative()).min(1).describe("Indexes into the category's `settings.allowances` or `settings.restrictions` of the rules that decided the action, the decisive one first. Several allowances list every rule that covers the content together."));
+const RULE_INDEXES_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.array(zod.number().int().nonnegative()).min(1).describe("Indexes into the category's `settings.allowances` or `settings.restrictions` of the rules that decided the action, the decisive one first. Several allowances list every rule that covers the content together."));
 const CATEGORY_ASSESSMENT_FIELDS = {
 	score: zod.number().min(0).max(1).describe(POLICY_SCORE_DESCRIPTION),
 	action: POLICY_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below 0.5."),
 	settings: CATEGORY_SETTINGS_SNAPSHOT_SCHEMA
 };
 /** What the policy made of one category, as a decision records it. */
-const CATEGORY_ASSESSMENT_SCHEMA = lazySchema(() => zod.object({
+const CATEGORY_ASSESSMENT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	...CATEGORY_ASSESSMENT_FIELDS,
 	source: zod.discriminatedUnion("kind", [
 		zod.object({ kind: zod.literal("default") }).strict(),
@@ -412,7 +412,7 @@ const CATEGORY_ASSESSMENT_SCHEMA = lazySchema(() => zod.object({
 	]).optional()
 }).strict());
 /** The policy a decision was made with, as it was then. */
-const DECISION_POLICY_SCHEMA = lazySchema(() => zod.object({
+const DECISION_POLICY_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	id: idField("pol").describe("The policy's ID"),
 	revision: zod.number().int().positive().describe("The policy's `revision` when it made the decision"),
 	preset: zod.object({
@@ -423,7 +423,7 @@ const DECISION_POLICY_SCHEMA = lazySchema(() => zod.object({
 	description: "The policy that made a decision, as it was when it made it",
 	namedType: "DecisionPolicy"
 })])));
-const ASSESSMENT_BASE_SCHEMA = lazySchema(() => zod.object({
+const ASSESSMENT_BASE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	policy: DECISION_POLICY_SCHEMA.optional().describe("The policy that made the decision. Absent from a preview, which no saved policy made."),
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
 	explanationComplete: zod.boolean().describe("Whether all questions needed for a complete explanation of this decision were answered. False means questions that could not change any action were skipped; the actions are still final."),
@@ -444,26 +444,26 @@ const ASSESSMENT_BASE_SCHEMA = lazySchema(() => zod.object({
 	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links.")
 }).strict());
 /** What the project's policy made of the report when the asset was decided. */
-const MODERATION_ASSESSMENT_FIELDS_SCHEMA = lazySchema(() => ASSESSMENT_BASE_SCHEMA.omit({ linkSafety: true }));
+const MODERATION_ASSESSMENT_FIELDS_SCHEMA = /* @__PURE__ */ lazySchema(() => ASSESSMENT_BASE_SCHEMA.omit({ linkSafety: true }));
 // packages/shared/src/HumanReview.ts
 /**
 * Automated outcomes that can be sampled. Purged content is deleted as soon as it is decided, for
 * safety and legal reasons, so there is never anything left to review.
 */
-const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = lazySchema(() => ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]));
+const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = /* @__PURE__ */ lazySchema(() => ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]));
 /**
 * Why an asset joined the queue: drawn by the random sample, or routed because its decision was
 * uncertain. An asset drawn by the sample is `sampled` even when it is also uncertain, so the
 * random sample stays representative.
 */
-const HUMAN_REVIEW_REASON_SCHEMA = lazySchema(() => zod.enum(["sampled", "uncertain"]));
-const HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA = lazySchema(() => zod.array(zod.enum(CLASSIFICATION_CATEGORIES)));
+const HUMAN_REVIEW_REASON_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(["sampled", "uncertain"]));
+const HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.array(zod.enum(CLASSIFICATION_CATEGORIES)));
 // packages/shared/src/Asset.ts
 /**
 * Where the asset is in the pipeline: waiting for its content or its turn (`queued`), being
 * processed, or settled (`completed` or `failed`).
 */
-const ASSET_CLASSIFICATION_STATUS_SCHEMA = lazySchema(() => zod.enum([
+const ASSET_CLASSIFICATION_STATUS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"queued",
 	"processing",
 	"completed",
@@ -473,18 +473,18 @@ const ASSET_CLASSIFICATION_STATUS_SCHEMA = lazySchema(() => zod.enum([
 * The moderation decision in force, which also decides delivery: `pending` until classification
 * decides, then a reviewer's decision when there is one, else the policy's.
 */
-const ASSET_MODERATION_STATUS_SCHEMA = lazySchema(() => zod.enum(["pending", ...ASSET_MODERATION_DECISION_SCHEMA.options]));
+const ASSET_MODERATION_STATUS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(["pending", ...ASSET_MODERATION_DECISION_SCHEMA.options]));
 /**
 * Whether CalmLens holds the asset's content (source, preview and extracted text): kept only until
 * processing finishes (`temporary`), retained (`stored`) or deleted (`removed`).
 */
-const ASSET_CONTENT_STATUS_SCHEMA = lazySchema(() => zod.enum([
+const ASSET_CONTENT_STATUS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"temporary",
 	"stored",
 	"removed"
 ]));
 /** Why an asset's processing failed. */
-const ASSET_FAILURE_REASON_SCHEMA = lazySchema(() => zod.enum([
+const ASSET_FAILURE_REASON_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"file-too-large",
 	"duration-limit",
 	"resolution-limit",
@@ -498,7 +498,7 @@ const ASSET_FAILURE_REASON_SCHEMA = lazySchema(() => zod.enum([
 	"too-many-items",
 	"processing-error"
 ]));
-const ASSET_TYPE_SCHEMA = lazySchema(() => zod.enum([
+const ASSET_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"image",
 	"video",
 	"audio",
@@ -525,14 +525,14 @@ const PRESENTATION_MIME_TYPES = [
 MODERATION_ASSESSMENT_FIELDS_SCHEMA.shape;
 // packages/shared/src/ConnectorType.ts
 /** Where a connector delivers events. Kept apart from `Connector.ts`, which the event catalog can't import. */
-const CONNECTOR_TYPE_SCHEMA = lazySchema(() => zod.enum([
+const CONNECTOR_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"in-app",
 	"webhook",
 	"slack",
 	"email"
 ]));
 // packages/shared/src/ProjectAccess.ts
-const PROJECT_MEMBER_ROLE_SCHEMA = lazySchema(() => zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]));
+const PROJECT_MEMBER_ROLE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]));
 // packages/shared/src/EventCatalog.ts
 const EVENT_SEVERITY_SCHEMA = zod.enum(["low", "high"]);
 zod.enum([
@@ -1876,7 +1876,7 @@ const WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
 /** Receivers reject deliveries whose timestamp is further than this from their clock. */
 const WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300;
 /** The webhook body: the event, exactly as `GET /events` lists it, with `facts` typed by `type`. */
-const WEBHOOK_EVENT_PAYLOAD_SCHEMA = lazySchema(() => TYPED_EVENT_SCHEMA);
+const WEBHOOK_EVENT_PAYLOAD_SCHEMA = /* @__PURE__ */ lazySchema(() => TYPED_EVENT_SCHEMA);
 /** The body CalmLens sends for an event (its public fields; see `toPublicEvent`). */
 const toWebhookEventPayload = (event) => toPublicEvent(event);
 /** `v1=<hex HMAC-SHA256 of "<timestamp>.<body>">`, the `x-calmlens-signature` header value. */

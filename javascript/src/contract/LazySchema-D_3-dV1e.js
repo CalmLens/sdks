@@ -11,8 +11,11 @@ const registryMap = globalRegistry._map;
 * receiver, so its methods see the real instance. Its metadata (`.meta()`, `.describe()`, zod-meta's
 * stores) is registered under the proxy too, for the code that looks schemas up by identity (JSON
 * Schema generation, where the proxy is embedded in another schema).
+*
+* Calling it has no side effects (the annotation tells bundlers), so a bundle drops the lazy
+* schemas it never uses, as it drops plain Zod schemas.
 */
-const lazySchema = (build) => {
+const lazySchema = /* @__NO_SIDE_EFFECTS__ */ (build) => {
 	let schema;
 	const real = () => {
 		if (!schema) {

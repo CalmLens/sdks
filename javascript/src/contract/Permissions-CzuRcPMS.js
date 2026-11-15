@@ -1,8 +1,8 @@
 import { n as idField } from "./Ids-C2cLdFM0.js";
-import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
+import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
 import * as zod from "zod";
 // packages/shared/src/Permissions.ts
-const ACTION_SCHEMA = lazySchema(() => zod.enum([
+const ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"assets:read",
 	"assets:download",
 	"assets:create",
@@ -50,13 +50,13 @@ const PROJECT_ACTIONS = [...[
 const isProjectAction = (action) => PROJECT_ACTIONS.includes(action);
 /** The actions that include `action`: its feature's write action and project:manage. */
 const actionsImplying = (action) => !isProjectAction(action) || action === "project:manage" ? [] : action.endsWith(":read") ? [action.replace(/:read$/, ":write"), "project:manage"] : ["project:manage"];
-const GRANT_SCHEMA = lazySchema(() => zod.object({
+const GRANT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	actions: zod.array(ACTION_SCHEMA),
 	folderId: idField("fldr").nullable(),
 	includeSubfolders: zod.boolean()
 }).strict().refine((g) => g.folderId === null || !g.actions.some(isProjectAction), "Project configuration permissions require project scope"));
-const GRANTS_SCHEMA = lazySchema(() => zod.array(GRANT_SCHEMA).max(100));
-const ACCESS_ROLE_SCHEMA = lazySchema(() => zod.enum([
+const GRANTS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.array(GRANT_SCHEMA).max(100));
+const ACCESS_ROLE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"admin",
 	"configurator",
 	"editor",

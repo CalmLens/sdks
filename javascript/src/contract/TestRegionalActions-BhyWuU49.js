@@ -1,5 +1,5 @@
-import { t as lazySchema } from "./LazySchema-CcKjWS20.js";
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-DtKWaQMI.js";
+import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-CQN8qnzX.js";
 import * as z from "zod";
 // packages/shared/src/Messages.ts
 /**
@@ -1026,7 +1026,7 @@ function getModerationQualifierInfo(qualifier) {
 }
 // packages/shared/src/TestRegionalActions.ts
 /** Authenticated test inputs can add regional delivery restrictions without inventing evidence. */
-const TEST_REGIONAL_ACTIONS_SCHEMA = lazySchema(() => z.array(z.object({
+const TEST_REGIONAL_ACTIONS_SCHEMA = /* @__PURE__ */ lazySchema(() => z.array(z.object({
 	region: JURISDICTION_SCHEMA.exclude(["global"]),
 	action: z.enum([
 		"limit",
