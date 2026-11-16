@@ -1291,10 +1291,10 @@
     },
     {
       "name": "every event type: asset.uploaded",
-      "body": "{\"id\":\"evt_assetuploadedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.uploaded\",\"severity\":\"low\",\"title\":\"beach.jpg uploaded\",\"description\":\"Added to the project as an image asset.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"file-format\",\"value\":\"jpg\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetuploadedxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.uploaded\",\"severity\":\"low\",\"title\":\"beach.jpg uploaded\",\"description\":\"Added to the project as an image asset.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"file-format\",\"value\":\"jpg\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=4a567162766dbd343b9ccf5d2ded5c22f48ac670a45c970990c463d3c38d08f8",
+      "signature": "v1=e76d2348a8228a9f576dd4c1e1cf88a228d4b0643f9226ed3b26c76f60df9754",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetuploadedxxxxxxx",
@@ -1307,10 +1307,10 @@
         "severity": "low",
         "title": "beach.jpg uploaded",
         "description": "Added to the project as an image asset.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1351,10 +1351,10 @@
     },
     {
       "name": "every event type: asset.classified",
-      "body": "{\"id\":\"evt_assetclassifiedxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.classified\",\"severity\":\"low\",\"title\":\"beach.jpg classified\",\"description\":\"Classification finished. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"moderation-status\",\"value\":\"age-restricted\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetclassifiedxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.classified\",\"severity\":\"low\",\"title\":\"beach.jpg classified\",\"description\":\"Classification finished. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"moderation-status\",\"value\":\"age-restricted\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=e0ff34ea4f789d96d563d7d2820c604cbb01ffd64ef0eeba73cf47ddac5e0800",
+      "signature": "v1=6486a74e37c90a31675b6b9ada61c366395775e553e0f3eea5e28eeda18bda6a",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetclassifiedxxxxx",
@@ -1367,10 +1367,10 @@
         "severity": "low",
         "title": "beach.jpg classified",
         "description": "Classification finished. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1468,10 +1468,10 @@
     },
     {
       "name": "every event type: asset.allowed",
-      "body": "{\"id\":\"evt_assetallowedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.allowed\",\"severity\":\"low\",\"title\":\"beach.jpg allowed\",\"description\":\"Delivered normally.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetallowedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.allowed\",\"severity\":\"low\",\"title\":\"beach.jpg allowed\",\"description\":\"Delivered normally.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=9eb1f4ead1ed23791912aa6c133c15232188c131e746dcd436a701ecd78e2198",
+      "signature": "v1=a49a25cff978190478050c36efb205f17575c31e0e464a47dea3ed23ec079897",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetallowedxxxxxxxx",
@@ -1484,10 +1484,10 @@
         "severity": "low",
         "title": "beach.jpg allowed",
         "description": "Delivered normally.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1528,10 +1528,10 @@
     },
     {
       "name": "every event type: asset.limited",
-      "body": "{\"id\":\"evt_assetlimitedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.limited\",\"severity\":\"low\",\"title\":\"beach.jpg limited\",\"description\":\"Delivered normally, marked for reduced reach. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetlimitedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.limited\",\"severity\":\"low\",\"title\":\"beach.jpg limited\",\"description\":\"Delivered normally, marked for reduced reach. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"limited\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=8fded351327f750dccb4cc2072ca504efd74ef908d46529fca1a5d0ea30242d7",
+      "signature": "v1=70a4ef43f915b64c2caf75329f24108ba56d7ac16b97023699cc47f8578f651f",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetlimitedxxxxxxxx",
@@ -1544,10 +1544,10 @@
         "severity": "low",
         "title": "beach.jpg limited",
         "description": "Delivered normally, marked for reduced reach. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1590,10 +1590,10 @@
     },
     {
       "name": "every event type: asset.age-restricted",
-      "body": "{\"id\":\"evt_assetagerestrictedxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.age-restricted\",\"severity\":\"high\",\"title\":\"beach.jpg age-restricted\",\"description\":\"Delivery requires `viewerClaims.ageConfirmed=true`, including requests using signed URLs or API keys. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"age-restricted\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetagerestrictedxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.age-restricted\",\"severity\":\"high\",\"title\":\"beach.jpg age-restricted\",\"description\":\"Delivery requires `viewerClaims.ageConfirmed=true`, including requests using signed URLs or API keys. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"age-restricted\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=871741205d1271783ad7c49e1e79c1e5357caa6d014e203caf27bc94852d404a",
+      "signature": "v1=fe1dd1e96082f26fee5eebde085b814b277a21b2fc2f59fb52892d477a3cffb1",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetagerestrictedxx",
@@ -1606,10 +1606,10 @@
         "severity": "high",
         "title": "beach.jpg age-restricted",
         "description": "Delivery requires `viewerClaims.ageConfirmed=true`, including requests using signed URLs or API keys. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1652,10 +1652,10 @@
     },
     {
       "name": "every event type: asset.blocked",
-      "body": "{\"id\":\"evt_assetblockedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetblockedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=a9fb10bbb2ef3870780212e02cd38076fedd63e30996a96a76364112ed551398",
+      "signature": "v1=1edd49961384a0cdec55e80b37d89be741f9ab2d520fd8c4793f1d13df8b5f66",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetblockedxxxxxxxx",
@@ -1668,10 +1668,10 @@
         "severity": "high",
         "title": "beach.jpg blocked",
         "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1714,10 +1714,10 @@
     },
     {
       "name": "every event type: asset.purged",
-      "body": "{\"id\":\"evt_assetpurgedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.purged\",\"severity\":\"high\",\"title\":\"beach.jpg purged\",\"description\":\"No longer delivered. Its content was deleted. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"purged\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetpurgedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.purged\",\"severity\":\"high\",\"title\":\"beach.jpg purged\",\"description\":\"No longer delivered. Its content was deleted. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"purged\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=df3349a4cd1681a6eaadd7587bcf246213438de3930499e89523081a4ac516eb",
+      "signature": "v1=0c87b9271d1ad385960f84d611004ded3c49d1cf2c3806d53fdf517c1c3f3ff1",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetpurgedxxxxxxxxx",
@@ -1730,10 +1730,10 @@
         "severity": "high",
         "title": "beach.jpg purged",
         "description": "No longer delivered. Its content was deleted. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1776,10 +1776,10 @@
     },
     {
       "name": "every event type: asset.failed",
-      "body": "{\"id\":\"evt_assetfailedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.failed\",\"severity\":\"high\",\"title\":\"clip.mp4 failed to process\",\"description\":\"Processing stopped with an error. Retry the asset, or contact support if it keeps failing.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"failed\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"clip.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"previous-status\",\"value\":\"processing\"},{\"key\":\"failure-reason\",\"value\":\"duration-limit\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetfailedxxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.failed\",\"severity\":\"high\",\"title\":\"clip.mp4 failed to process\",\"description\":\"Processing stopped with an error. Retry the asset, or contact support if it keeps failing.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"failed\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"clip.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"previous-status\",\"value\":\"processing\"},{\"key\":\"failure-reason\",\"value\":\"duration-limit\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=2bc68b82a0d689c6681880be72e87efc357a4e7f85d555af998aef2e50cf306d",
+      "signature": "v1=4ee3e9863eed82839a017f389ee2e21928edfb2e0e952dbcb7e03aa32c828792",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetfailedxxxxxxxxx",
@@ -1792,10 +1792,10 @@
         "severity": "high",
         "title": "clip.mp4 failed to process",
         "description": "Processing stopped with an error. Retry the asset, or contact support if it keeps failing.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1840,10 +1840,10 @@
     },
     {
       "name": "every event type: asset.progress-updated",
-      "body": "{\"id\":\"evt_assetprogressupdated\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.progress-updated\",\"severity\":\"low\",\"title\":\"lecture.mp4 is 20% analysed\",\"description\":\"13 of 63 sections are done. Its decision follows once all are.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"lecture.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"completed-sections\",\"value\":13},{\"key\":\"total-sections\",\"value\":63},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetprogressupdated\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.progress-updated\",\"severity\":\"low\",\"title\":\"lecture.mp4 is 20% analysed\",\"description\":\"13 of 63 sections are done. Its decision follows once all are.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"lecture.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"completed-sections\",\"value\":13},{\"key\":\"total-sections\",\"value\":63},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=25a4be8a4476a898b8d0671a450d54abbc708a73982d4dbdcbf610a7bf43252c",
+      "signature": "v1=114f484a1e114483b23205db6d0c30e75e73828994d8d3b3a5d8e772f9ffff14",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetprogressupdated",
@@ -1856,10 +1856,10 @@
         "severity": "low",
         "title": "lecture.mp4 is 20% analysed",
         "description": "13 of 63 sections are done. Its decision follows once all are.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1904,10 +1904,10 @@
     },
     {
       "name": "every event type: asset.deleted",
-      "body": "{\"id\":\"evt_assetdeletedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.deleted\",\"severity\":\"low\",\"title\":\"beach.jpg deleted\",\"description\":\"The asset and its stored content were deleted.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetdeletedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.deleted\",\"severity\":\"low\",\"title\":\"beach.jpg deleted\",\"description\":\"The asset and its stored content were deleted.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=18e1d9dac3eb82ef5985a84a74f448b69a4330bf4c4132f1ccb706e663b0e313",
+      "signature": "v1=d6401405c4e29823cfe3112489c90198fd316971f10ab56bb1a3eb3bf5602033",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetdeletedxxxxxxxx",
@@ -1920,10 +1920,10 @@
         "severity": "low",
         "title": "beach.jpg deleted",
         "description": "The asset and its stored content were deleted.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -1960,10 +1960,10 @@
     },
     {
       "name": "every event type: asset.content-removed",
-      "body": "{\"id\":\"evt_assetcontentremovedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.content-removed\",\"severity\":\"low\",\"title\":\"beach.jpg content removed\",\"description\":\"The stored content was removed. The asset and its classification results remain.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetcontentremovedx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"api-key\",\"id\":\"key_9Pt3Wm6Rk2Lx8Qv4Nb7C\"},\"type\":\"asset.content-removed\",\"severity\":\"low\",\"title\":\"beach.jpg content removed\",\"description\":\"The stored content was removed. The asset and its classification results remain.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"removed\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=2fa8ca31b0e88ad7e2827980b679ce9edcb5bb0d7d6a2534ea22d8c7a3fb2d51",
+      "signature": "v1=204f64ab1893051892391ede171fdb16c2f400fad522f8fa75c8209c94e46533",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetcontentremovedx",
@@ -1976,10 +1976,10 @@
         "severity": "low",
         "title": "beach.jpg content removed",
         "description": "The stored content was removed. The asset and its classification results remain.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -2016,10 +2016,10 @@
     },
     {
       "name": "every event type: asset.retried",
-      "body": "{\"id\":\"evt_assetretriedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.retried\",\"severity\":\"low\",\"title\":\"beach.jpg retried\",\"description\":\"The asset was queued for processing again.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetretriedxxxxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.retried\",\"severity\":\"low\",\"title\":\"beach.jpg retried\",\"description\":\"The asset was queued for processing again.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"processing\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=ec5399e0b6a7a4cd3fcd3b03079e399b31785cb127a54c127b913de7d5af3270",
+      "signature": "v1=dfc9c42770a598b169ac99ffea8235eb8a824e91bb76c0c2d83f4abd46d13b46",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetretriedxxxxxxxx",
@@ -2032,10 +2032,10 @@
         "severity": "low",
         "title": "beach.jpg retried",
         "description": "The asset was queued for processing again.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -2072,10 +2072,10 @@
     },
     {
       "name": "every event type: asset.review-requested",
-      "body": "{\"id\":\"evt_assetreviewrequested\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.review-requested\",\"severity\":\"low\",\"title\":\"beach.jpg is waiting for review\",\"description\":\"Its decision was uncertain for harassment, so it was added to the human review queue.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"automated-status\",\"value\":\"allowed\"},{\"key\":\"review-reason\",\"value\":\"uncertain\"},{\"key\":\"uncertain-categories\",\"value\":[\"harassment\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetreviewrequested\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.review-requested\",\"severity\":\"low\",\"title\":\"beach.jpg is waiting for review\",\"description\":\"Its decision was uncertain for harassment, so it was added to the human review queue.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"automated-status\",\"value\":\"allowed\"},{\"key\":\"review-reason\",\"value\":\"uncertain\"},{\"key\":\"uncertain-categories\",\"value\":[\"harassment\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=baeb298d2dacdc3f3cfe4d8c07880cd94bb841a3f7082b4cc9c0bc8ed86cb636",
+      "signature": "v1=275633eb1980fa4364932341154c1b465f2e297b81d660f04cc0bf5c9e1ec84b",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetreviewrequested",
@@ -2088,10 +2088,10 @@
         "severity": "low",
         "title": "beach.jpg is waiting for review",
         "description": "Its decision was uncertain for harassment, so it was added to the human review queue.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -2142,10 +2142,10 @@
     },
     {
       "name": "every event type: asset.review-completed",
-      "body": "{\"id\":\"evt_assetreviewcompleted\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.review-completed\",\"severity\":\"low\",\"title\":\"Review completed\",\"description\":\"A reviewer completed a queued review, whether confirming or changing the asset's decision.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"review-id\",\"value\":\"rev_8Xm3Rk2Lq7Vt9Wb4Np6C\"},{\"key\":\"decision\",\"value\":\"allowed\"},{\"key\":\"applied-to-asset\",\"value\":false},{\"key\":\"note\",\"value\":null},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"evt_assetreviewcompleted\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"user\",\"id\":\"user_4Rk9Xm2Lq7Vt3Wb8Np6C\"},\"type\":\"asset.review-completed\",\"severity\":\"low\",\"title\":\"Review completed\",\"description\":\"A reviewer completed a queued review, whether confirming or changing the asset's decision.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"review-id\",\"value\":\"rev_8Xm3Rk2Lq7Vt9Wb4Np6C\"},{\"key\":\"decision\",\"value\":\"allowed\"},{\"key\":\"applied-to-asset\",\"value\":false},{\"key\":\"note\",\"value\":null},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=4e06675f6004a4cfb6ff43e0c51035a83a8e8ae06f5e6d91f462881d03851cd7",
+      "signature": "v1=2229d9ab9c3528c3904de67ad5975f1d57b296a2df9c29a6410f4f21b4d4edea",
       "now": 1700000000,
       "expected": {
         "id": "evt_assetreviewcompleted",
@@ -2158,10 +2158,10 @@
         "severity": "low",
         "title": "Review completed",
         "description": "A reviewer completed a queued review, whether confirming or changing the asset's decision.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -3399,10 +3399,10 @@
         "severity": "high",
         "title": "beach.jpg blocked",
         "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -3452,10 +3452,10 @@
         "severity": "high",
         "title": "beach.jpg blocked",
         "description": "No longer delivered. Its content is kept. Possible violations: sexual.",
-        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "assetSequence": 1,
         "asset": {
-          "id": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
           "externalId": "post-123",
           "uploadPresetId": null,
           "upload": {
@@ -3494,7 +3494,7 @@
         ],
         "createdAt": 1700000000000
       },
-      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "deliveryId": "delivery-test",
       "timestampSeconds": 1700000000,
@@ -3502,7 +3502,7 @@
         "content-type": "application/json",
         "x-calmlens-delivery": "delivery-test",
         "x-calmlens-timestamp": "1700000000",
-        "x-calmlens-signature": "v1=4e60dff5cdb0829e148e2ad9d1340834122d6263a68bfbc8c14b054ba3f2f4d0"
+        "x-calmlens-signature": "v1=a9ec00d1874c59742aca5ffccd18ed3c9f1a2eda9fbd470e6b89d7ea54aad02b"
       },
       "isTest": true
     }
