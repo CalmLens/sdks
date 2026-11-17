@@ -1,10 +1,11 @@
 // Whether a release commit's required checks passed. A release is published only after the SDK
-// Tests and SDK examples workflows, run for the push of that commit to main, have succeeded.
+// Tests and SDK examples workflows, run for the push that put that commit's code on main, have
+// succeeded: the commit's own push, or the push of a merge that holds exactly its code.
 //
 //   node scripts/release-checks.mjs <commit>
 //
-// Prints `passed`, `failed` or the name of the check still to finish, and exits 0 only for
-// `passed`. Reads the runs of the repository in GITHUB_REPOSITORY (default CalmLens/sdks).
+// Prints `passed`, `failed`, `unchecked` or the name of the check still to finish, and exits 0
+// only for `passed`. Reads the runs of the repository in GITHUB_REPOSITORY (default CalmLens/sdks).
 
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -25,8 +26,35 @@ export function checkState(checks) {
   return "passed";
 }
 
-/** The checks of the push that put `commit` on main. */
+const git = (cwd, ...args) =>
+  execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+
+/**
+ * The commit whose push to main ran `commit`'s checks: the commit itself when it was pushed
+ * directly, or else the merge that brought it in, provided that merge holds exactly its code.
+ * Null when it reached main only alongside other changes, so no push checked it on its own.
+ */
+export function checkedCommit(commit, cwd = process.cwd()) {
+  const mainline = git(cwd, "rev-list", "--first-parent", "HEAD").split("\n");
+  if (mainline.includes(commit)) return commit;
+  const merge = mainline.findLast((candidate) => {
+    try {
+      git(cwd, "merge-base", "--is-ancestor", commit, candidate);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!merge) return null;
+  return git(cwd, "rev-parse", `${merge}^{tree}`) === git(cwd, "rev-parse", `${commit}^{tree}`)
+    ? merge
+    : null;
+}
+
+/** The checks of the push that put `commit` on main, or `unchecked` when no push checked it alone. */
 export function releaseCheckState(commit) {
+  const pushed = checkedCommit(commit);
+  if (!pushed) return "unchecked";
   const checks = JSON.parse(
     execFileSync(
       "gh",
@@ -36,7 +64,7 @@ export function releaseCheckState(commit) {
         "-R",
         process.env.GITHUB_REPOSITORY || "CalmLens/sdks",
         "--commit",
-        commit,
+        pushed,
         "--event",
         "push",
         "--limit",

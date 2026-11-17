@@ -25,6 +25,10 @@ const release = releases.find((entry) => entry.sdk === sdk);
 const state = release && afterChecks ? releaseCheckState(source) : "passed";
 if (state === "failed")
   process.stderr.write(`::warning::Not releasing ${sdk} from ${source}: its checks failed\n`);
+else if (state === "unchecked")
+  process.stderr.write(
+    `::warning::Not releasing ${sdk} from ${source}: it reached main merged with other changes, so no push checked its code\n`,
+  );
 else if (state !== "passed") process.stdout.write(`Waiting for ${state} at ${source}\n`);
 else if (release) {
   if (!/^\d+\.\d+\.\d+$/.test(release.version)) throw new Error(`Invalid ${sdk} version`);
