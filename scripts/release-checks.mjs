@@ -34,8 +34,9 @@ const git = (cwd, ...args) =>
  * directly, or else the merge that brought it in, provided that merge holds exactly its code.
  * Null when it reached main only alongside other changes, so no push checked it on its own.
  */
-export function checkedCommit(commit, cwd = process.cwd()) {
-  const mainline = git(cwd, "rev-list", "--first-parent", "HEAD").split("\n");
+export function checkedCommit(commit, cwd = process.cwd(), main = "origin/main") {
+  // Main's history, not HEAD's: a publish runs on a checkout of the release tag itself.
+  const mainline = git(cwd, "rev-list", "--first-parent", main).split("\n");
   if (mainline.includes(commit)) return commit;
   const merge = mainline.findLast((candidate) => {
     try {

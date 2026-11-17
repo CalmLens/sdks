@@ -53,6 +53,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Main's history, to find the push that checked the release (release-checks.mjs).
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24

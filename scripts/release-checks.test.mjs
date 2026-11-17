@@ -36,20 +36,25 @@ test("a release's checks are its own push's, or those of a merge that holds exac
     git("config", "user.email", "test@example.com");
     git("config", "user.name", "Test");
     const pushed = commit("plan.json", "Pushed release");
-    assert.equal(checkedCommit(pushed, cwd), pushed);
+    assert.equal(checkedCommit(pushed, cwd, "main"), pushed);
 
     git("checkout", "-b", "alone");
     const alone = commit("plan.json", "Release merged alone");
     git("checkout", "main");
     git("merge", "--no-ff", "alone", "-m", "Merge the release alone");
-    assert.equal(checkedCommit(alone, cwd), git("rev-parse", "HEAD"));
+    const merge = git("rev-parse", "HEAD");
+    assert.equal(checkedCommit(alone, cwd, "main"), merge);
+    // As a publish sees it: a checkout of the release's tag, with main's history fetched.
+    git("checkout", "-q", alone);
+    assert.equal(checkedCommit(alone, cwd, "main"), merge);
+    git("checkout", "-q", "main");
 
     git("checkout", "-b", "beside");
     const beside = commit("plan.json", "Release merged beside other work");
     git("checkout", "main");
     commit("other.txt", "Other work");
     git("merge", "--no-ff", "beside", "-m", "Merge the release beside other work");
-    assert.equal(checkedCommit(beside, cwd), null);
+    assert.equal(checkedCommit(beside, cwd, "main"), null);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
