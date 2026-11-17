@@ -1,5 +1,19 @@
 # @calmlens/sdk-php
 
+## 0.27.0
+
+### Patch Changes
+
+- 6d7f433: The mock CDN answers every resource of an asset whose content was removed, its placeholder
+  included, with `404` `asset/not-found`, as it answers an unknown asset, as the CDN now does. Its
+  display info still reports the asset as unavailable.
+- fe4ada1: `assets.explain` is removed, with its `rerun` option, as the API no longer explains or re-runs a
+  decided asset's moderation: an asset keeps the one decision it is given. The
+  `asset.rerun-requested` event type and the `asset/not-decided`, `asset/policy-changed` and
+  `asset/reviewed` error codes are removed too. The mock clients no longer offer the `rerun`
+  moderation trigger, and `completeProcessing` finishes only an asset that is processing.
+  `classification.moderation.explanationComplete` is unchanged.
+
 ## 0.26.1
 
 ### Patch Changes
