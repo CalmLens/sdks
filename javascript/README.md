@@ -46,7 +46,7 @@ if (status === "allowed" || status === "limited") {
 // Images and documents: queued, resolved by webhook or assets.retrieve()
 const image = await client.assets.create({
   name: "photo.jpg",
-  content: { data: file, type: "image/jpeg" },
+  content: file,
   externalId: "post-7",
 });
 console.log(image.classification.status, image.classification.moderation.decision); // "processing" null

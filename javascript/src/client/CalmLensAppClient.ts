@@ -106,14 +106,15 @@ export default class CalmLensAppClient {
     if (!("content" in options) && !("part" in options)) {
       throw invalidArgument("Uploads through an upload preset need content or a part");
     }
-    prepareSubmitAssetOptions(options, {
+    // A Blob or File becomes `{ data, type }`, with a File's name as the default.
+    const prepared = prepareSubmitAssetOptions(options, {
       deferUploadChecks: connection.deferUploadChecks,
       partSizeBytes: connection.partSizeBytes,
     });
     const token = await this.newUploadToken();
-    if ("content" in options && splitsIntoParts(options.content, connection.partSizeBytes)) {
+    if ("content" in prepared && splitsIntoParts(prepared.content, connection.partSizeBytes)) {
       // The token that started the upload authorizes its later parts.
-      const data = await connection.submitInParts(this.uploadsPath, options, wait, {
+      const data = await connection.submitInParts(this.uploadsPath, prepared, wait, {
         authHeaders: token ? { Authorization: `Bearer ${token}` } : {},
         partPath: (assetId) => `${this.uploadsPath}/${encodeURIComponent(assetId)}/part`,
         onStarted: (assetId) => {
@@ -125,7 +126,7 @@ export default class CalmLensAppClient {
     }
     const data = await connection.submitUpload(
       this.uploadsPath,
-      options,
+      prepared as Exclude<typeof prepared, { url: string }>,
       wait,
       token ? { Authorization: `Bearer ${token}` } : {},
     );

@@ -23,10 +23,12 @@ import type {
   ConnectionOptions,
   CreateMultipartUploadPartOptions,
   MultipartUploadPartOptions,
+  PreparedSubmitAssetOptions,
   RequestOptions,
   SubmitAssetOptions,
   UploadAssetPartOptions,
   UploadedAsset,
+  UploadPresetSubmitAssetOptions,
 } from "./CalmLensTypes";
 import { isAcceptedUploadMimeType, randomUuid, stringifyQuery } from "./CalmLensUtils";
 
@@ -279,13 +281,40 @@ const assertUploadSize = (type: string, size: number | undefined, inParts: boole
 };
 
 /** Checks upload options before anything is sent. */
+const isBlob = (value: unknown): value is Blob =>
+  typeof Blob !== "undefined" && value instanceof Blob;
+
+/**
+ * `content` given as a `Blob` or `File`, as the `{ data, type }` the rest of the client reads: the
+ * content type is the Blob's own, and a File's name is the asset's when the options give none.
+ */
+export const withContentObject = <T extends object>(options: T): T => {
+  if (!options || typeof options !== "object" || !("content" in options)) return options;
+  const content = (options as { content: unknown }).content;
+  if (!isBlob(content)) return options;
+  if (!content.type) {
+    throw invalidPayload(
+      'The Blob has no type: create it with one, such as new Blob([bytes], { type: "image/png" }), or pass { data, type }',
+    );
+  }
+  const fileName =
+    typeof File !== "undefined" && content instanceof File ? content.name : undefined;
+  const named = options as { name?: string };
+  return {
+    ...options,
+    ...(named.name || !fileName ? {} : { name: fileName }),
+    content: { data: content, type: content.type },
+  } as T;
+};
+
 export const prepareSubmitAssetOptions = (
-  options: SubmitAssetOptions,
+  input: SubmitAssetOptions | UploadPresetSubmitAssetOptions,
   {
     deferUploadChecks = false,
     partSizeBytes = DEFAULT_PART_SIZE_BYTES,
   }: { deferUploadChecks?: boolean; partSizeBytes?: number } = {},
-): SubmitAssetOptions => {
+): PreparedSubmitAssetOptions => {
+  const options = withContentObject(input) as PreparedSubmitAssetOptions;
   if (!options || typeof options !== "object") {
     throw invalidArgument("Asset options are required");
   }
@@ -651,14 +680,14 @@ export class CalmLensConnection {
    */
   async submitUpload(
     uploadsPath: string,
-    options: Exclude<SubmitAssetOptions, { url: string }>,
+    options: Exclude<PreparedSubmitAssetOptions, { url: string }>,
     wait: boolean,
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     const isMultipart = "part" in options;
     const payload = isMultipart ? options.part : options.content;
     const multipartOptions = options as Extract<
-      SubmitAssetOptions,
+      PreparedSubmitAssetOptions,
       { part: CreateMultipartUploadPartOptions }
     >;
     const idempotencyKey =
@@ -736,7 +765,7 @@ export class CalmLensConnection {
    */
   async submitInParts(
     uploadsPath: string,
-    options: Extract<SubmitAssetOptions, { content: unknown }>,
+    options: Extract<PreparedSubmitAssetOptions, { content: unknown }>,
     wait: boolean,
     {
       authHeaders = {},
@@ -764,7 +793,7 @@ export class CalmLensConnection {
         part: { ...part(1), type: content.type, partNumber: 1, isFinal: false },
         totalSizeInBytes: source.size,
         idempotencyKey: key,
-      } as SubmitAssetOptions as Exclude<SubmitAssetOptions, { url: string }>,
+      } as PreparedSubmitAssetOptions as Exclude<PreparedSubmitAssetOptions, { url: string }>,
       wait,
       authHeaders,
     )) as { id?: unknown };

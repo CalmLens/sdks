@@ -467,10 +467,11 @@ export interface SignedUploadToken {
 
 /** What an upload through a preset can set: everything else comes from the preset or token. */
 export type UploadPresetSubmitAssetOptions = IdempotencyOptions & {
-  name: string;
+  /** Required, except with a `File`, whose name it defaults to. */
+  name?: string;
   description?: string;
 } & (
-    | { content: AssetContentOptions }
+    | { content: AssetContentInput }
     | {
         part: CreateMultipartUploadPartOptions;
         /** The size of the whole file, when known. */
@@ -813,7 +814,14 @@ export interface SubmitAssetCommonOptions extends IdempotencyOptions {
   isFinal?: never;
 }
 
-export type SubmitAssetOptions =
+/**
+ * An asset's content: a `Blob` or `File`, whose own type is the content type (and a `File`'s
+ * name the asset's name when you give none), or bytes, base64 or plain text with their `type`.
+ */
+export type AssetContentInput = AssetContentOptions | Blob;
+
+/** Options as the client sends them, once a `Blob` or `File` is read as `{ data, type }`. */
+export type PreparedSubmitAssetOptions =
   | (SubmitAssetCommonOptions & {
       content: AssetContentOptions;
     })
@@ -830,6 +838,11 @@ export type SubmitAssetOptions =
        */
       totalSizeInBytes?: number;
     });
+
+/** What `assets.create` and `assets.classify` take: content, a URL or a multipart part. */
+export type SubmitAssetOptions =
+  | PreparedSubmitAssetOptions
+  | (SubmitAssetCommonOptions & { content: Blob });
 
 export interface MultipartUploadOptions extends SubmitAssetCommonOptions {
   part: CreateMultipartUploadPartOptions;
