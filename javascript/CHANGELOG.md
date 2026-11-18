@@ -1,3 +1,9 @@
+## 0.27.2
+
+### Patch Changes
+
+- b01aaa9: Accept Word macro-enabled documents (DOCM, `application/vnd.ms-word.document.macroenabled.12`) as uploads, as XLSM and PPTM already are: their text, images and pages are moderated like a DOCX's.
+
 ## 0.27.1
 
 ### Patch Changes
