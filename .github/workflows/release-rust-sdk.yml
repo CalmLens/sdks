@@ -1,0 +1,95 @@
+name: Publish Rust SDK
+
+# Publishes rust/ to crates.io as `calmlens` through trusted publishing (no stored token).
+#
+# When a merged release plan includes Rust and its commit's SDK Tests and SDK examples runs have
+# passed, the tag job tags `rust-sdk/v<version>` and the publish job packages that tag's crate and
+# uploads it. It runs again whenever one of those checks completes on main, so it waits while they
+# run, skips a release whose checks failed and skips a version crates.io already has.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-rust-sdk-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - id: tag
+        run: node scripts/release-tag.mjs rust rust-sdk/v release-rust-sdk.yml --after-checks --output
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    # The registry's trusted publisher names this workflow file and environment.
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/calmlens
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the manifest version
+        id: version
+        working-directory: .
+        run: node scripts/check-sdk-release-tag.mjs rust "${{ needs.tag.outputs.tag }}"
+      - name: Check whether crates.io has the version
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' -A "CalmLens/sdks release workflow" "https://crates.io/api/v1/crates/calmlens/$VERSION")
+          case "$status" in
+            200) echo "calmlens $VERSION is already on crates.io"; echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::crates.io answered $status"; exit 1 ;;
+          esac
+      - run: rustup toolchain install stable --profile minimal
+        if: steps.published.outputs.published == 'false'
+      - name: Package
+        if: steps.published.outputs.published == 'false'
+        run: cargo +stable publish --locked --dry-run
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+        if: steps.published.outputs.published == 'false'
+      - name: Publish
+        if: steps.published.outputs.published == 'false'
+        run: cargo +stable publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

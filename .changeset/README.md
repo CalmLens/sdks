@@ -10,16 +10,18 @@ JavaScript is `@calmlens/sdk`; native SDKs use
 The release workflow maintains a Version SDKs PR. Review its versions, native manifests
 and changelogs, then merge it. No publishing happens from that PR branch.
 
-The private application checks merged release plans every 15 minutes (or run its
-Release SDKs workflow manually). It updates its submodule pin, creates immutable
-release tags and dispatches the protected Python, Ruby, Rust and Java registry workflows.
-
-This public repo tags and publishes the rest itself. Go is tagged and validated here
+This public repo tags and publishes every SDK itself. Go is tagged and validated here
 (release-go-sdk.yml). The JavaScript SDK is tagged `javascript/v<version>` once its release
 commit's SDK Tests and SDK examples runs have passed, and release-npm.yml publishes one packed
 build to npm with provenance as both `@calmlens/sdk` and `calmlens`, skipping a name that
 already has the version. The `calmlens` CLI is tagged `cli-v<version>`, and release-cli.yml
-publishes its standalone executables and Homebrew formula. A failed publish remains visible in Actions;
+publishes its standalone executables and Homebrew formula. Python, Ruby, Rust and Java
+are tagged `<language>-sdk/v<version>` once the same checks have passed, and
+release-python-sdk.yml, release-ruby-sdk.yml, release-rust-sdk.yml and release-java-sdk.yml
+publish that tag's code to PyPI, RubyGems, crates.io and Maven Central from main's workflow,
+skipping a version the registry already has. PyPI, RubyGems and crates.io trust those
+workflow files and their `pypi`, `rubygems` and `crates-io` environments; Maven Central's
+token and signing key are secrets of the `maven-central` environment. A failed publish remains visible in Actions;
 correct code with a new changeset/version rather than moving a published tag.
 
 Do not hand-edit the proxy package.json versions or release.json. The version command

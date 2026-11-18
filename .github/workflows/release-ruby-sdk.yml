@@ -1,0 +1,98 @@
+name: Publish Ruby SDK
+
+# Publishes ruby/ to RubyGems as `calmlens` through trusted publishing (no stored key).
+#
+# When a merged release plan includes Ruby and its commit's SDK Tests and SDK examples runs have
+# passed, the tag job tags `ruby-sdk/v<version>` and the publish job builds that tag's gem and
+# pushes it. It runs again whenever one of those checks completes on main, so it waits while they
+# run, skips a release whose checks failed and skips a version RubyGems already has.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-ruby-sdk-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - id: tag
+        run: node scripts/release-tag.mjs ruby ruby-sdk/v release-ruby-sdk.yml --after-checks --output
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    # The registry's trusted publisher names this workflow file and environment.
+    environment:
+      name: rubygems
+      url: https://rubygems.org/gems/calmlens
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ruby
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the manifest version
+        id: version
+        working-directory: .
+        run: node scripts/check-sdk-release-tag.mjs ruby "${{ needs.tag.outputs.tag }}"
+      - name: Check whether RubyGems has the version
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://rubygems.org/api/v2/rubygems/calmlens/versions/$VERSION.json")
+          case "$status" in
+            200) echo "calmlens $VERSION is already on RubyGems"; echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RubyGems answered $status"; exit 1 ;;
+          esac
+      - uses: ruby/setup-ruby@v1
+        if: steps.published.outputs.published == 'false'
+        with:
+          ruby-version: "3.3"
+      - name: Build and smoke-test the gem
+        if: steps.published.outputs.published == 'false'
+        run: |
+          gem build calmlens.gemspec
+          gem install "./calmlens-${{ steps.version.outputs.version }}.gem"
+          ruby -rcalmlens -e 'CalmLens::ServerClient.new(api_key: "test", project_id: "test").close'
+      # Exchanges this job's OIDC token for a short-lived RubyGems API key.
+      - uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+        if: steps.published.outputs.published == 'false'
+      - name: Publish
+        if: steps.published.outputs.published == 'false'
+        run: gem push "calmlens-${{ steps.version.outputs.version }}.gem"

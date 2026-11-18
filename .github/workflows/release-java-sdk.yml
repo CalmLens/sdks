@@ -1,0 +1,106 @@
+name: Publish Java SDK
+
+# Publishes java/ to Maven Central (central.sonatype.com) as com.calmlens:calmlens-sdk, with
+# sources and javadoc jars and GPG signatures (the `release` profile in its pom.xml).
+#
+# When a merged release plan includes Java and its commit's SDK Tests and SDK examples runs have
+# passed, the tag job tags `java-sdk/v<version>` and the publish job signs that tag's build and
+# uploads it. It runs again whenever one of those checks completes on main, so it waits while they
+# run, skips a release whose checks failed and skips a version Maven Central already serves.
+#
+# Secrets of the `maven-central` environment, which only main may deploy to:
+#   MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  a Central Portal user token
+#   MAVEN_GPG_PRIVATE_KEY                            ASCII-armored private signing key
+#   MAVEN_GPG_PASSPHRASE                             that key's passphrase
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-java-sdk-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - id: tag
+        run: node scripts/release-tag.mjs java java-sdk/v release-java-sdk.yml --after-checks --output
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    # The registry's trusted publisher names this workflow file and environment.
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/artifact/com.calmlens/calmlens-sdk
+    defaults:
+      run:
+        working-directory: java
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the manifest version
+        id: version
+        working-directory: .
+        run: node scripts/check-sdk-release-tag.mjs java "${{ needs.tag.outputs.tag }}"
+      - name: Check whether Maven Central has the version
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/com/calmlens/calmlens-sdk/$VERSION/calmlens-sdk-$VERSION.pom")
+          case "$status" in
+            200) echo "calmlens-sdk $VERSION is already on Maven Central"; echo "published=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Maven Central answered $status"; exit 1 ;;
+          esac
+      # Writes the `central` server (matching publishingServerId) to settings.xml with credentials
+      # read from the environment variables named here, and imports the signing key.
+      - uses: actions/setup-java@v4
+        if: steps.published.outputs.published == 'false'
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      # Signs and uploads, then waits until Central reports the release published.
+      - name: Publish
+        if: steps.published.outputs.published == 'false'
+        run: mvn -B -P release deploy
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}

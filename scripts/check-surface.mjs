@@ -11,8 +11,9 @@
 // While the version is 0.x any change may be a patch release.
 //
 // The previous release is the SDK's release tag (`javascript/v<version>`, `cli-v<version>`,
-// `go/v<version>`, PHP's `v<version>`) or, for the SDKs tagged by the private application, the
-// commit whose `.changeset/release.json` recorded that version. It reads git and the fixtures
+// `go/v<version>`, PHP's `v<version>`, `<language>-sdk/v<version>` for Python, Ruby, Rust and
+// Java) or, for a release made before its SDK was tagged here, the commit whose
+// `.changeset/release.json` recorded that version. It reads git and the fixtures
 // only, so it runs offline, but it needs the full history and tags (not a shallow clone).
 //
 //   node scripts/check-surface.mjs
@@ -29,7 +30,15 @@ import { fileURLToPath } from "node:url";
 
 export const SDKS = ["javascript", "python", "ruby", "rust", "java", "go", "php"];
 /** The release tags this repository creates for each SDK. */
-export const TAG_PREFIXES = { javascript: ["javascript/v", "cli-v"], go: ["go/v"], php: ["v"] };
+export const TAG_PREFIXES = {
+  javascript: ["javascript/v", "cli-v"],
+  go: ["go/v"],
+  php: ["v"],
+  python: ["python-sdk/v"],
+  ruby: ["ruby-sdk/v"],
+  rust: ["rust-sdk/v"],
+  java: ["java-sdk/v"],
+};
 /** The copies of the shared surface fixture, for SDKs that keep none of their own. */
 const SURFACE_COPIES = ["go", "java", "ruby", "rust"];
 const CONTRACT = "javascript/src/contract";

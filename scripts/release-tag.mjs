@@ -5,17 +5,24 @@
 //   node scripts/release-tag.mjs go go/v release-go-sdk.yml
 //   node scripts/release-tag.mjs javascript cli-v release-cli.yml
 //   node scripts/release-tag.mjs javascript javascript/v release-npm.yml --after-checks
+//   node scripts/release-tag.mjs python python-sdk/v release-python-sdk.yml --after-checks --output
 //
 // With --after-checks the release is tagged only once its commit's SDK Tests and SDK examples
 // runs have passed (release-checks.mjs): while one is running it waits for a later run of this
 // script, and once they have failed it skips the release.
+//
+// With --output nothing is dispatched: the tag is written to the step's `tag` output instead, for a
+// later job of the same run to publish. PyPI, RubyGems and crates.io trust a workflow file and
+// environment, so the publish job runs main's workflow and checks out the release tag's code.
 
 import { execFileSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { releaseCheckState } from "./release-checks.mjs";
 import { releaseSource } from "./release-source.mjs";
 
 const [sdk, prefix, workflow, ...flags] = process.argv.slice(2);
 const afterChecks = flags.includes("--after-checks");
+const output = flags.includes("--output");
 if (!sdk || !prefix || !workflow) throw new Error("Pass the SDK, tag prefix and workflow file.");
 const run = (command, args) => execFileSync(command, args, { encoding: "utf8" }).trim();
 const git = (...args) => run("git", args);
@@ -39,6 +46,11 @@ else if (release) {
   } else {
     git("tag", tag, source);
     git("push", "origin", `refs/tags/${tag}`);
+  }
+  if (output) {
+    if (!process.env.GITHUB_OUTPUT) throw new Error("--output needs GITHUB_OUTPUT");
+    appendFileSync(process.env.GITHUB_OUTPUT, `tag=${tag}\n`);
+    process.exit(0);
   }
   const runs = JSON.parse(
     run("gh", [

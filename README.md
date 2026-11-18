@@ -88,7 +88,7 @@ Add a changeset with `bun run changeset` when an SDK needs a release. Select the
 and bump type; the Version SDKs workflow maintains a release PR containing the native
 version updates and per-SDK changelogs. Merge that PR to release.
 
-The JavaScript SDK, Go, PHP and the CLI are released from this repository. When a merged plan
+Every SDK and the CLI are released from this repository. When a merged plan
 includes the JavaScript SDK and its commit's SDK Tests and SDK examples runs have passed,
 `release-npm.yml` tags `javascript/v<version>` and publishes one packed build to npm with
 provenance, as `calmlens` and as `@calmlens/sdk`. `release-cli.yml` tags `cli-v<version>`,
@@ -99,11 +99,10 @@ Scoop manifest, winget manifests and a container image, published only when the
 releases `v<version>`; Packagist installs `calmlens/sdk` from those tags, through the root
 `composer.json`, with `.gitattributes` keeping the archive to the PHP package.
 
-Python, Ruby, Rust and Java are published by the private application repository with its
-existing trusted publishers and protected environments. Its Release SDKs workflow checks
-tested public release plans every 15 minutes (or on manual dispatch), advances the submodule
-pin, creates immutable release tags and dispatches those publishing jobs. Check both
-repositories' Actions for completion.
+Python, Ruby, Rust and Java are tagged `<language>-sdk/v<version>` once the same checks have
+passed; `release-python-sdk.yml`, `release-ruby-sdk.yml`, `release-rust-sdk.yml` and
+`release-java-sdk.yml` publish that tag's code to PyPI, RubyGems and crates.io through trusted
+publishing and to Maven Central with the `maven-central` environment's token and signing key.
 
 See [.changeset/README.md](.changeset/README.md) for package identifiers and retry guidance.
 The small native `package.json` files are version records for Changesets, not npm packages.

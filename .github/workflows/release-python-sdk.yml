@@ -1,0 +1,78 @@
+name: Publish Python SDK
+
+# Publishes python/ to PyPI as `calmlens` through trusted publishing (no stored token).
+#
+# When a merged release plan includes Python and its commit's SDK Tests and SDK examples runs have
+# passed, the tag job tags `python-sdk/v<version>` and the publish job builds that tag's code and
+# uploads it. It runs again whenever one of those checks completes on main, so it waits while they
+# run, skips a release whose checks failed and skips a version PyPI already has.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-python-sdk-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - id: tag
+        run: node scripts/release-tag.mjs python python-sdk/v release-python-sdk.yml --after-checks --output
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    # The registry's trusted publisher names this workflow file and environment.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/calmlens/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the manifest version
+        run: node scripts/check-sdk-release-tag.mjs python "${{ needs.tag.outputs.tag }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build distributions
+        run: |
+          python -m pip install build twine
+          python -m build python --outdir dist
+          python -m twine check --strict dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
