@@ -29,6 +29,7 @@ UPLOAD_MIME_SUFFIXES: Tuple[str, ...] = (
 UPLOAD_MIME_TYPES: Tuple[str, ...] = (
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-word.document.macroenabled.12",
     "application/msword",
     "application/rtf",
     "application/vnd.oasis.opendocument.text",

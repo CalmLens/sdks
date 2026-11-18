@@ -36,6 +36,7 @@ final class UploadMimeTypes
     public const TYPES = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-word.document.macroenabled.12',
         'application/msword',
         'application/rtf',
         'application/vnd.oasis.opendocument.text',

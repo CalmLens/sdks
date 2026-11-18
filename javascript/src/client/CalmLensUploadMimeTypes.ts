@@ -17,6 +17,7 @@ export const UPLOAD_MIME_SUFFIXES: readonly string[] = ["+json", "+xml"];
 export const UPLOAD_MIME_TYPES: readonly string[] = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-word.document.macroenabled.12",
   "application/msword",
   "application/rtf",
   "application/vnd.oasis.opendocument.text",

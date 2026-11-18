@@ -29,6 +29,7 @@ public final class UploadMimeTypes {
   public static final List<String> TYPES = List.of(
       "application/pdf",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-word.document.macroenabled.12",
       "application/msword",
       "application/rtf",
       "application/vnd.oasis.opendocument.text",
