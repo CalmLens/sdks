@@ -6,6 +6,9 @@ name: Publish Rust SDK
 # passed, the tag job tags `rust-sdk/v<version>` and the publish job packages that tag's crate and
 # uploads it. It runs again whenever one of those checks completes on main, so it waits while they
 # run, skips a release whose checks failed and skips a version crates.io already has.
+#
+# crates.io refuses trusted publishing from a workflow_run event, so the tag job dispatches this
+# workflow on main with the tag, and the publish job runs only for that dispatch.
 on:
   push:
     branches: [main]
@@ -14,10 +17,16 @@ on:
     workflows: ["SDK Tests", "SDK examples"]
     types: [completed]
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The rust-sdk/v<version> tag to publish (set by the tag job)
+        required: false
+        type: string
 
 concurrency:
-  group: calmlens-rust-sdk-release
+  # The dispatched publish must not wait behind, or be replaced by, the tag runs that start it.
+  group: calmlens-rust-sdk-release-${{ github.event_name }}
   cancel-in-progress: false
 
 permissions:
@@ -25,13 +34,11 @@ permissions:
 
 jobs:
   tag:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -43,16 +50,28 @@ jobs:
         run: node scripts/release-tag.mjs rust rust-sdk/v release-rust-sdk.yml --after-checks --output
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Dispatch the publish unless crates.io has the version
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' -A "CalmLens/sdks release workflow" "https://crates.io/api/v1/crates/calmlens/${TAG#rust-sdk/v}")
+          case "$status" in
+            200) echo "calmlens ${TAG#rust-sdk/v} is already on crates.io" ;;
+            404) gh workflow run release-rust-sdk.yml --ref main -f tag="$TAG" ;;
+            *) echo "::error::crates.io answered $status"; exit 1 ;;
+          esac
 
   publish:
-    needs: tag
-    if: needs.tag.outputs.tag != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'rust-sdk/v')
     runs-on: ubuntu-latest
     # The registry's trusted publisher names this workflow file and environment.
     environment:
       name: crates-io
       url: https://crates.io/crates/calmlens
     permissions:
+      actions: read
       contents: read
       id-token: write
     defaults:
@@ -61,14 +80,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.tag.outputs.tag }}
+          ref: ${{ inputs.tag }}
+          # Main's history, to find the push that checked the release (release-checks.mjs).
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24
       - name: Check the tag matches the manifest version
         id: version
         working-directory: .
-        run: node scripts/check-sdk-release-tag.mjs rust "${{ needs.tag.outputs.tag }}"
+        run: node scripts/check-sdk-release-tag.mjs rust "$TAG"
+        env:
+          TAG: ${{ inputs.tag }}
+      # A dispatch can name any tag, so its code must have passed its checks.
+      - name: Require passed SDK Tests and SDK examples runs
+        working-directory: .
+        run: node scripts/release-checks.mjs "$(git rev-parse HEAD)"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Check whether crates.io has the version
         id: published
         env:
