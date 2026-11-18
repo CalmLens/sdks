@@ -1,12 +1,12 @@
 {
-  "version": "0.27.1",
+  "version": "0.27.2",
   "description": "CalmLens CLI for local webhook development",
   "homepage": "https://calmlens.com/docs/guides/local-development",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/CalmLens/sdks/releases/download/cli-v0.27.1/calmlens-0.27.1-windows-x64.zip",
-      "hash": "02d87c5444dbbaf02c02fa74b1a6f6106e4e8b2c08c4a9a6d6199f560e314c3f"
+      "url": "https://github.com/CalmLens/sdks/releases/download/cli-v0.27.2/calmlens-0.27.2-windows-x64.zip",
+      "hash": "48011312a3bdb21bde66d656a472f14cfad08b80b07270e85fe909bfcad83593"
     }
   },
   "bin": "calmlens.exe",
