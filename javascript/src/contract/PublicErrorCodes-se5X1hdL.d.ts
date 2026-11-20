@@ -99,7 +99,6 @@ declare const PUBLIC_ERROR_CODES: {
   readonly UPLOAD_PRESET_DISABLED: RequestErrorCode;
   readonly UPLOAD_PRESET_TOKEN_REQUIRED: RequestErrorCode;
   readonly REMOTE_URL_NOT_ALLOWED: RequestErrorCode;
-  readonly WEBSITE_RATE_LIMIT_REACHED: RequestErrorCode;
   readonly UPLOAD_PRESET_DAILY_LIMIT_REACHED: RequestErrorCode;
   readonly UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: RequestErrorCode;
   readonly UPLOAD_PRESET_FIELD_NOT_ALLOWED: RequestErrorCode;

@@ -15,7 +15,6 @@ use CalmLens\CalmLensObject;
  * @property-read bool $streamingEnabled
  * @property-read bool $aiMediaSearchEnabled
  * @property-read null|RemoteUrlRule $remoteUrlRule
- * @property-read null|int $websiteSubmissionsPerMinute
  * @property-read HumanReviewSettings $humanReview
  */
 final class ProjectSettingsValues extends CalmLensObject

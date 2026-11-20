@@ -11193,7 +11193,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/website-rate-limit-reached",
+            "failure": "upload/rate-limit-reached",
             "retryAfter": 1
           }
         },
@@ -11261,7 +11261,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/website-rate-limit-reached",
+            "failure": "upload/rate-limit-reached",
             "retryAfter": 30
           }
         },
@@ -11270,7 +11270,7 @@
           "args": {},
           "expect": {
             "error": {
-              "code": "upload/website-rate-limit-reached",
+              "code": "upload/rate-limit-reached",
               "status": 429,
               "retryAfter": 30,
               "kind": "rate-limit"

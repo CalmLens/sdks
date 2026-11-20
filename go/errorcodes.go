@@ -191,8 +191,6 @@ const (
 	CodeRemoteURLNotAllowed ErrorCode = "remote-url/not-allowed"
 	// CodeUploadRateLimitReached is returned with HTTP 429.
 	CodeUploadRateLimitReached ErrorCode = "upload/rate-limit-reached"
-	// CodeWebsiteRateLimitReached is returned with HTTP 429.
-	CodeWebsiteRateLimitReached ErrorCode = "upload/website-rate-limit-reached"
 	// CodeUploadPresetDailyLimitReached is returned with HTTP 429.
 	CodeUploadPresetDailyLimitReached ErrorCode = "upload-preset/daily-limit-reached"
 	// CodeUploadPresetOriginNotAllowed is returned with HTTP 403.
@@ -337,7 +335,6 @@ var publicErrorStatuses = map[ErrorCode]int{
 	CodeUploadPresetTokenRequired:         401,
 	CodeRemoteURLNotAllowed:               403,
 	CodeUploadRateLimitReached:            429,
-	CodeWebsiteRateLimitReached:           429,
 	CodeUploadPresetDailyLimitReached:     429,
 	CodeUploadPresetOriginNotAllowed:      403,
 	CodeUploadPresetFieldNotAllowed:       400,

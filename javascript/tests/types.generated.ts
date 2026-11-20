@@ -980,7 +980,6 @@ type T_shared_63 = {
   streamingEnabled: boolean;
   aiMediaSearchEnabled: boolean;
   remoteUrlRule: { mode: "allow" | "deny"; domains: string[] } | null;
-  websiteSubmissionsPerMinute: number | null;
   humanReview: T_shared_64;
 };
 type T_shared_62 = { projectId: string; revision: number; settings: T_shared_63 };
@@ -2848,7 +2847,6 @@ export function checkTypes(): void {
           streamingEnabled?: boolean;
           aiMediaSearchEnabled?: boolean;
           remoteUrlRule?: { mode: "allow" | "deny"; domains: string[] } | null;
-          websiteSubmissionsPerMinute?: number | null;
           humanReview?: {
             allowedSamplePercent?: number;
             restrictedSamplePercent?: number;

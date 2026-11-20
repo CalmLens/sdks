@@ -8576,9 +8576,6 @@ pub struct ProjectSettings {
     /// The domains accepted when content is submitted by URL; `None` accepts every public domain.
     #[serde(default)]
     pub remote_url_rule: Option<RemoteUrlRule>,
-    /// How many websites the project can submit per minute; `None` uses the platform limit.
-    #[serde(default)]
-    pub website_submissions_per_minute: Option<u32>,
     /// Which automated decisions are sampled into the human review queue.
     pub human_review: HumanReviewSettings,
     /// Fields this SDK version does not know.
@@ -8665,10 +8662,6 @@ pub struct ProjectSettingsDefinition {
     /// public domain.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub remote_url_rule: Patch<RemoteUrlRule>,
-    /// Lowers how many websites the project can submit per minute. Left out or null uses the
-    /// platform limit.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub website_submissions_per_minute: Patch<u32>,
     /// Which automated decisions are sampled into the human review queue. Defaults to none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_review: Option<HumanReviewDefinition>,
@@ -8731,17 +8724,6 @@ impl ProjectSettingsDefinition {
         self.remote_url_rule = Patch::Null;
         self
     }
-    /// Lowers how many websites the project can submit per minute. Left out or null uses the
-    /// platform limit.
-    pub fn website_submissions_per_minute(mut self, value: u32) -> Self {
-        self.website_submissions_per_minute = Patch::Value(value);
-        self
-    }
-    /// Clears `website_submissions_per_minute`: sends `null`, where leaving it out keeps the current value.
-    pub fn clear_website_submissions_per_minute(mut self) -> Self {
-        self.website_submissions_per_minute = Patch::Null;
-        self
-    }
     /// Which automated decisions are sampled into the human review queue. Defaults to none.
     pub fn human_review(mut self, value: impl Into<HumanReviewDefinition>) -> Self {
         self.human_review = Some(value.into());
@@ -8759,9 +8741,6 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
             ai_media_search_enabled: Some(settings.ai_media_search_enabled),
             link_checking_enabled: Some(settings.link_checking_enabled),
             remote_url_rule: settings.remote_url_rule.map_or(Patch::Null, Patch::Value),
-            website_submissions_per_minute: settings
-                .website_submissions_per_minute
-                .map_or(Patch::Null, Patch::Value),
             human_review: Some(settings.human_review.into()),
             extra: settings.extra,
         }

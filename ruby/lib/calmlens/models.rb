@@ -555,7 +555,6 @@ module CalmLens
     streaming_enabled: ["streamingEnabled", nil],
     ai_media_search_enabled: ["aiMediaSearchEnabled", nil],
     remote_url_rule: ["remoteUrlRule", [:model, "CalmLens::ProjectSettingsResource::Settings::RemoteUrlRule"]],
-    website_submissions_per_minute: ["websiteSubmissionsPerMinute", nil],
     human_review: ["humanReview", [:model, "CalmLens::ProjectSettingsResource::Settings::HumanReview"]]
   )
 

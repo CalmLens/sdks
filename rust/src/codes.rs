@@ -186,8 +186,6 @@ error_codes! {
     RemoteUrlNotAllowed = "remote-url/not-allowed", 403;
     /// `upload/rate-limit-reached` (HTTP 429): This organisation has started too many uploads in the last 10 seconds. Wait for the Retry-After period, or lower the pace of uploads.
     UploadRateLimitReached = "upload/rate-limit-reached", 429;
-    /// `upload/website-rate-limit-reached` (HTTP 429): This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.
-    WebsiteRateLimitReached = "upload/website-rate-limit-reached", 429;
     /// `upload-preset/daily-limit-reached` (HTTP 429): You have reached this upload preset's daily upload limit. Try again after midnight UTC.
     UploadPresetDailyLimitReached = "upload-preset/daily-limit-reached", 429;
     /// `upload-preset/origin-not-allowed` (HTTP 403): This site isn't allowed to upload through this upload preset.

@@ -196,8 +196,6 @@ public final class ErrorCodes {
   public static final String REMOTE_URL_NOT_ALLOWED = "remote-url/not-allowed";
   /** {@code upload/rate-limit-reached} (HTTP 429). */
   public static final String UPLOAD_RATE_LIMIT_REACHED = "upload/rate-limit-reached";
-  /** {@code upload/website-rate-limit-reached} (HTTP 429). */
-  public static final String WEBSITE_RATE_LIMIT_REACHED = "upload/website-rate-limit-reached";
   /** {@code upload-preset/daily-limit-reached} (HTTP 429). */
   public static final String UPLOAD_PRESET_DAILY_LIMIT_REACHED = "upload-preset/daily-limit-reached";
   /** {@code upload-preset/origin-not-allowed} (HTTP 403). */
@@ -364,7 +362,6 @@ public final class ErrorCodes {
       Map.entry(UPLOAD_PRESET_TOKEN_REQUIRED, 401),
       Map.entry(REMOTE_URL_NOT_ALLOWED, 403),
       Map.entry(UPLOAD_RATE_LIMIT_REACHED, 429),
-      Map.entry(WEBSITE_RATE_LIMIT_REACHED, 429),
       Map.entry(UPLOAD_PRESET_DAILY_LIMIT_REACHED, 429),
       Map.entry(UPLOAD_PRESET_ORIGIN_NOT_ALLOWED, 403),
       Map.entry(UPLOAD_PRESET_FIELD_NOT_ALLOWED, 400),

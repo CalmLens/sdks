@@ -411,7 +411,6 @@ module CalmLens
     def streaming_enabled: () -> bool
     def ai_media_search_enabled: () -> bool
     def remote_url_rule: () -> ProjectSettingsResource::Settings::RemoteUrlRule?
-    def website_submissions_per_minute: () -> Integer?
     def human_review: () -> ProjectSettingsResource::Settings::HumanReview
   end
   class UploadPreset::ProcessingOptions < Model

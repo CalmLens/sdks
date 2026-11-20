@@ -98,7 +98,6 @@ module CalmLens
     UPLOAD_PRESET_TOKEN_REQUIRED = 'upload-preset/token-required'
     REMOTE_URL_NOT_ALLOWED = 'remote-url/not-allowed'
     UPLOAD_RATE_LIMIT_REACHED = 'upload/rate-limit-reached'
-    WEBSITE_RATE_LIMIT_REACHED = 'upload/website-rate-limit-reached'
     UPLOAD_PRESET_DAILY_LIMIT_REACHED = 'upload-preset/daily-limit-reached'
     UPLOAD_PRESET_ORIGIN_NOT_ALLOWED = 'upload-preset/origin-not-allowed'
     UPLOAD_PRESET_FIELD_NOT_ALLOWED = 'upload-preset/field-not-allowed'
@@ -219,7 +218,6 @@ module CalmLens
       'upload-preset/token-required' => 401,
       'remote-url/not-allowed' => 403,
       'upload/rate-limit-reached' => 429,
-      'upload/website-rate-limit-reached' => 429,
       'upload-preset/daily-limit-reached' => 429,
       'upload-preset/origin-not-allowed' => 403,
       'upload-preset/field-not-allowed' => 400,

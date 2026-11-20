@@ -284,11 +284,8 @@ type ProjectSettings struct {
 	AIMediaSearchEnabled bool `json:"aiMediaSearchEnabled"`
 	LinkCheckingEnabled  bool `json:"linkCheckingEnabled"`
 	// RemoteURLRule restricts the domains accepted by URL; nil accepts every public domain.
-	RemoteURLRule *RemoteURLRule `json:"remoteUrlRule"`
-	// WebsiteSubmissionsPerMinute lowers how many websites the project can submit per minute; nil
-	// uses the platform limit.
-	WebsiteSubmissionsPerMinute *int                `json:"websiteSubmissionsPerMinute"`
-	HumanReview                 HumanReviewSettings `json:"humanReview"`
+	RemoteURLRule *RemoteURLRule      `json:"remoteUrlRule"`
+	HumanReview   HumanReviewSettings `json:"humanReview"`
 }
 
 // ProjectSettingsResource is a project's settings and the revision to send back with a change.
@@ -320,8 +317,6 @@ type ProjectSettingsInput struct {
 	LinkCheckingEnabled  *bool `json:"linkCheckingEnabled"`
 	// RemoteURLRule defaults to null, which accepts every public domain.
 	RemoteURLRule Patch[RemoteURLRule] `json:"remoteUrlRule"`
-	// WebsiteSubmissionsPerMinute defaults to null, which uses the platform limit.
-	WebsiteSubmissionsPerMinute Patch[int] `json:"websiteSubmissionsPerMinute"`
 	// HumanReview defaults to sampling nothing.
 	HumanReview *HumanReviewSettingsInput `json:"humanReview"`
 }
@@ -351,7 +346,6 @@ func (s ProjectSettingsInput) MarshalJSON() ([]byte, error) {
 		body["aiMediaSearchEnabled"] = *s.AIMediaSearchEnabled
 	}
 	s.RemoteURLRule.put(body, "remoteUrlRule")
-	s.WebsiteSubmissionsPerMinute.put(body, "websiteSubmissionsPerMinute")
 	if s.HumanReview != nil {
 		body["humanReview"] = s.HumanReview
 	}

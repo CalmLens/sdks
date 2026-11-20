@@ -294,8 +294,8 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new
     [-> { mock.fail_next_request(Errno::ECONNRESET.new, details: { 'reason' => 'reset' }) },
      -> { mock.fail_next_request(Errno::ECONNRESET.new, retry_after: 1) },
-     -> { mock.fail_next_request('upload/website-rate-limit-reached', retry_after: 1.5) },
-     -> { mock.fail_next_request('upload/website-rate-limit-reached', retry_after: -1) }].each do |queue|
+     -> { mock.fail_next_request('upload/rate-limit-reached', retry_after: 1.5) },
+     -> { mock.fail_next_request('upload/rate-limit-reached', retry_after: -1) }].each do |queue|
       assert_equal 'sdk/invalid-argument', assert_raises(CalmLens::InvalidArgumentError) { queue.call }.code
     end
     # Nothing was queued, so the next request reaches the API.

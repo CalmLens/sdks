@@ -1664,8 +1664,6 @@ class PublicProjectSettings(CalmLensObject):
     link_checking_enabled: bool
     #: ``None`` accepts every public domain.
     remote_url_rule: Optional[RemoteUrlRule]
-    #: Lowers how many websites the project can submit per minute; ``None`` uses the platform limit.
-    website_submissions_per_minute: Optional[int]
     human_review: HumanReviewSettings
 
 
@@ -1681,7 +1679,6 @@ class PublicProjectSettingsInput(TypedDict, total=False):
     ai_media_search_enabled: bool
     link_checking_enabled: bool
     remote_url_rule: Optional[RemoteUrlRuleParams]
-    website_submissions_per_minute: Optional[int]
     human_review: HumanReviewSettingsInput
 
 

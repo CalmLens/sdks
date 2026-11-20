@@ -190,7 +190,7 @@ end
 mock = CalmLens::MockServerClient.new(moderate: moderate)
 completed = mock.complete_processing('asset-1', CalmLens::MockDecision.of('age-restricted').not_evaluated('profanity'))
 mock.complete_processing('asset-2')
-mock.fail_next_request('upload/website-rate-limit-reached', operation: 'assets.create', details: { 'reason' => 'busy' }, retry_after: 30)
+mock.fail_next_request('upload/rate-limit-reached', operation: 'assets.create', details: { 'reason' => 'busy' }, retry_after: 30)
 mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
                    actor: { type: 'automated', id: nil }, facts: [{ key: 'asset-name', value: 'beach.jpg' }],
                    asset: { id: 'asset-1', upload: { status: 'completed' },

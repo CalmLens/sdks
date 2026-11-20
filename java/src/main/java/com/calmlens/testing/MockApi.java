@@ -2130,7 +2130,6 @@ final class MockApi {
     settings.addProperty("aiMediaSearchEnabled", false);
     settings.addProperty("linkCheckingEnabled", false);
     settings.add("remoteUrlRule", JsonNull.INSTANCE);
-    settings.add("websiteSubmissionsPerMinute", JsonNull.INSTANCE);
     projectSettingsValues.deepCopy().entrySet().forEach(entry -> settings.add(entry.getKey(), entry.getValue()));
     JsonObject humanReview = new JsonObject();
     humanReview.addProperty("allowedSamplePercent", 0);

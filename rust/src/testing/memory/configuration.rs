@@ -307,7 +307,6 @@ impl Backend {
             "streamingEnabled": false,
             "aiMediaSearchEnabled": false, "linkCheckingEnabled": false,
             "remoteUrlRule": null,
-            "websiteSubmissionsPerMinute": null,
             "humanReview": {
                 "allowedSamplePercent": 0,
                 "restrictedSamplePercent": 0,

@@ -237,7 +237,6 @@ class ConfigurationTest {
     ProjectSettingsParams input = ProjectSettingsParams.builder()
         .setOptOutJurisdictions(List.of(Jurisdiction.EU)).setBlockUnmoderatedAssets(false).setStoreSensitiveMetadata(true).setStreamingEnabled(true)
         .setAiMediaSearchEnabled(true).setRemoteUrlRule(RemoteUrlRuleParams.builder().setMode(RemoteUrlMode.ALLOW).setDomains(List.of("example.com")).build())
-        .setWebsiteSubmissionsPerMinute(3)
         .setHumanReview(HumanReviewSettingsParams.builder().setAllowedSamplePercent(1.5).setReviewMissingEvidence(true).build()).build();
     ProjectSettingsResource saved = mock.client().projectSettings().update(ProjectSettingsUpdateParams.builder().setSettings(input).setRevision(1)
         .setSearchIndexingBudgetUnits(120.0).build());
@@ -250,7 +249,6 @@ class ConfigurationTest {
     assertTrue(saved.getSettings().getAiMediaSearchEnabled());
     assertEquals(RemoteUrlMode.ALLOW, saved.getSettings().getRemoteUrlRule().orElseThrow().getMode());
     assertEquals(List.of("example.com"), saved.getSettings().getRemoteUrlRule().orElseThrow().getDomains());
-    assertEquals(3, saved.getSettings().getWebsiteSubmissionsPerMinute().orElseThrow());
     var review = saved.getSettings().getHumanReview();
     assertEquals(List.of(1.5, 0.0, 0.0, true),
         List.of(review.getAllowedSamplePercent(), review.getRestrictedSamplePercent(), review.getUncertaintyMarginPercent(), review.getReviewMissingEvidence()));

@@ -4661,7 +4661,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -4714,7 +4713,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -4757,7 +4755,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -83346,7 +83343,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -83384,7 +83380,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -83443,7 +83438,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -83502,7 +83496,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -102203,7 +102196,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -102258,7 +102250,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -102317,7 +102308,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -102351,7 +102341,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -102382,7 +102371,6 @@
               "example.com"
             ]
           },
-          "websiteSubmissionsPerMinute": 1,
           "humanReview": {
             "allowedSamplePercent": 1.5,
             "restrictedSamplePercent": 1.5,
@@ -102406,7 +102394,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -102440,7 +102427,6 @@
             "example.com"
           ]
         },
-        "websiteSubmissionsPerMinute": 1,
         "humanReview": {
           "allowedSamplePercent": 1.5,
           "restrictedSamplePercent": 1.5,
@@ -102471,7 +102457,6 @@
               "example.com"
             ]
           },
-          "websiteSubmissionsPerMinute": 1,
           "humanReview": {
             "allowedSamplePercent": 1.5,
             "restrictedSamplePercent": 1.5,
@@ -102495,7 +102480,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,
@@ -102554,7 +102538,6 @@
         "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": null,
         "humanReview": {
           "allowedSamplePercent": 0,
           "restrictedSamplePercent": 0,

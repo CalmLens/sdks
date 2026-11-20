@@ -654,7 +654,6 @@ fn settings_read_convert_to_a_definition_holding_every_setting() {
         "aiMediaSearchEnabled": true,
         "linkCheckingEnabled": true,
         "remoteUrlRule": null,
-        "websiteSubmissionsPerMinute": 5,
         "humanReview": {
             "allowedSamplePercent": 1.5,
             "restrictedSamplePercent": 2.5,

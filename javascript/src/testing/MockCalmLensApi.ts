@@ -3161,7 +3161,6 @@ export class MockCalmLensApi {
         aiMediaSearchEnabled: false,
         linkCheckingEnabled: false,
         remoteUrlRule: null,
-        websiteSubmissionsPerMinute: null,
         ...this.projectSettingsValues,
         humanReview: {
           allowedSamplePercent: 0,

@@ -41,7 +41,6 @@ final class ProjectSettings extends Resource
      *         storeSensitiveMetadata?: bool, linkCheckingEnabled?: bool, streamingEnabled?: bool,
      *         aiMediaSearchEnabled?: bool,
      *         remoteUrlRule?: array{mode: 'allow'|'deny', domains: list<string>}|null,
-     *         websiteSubmissionsPerMinute?: ?int,
      *         humanReview?: array{
      *             allowedSamplePercent?: int|float, restrictedSamplePercent?: int|float,
      *             uncertaintyMarginPercent?: int|float, reviewMissingEvidence?: bool,

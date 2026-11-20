@@ -11069,16 +11069,6 @@
                     }
                   ]
                 },
-                "websiteSubmissionsPerMinute": {
-                  "anyOf": [
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
                 "humanReview": {
                   "type": "object",
                   "properties": {
@@ -15036,16 +15026,6 @@
             }
           ]
         },
-        "websiteSubmissionsPerMinute": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "humanReview": {
           "$ref": "#/definitions/shared.64"
         }
@@ -15059,7 +15039,6 @@
         "streamingEnabled",
         "aiMediaSearchEnabled",
         "remoteUrlRule",
-        "websiteSubmissionsPerMinute",
         "humanReview"
       ],
       "additionalProperties": false

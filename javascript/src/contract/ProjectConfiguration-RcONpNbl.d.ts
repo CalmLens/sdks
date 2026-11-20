@@ -124,7 +124,6 @@ declare const PUBLIC_PROJECT_SETTINGS_SCHEMA: zod.ZodObject<{
     }>;
     domains: zod.ZodArray<zod.ZodString>;
   }, zod.core.$strip>>>;
-  websiteSubmissionsPerMinute: zod.ZodDefault<zod.ZodNullable<zod.ZodNumber>>;
   humanReview: zod.ZodDefault<zod.ZodObject<{
     allowedSamplePercent: zod.ZodDefault<zod.ZodNumber>;
     restrictedSamplePercent: zod.ZodDefault<zod.ZodNumber>;
@@ -153,7 +152,6 @@ declare const PROJECT_SETTINGS_RESOURCE_SCHEMA: zod.ZodObject<{
       }>;
       domains: zod.ZodArray<zod.ZodString>;
     }, zod.core.$strip>>>;
-    websiteSubmissionsPerMinute: zod.ZodDefault<zod.ZodNullable<zod.ZodNumber>>;
     humanReview: zod.ZodDefault<zod.ZodObject<{
       allowedSamplePercent: zod.ZodDefault<zod.ZodNumber>;
       restrictedSamplePercent: zod.ZodDefault<zod.ZodNumber>;
@@ -182,7 +180,6 @@ declare const PUT_PROJECT_SETTINGS_BODY_SCHEMA: zod.ZodObject<{
       }>;
       domains: zod.ZodArray<zod.ZodString>;
     }, zod.core.$strip>>>;
-    websiteSubmissionsPerMinute: zod.ZodDefault<zod.ZodNullable<zod.ZodNumber>>;
     humanReview: zod.ZodDefault<zod.ZodObject<{
       allowedSamplePercent: zod.ZodDefault<zod.ZodNumber>;
       restrictedSamplePercent: zod.ZodDefault<zod.ZodNumber>;

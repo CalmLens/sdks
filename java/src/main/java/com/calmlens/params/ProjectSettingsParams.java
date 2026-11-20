@@ -16,7 +16,6 @@ public final class ProjectSettingsParams extends ApiParams {
   private final @Nullable Boolean streamingEnabled;
   private final @Nullable Boolean aiMediaSearchEnabled;
   private final @Nullable Patch<RemoteUrlRuleParams> remoteUrlRule;
-  private final @Nullable Patch<Integer> websiteSubmissionsPerMinute;
   private final @Nullable HumanReviewSettingsParams humanReview;
 
   private ProjectSettingsParams(Builder builder) {
@@ -29,7 +28,6 @@ public final class ProjectSettingsParams extends ApiParams {
     this.streamingEnabled = builder.streamingEnabled;
     this.aiMediaSearchEnabled = builder.aiMediaSearchEnabled;
     this.remoteUrlRule = builder.remoteUrlRule;
-    this.websiteSubmissionsPerMinute = builder.websiteSubmissionsPerMinute;
     this.humanReview = builder.humanReview;
   }
 
@@ -60,9 +58,6 @@ public final class ProjectSettingsParams extends ApiParams {
   /** @return which remote URLs may be uploaded: empty when unset; a cleared option is sent as null (see {@link #isCleared(String)}) */
   public java.util.Optional<RemoteUrlRuleParams> getRemoteUrlRule() { return java.util.Optional.ofNullable(remoteUrlRule == null ? null : remoteUrlRule.get()); }
 
-  /** @return the most websites submitted per minute: empty when unset; a cleared option is sent as null (see {@link #isCleared(String)}) */
-  public java.util.Optional<Integer> getWebsiteSubmissionsPerMinute() { return java.util.Optional.ofNullable(websiteSubmissionsPerMinute == null ? null : websiteSubmissionsPerMinute.get()); }
-
   /** @return human review settings; empty when unset */
   public java.util.Optional<HumanReviewSettingsParams> getHumanReview() { return java.util.Optional.ofNullable(humanReview); }
 
@@ -70,7 +65,7 @@ public final class ProjectSettingsParams extends ApiParams {
    * @param name an option's API name
    * @return whether the option is cleared: sent as null
    */
-  public boolean isCleared(String name) { return (name.equals("remoteUrlRule") && remoteUrlRule != null && remoteUrlRule.isClear()) || (name.equals("websiteSubmissionsPerMinute") && websiteSubmissionsPerMinute != null && websiteSubmissionsPerMinute.isClear()); }
+  public boolean isCleared(String name) { return name.equals("remoteUrlRule") && remoteUrlRule != null && remoteUrlRule.isClear(); }
 
   /** Builds {@link ProjectSettingsParams}. */
   public static final class Builder extends ApiParams.Builder<Builder> {
@@ -82,7 +77,6 @@ public final class ProjectSettingsParams extends ApiParams {
     private @Nullable Boolean streamingEnabled;
     private @Nullable Boolean aiMediaSearchEnabled;
     private @Nullable Patch<RemoteUrlRuleParams> remoteUrlRule;
-    private @Nullable Patch<Integer> websiteSubmissionsPerMinute;
     private @Nullable HumanReviewSettingsParams humanReview;
 
     private Builder() {}
@@ -141,19 +135,6 @@ public final class ProjectSettingsParams extends ApiParams {
      * @return this builder
      */
     public Builder clearRemoteUrlRule() { this.remoteUrlRule = Patch.clear(); return this; }
-
-    /**
-     * @param value the most websites submitted per minute; null unsets it
-     * @return this builder
-     */
-    public Builder setWebsiteSubmissionsPerMinute(@Nullable Integer value) { this.websiteSubmissionsPerMinute = value == null ? null : Patch.value(value); return this; }
-
-    /**
-     * Sends null for websiteSubmissionsPerMinute, clearing it.
-     *
-     * @return this builder
-     */
-    public Builder clearWebsiteSubmissionsPerMinute() { this.websiteSubmissionsPerMinute = Patch.clear(); return this; }
 
     /**
      * @param value human review settings; null unsets it

@@ -750,11 +750,6 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This organisation has started too many uploads in the last 10 seconds. Wait for the Retry-After period, or lower the pace of uploads.",
 		status: 429
 	}),
-	WEBSITE_RATE_LIMIT_REACHED: new ErrorCode({
-		id: "upload/website-rate-limit-reached",
-		defaultMessage: "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-		status: 429
-	}),
 	UPLOAD_PRESET_DAILY_LIMIT_REACHED: new ErrorCode({
 		id: "upload-preset/daily-limit-reached",
 		defaultMessage: "You have reached this upload preset's daily upload limit. Try again after midnight UTC.",

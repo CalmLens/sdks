@@ -3071,40 +3071,6 @@
     }
   },
   {
-    "code": "upload/website-rate-limit-reached",
-    "status": 429,
-    "kind": "rate-limit",
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 429,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-website-rate-limit-reached",
-        "retry-after": "60"
-      },
-      "body": {
-        "code": "upload/website-rate-limit-reached",
-        "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-        "requestId": "req-upload-website-rate-limit-reached",
-        "details": {
-          "reason": "website_rate_limit_reached"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload/website-rate-limit-reached",
-      "status": 429,
-      "requestId": "req-upload-website-rate-limit-reached",
-      "retryAfter": 60,
-      "details": {
-        "reason": "website_rate_limit_reached"
-      }
-    }
-  },
-  {
     "code": "upload-preset/daily-limit-reached",
     "status": 429,
     "kind": "rate-limit",

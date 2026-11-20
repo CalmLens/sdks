@@ -16,7 +16,6 @@ public final class ProjectSettings extends CalmLensObject {
   @Required private Boolean aiMediaSearchEnabled;
   @Required private Boolean linkCheckingEnabled;
   private RemoteUrlRule remoteUrlRule;
-  private Integer websiteSubmissionsPerMinute;
   @Required private HumanReviewSettings humanReview;
 
   private ProjectSettings() {}
@@ -44,9 +43,6 @@ public final class ProjectSettings extends CalmLensObject {
 
   /** @return the domains accepted when content is submitted by URL for every public domain; empty when the API sends none */
   public Optional<RemoteUrlRule> getRemoteUrlRule() { return Optional.ofNullable(remoteUrlRule); }
-
-  /** @return how many websites the project can submit per minute for the platform limit; empty when the API sends none */
-  public Optional<Integer> getWebsiteSubmissionsPerMinute() { return Optional.ofNullable(websiteSubmissionsPerMinute); }
 
   /** @return which automated decisions are sampled into the human review queue */
   public HumanReviewSettings getHumanReview() { return required(humanReview, "humanReview"); }

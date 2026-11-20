@@ -369,7 +369,6 @@ module CalmLens
     ?streaming_enabled: bool,
     ?ai_media_search_enabled: bool,
     ?remote_url_rule: { mode: "allow" | "deny", domains: Array[String] }?,
-    ?website_submissions_per_minute: Integer?,
     ?human_review: {
       ?allowed_sample_percent: number,
       ?restricted_sample_percent: number,
