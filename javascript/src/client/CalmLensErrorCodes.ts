@@ -94,6 +94,7 @@ export const API_ERROR_CODES = {
   UPLOAD_PRESET_DISABLED: "upload-preset/disabled",
   UPLOAD_PRESET_TOKEN_REQUIRED: "upload-preset/token-required",
   REMOTE_URL_NOT_ALLOWED: "remote-url/not-allowed",
+  UPLOAD_RATE_LIMIT_REACHED: "upload/rate-limit-reached",
   WEBSITE_RATE_LIMIT_REACHED: "upload/website-rate-limit-reached",
   UPLOAD_PRESET_DAILY_LIMIT_REACHED: "upload-preset/daily-limit-reached",
   UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: "upload-preset/origin-not-allowed",
@@ -497,6 +498,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "remote-url/not-allowed": {
     status: 403,
     message: "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
+  },
+  "upload/rate-limit-reached": {
+    status: 429,
+    message: "This organisation has started too many uploads in the last 10 seconds. Wait for the Retry-After period, or lower the pace of uploads.",
   },
   "upload/website-rate-limit-reached": {
     status: 429,

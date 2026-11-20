@@ -3037,6 +3037,40 @@
     }
   },
   {
+    "code": "upload/rate-limit-reached",
+    "status": 429,
+    "kind": "rate-limit",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-rate-limit-reached",
+        "retry-after": "60"
+      },
+      "body": {
+        "code": "upload/rate-limit-reached",
+        "message": "This organisation has started too many uploads in the last 10 seconds. Wait for the Retry-After period, or lower the pace of uploads.",
+        "requestId": "req-upload-rate-limit-reached",
+        "details": {
+          "reason": "upload_rate_limit_reached"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload/rate-limit-reached",
+      "status": 429,
+      "requestId": "req-upload-rate-limit-reached",
+      "retryAfter": 60,
+      "details": {
+        "reason": "upload_rate_limit_reached"
+      }
+    }
+  },
+  {
     "code": "upload/website-rate-limit-reached",
     "status": 429,
     "kind": "rate-limit",

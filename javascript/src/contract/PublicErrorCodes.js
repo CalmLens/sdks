@@ -745,6 +745,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
 		status: 403
 	}),
+	UPLOAD_RATE_LIMIT_REACHED: new ErrorCode({
+		id: "upload/rate-limit-reached",
+		defaultMessage: "This organisation has started too many uploads in the last 10 seconds. Wait for the Retry-After period, or lower the pace of uploads.",
+		status: 429
+	}),
 	WEBSITE_RATE_LIMIT_REACHED: new ErrorCode({
 		id: "upload/website-rate-limit-reached",
 		defaultMessage: "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
