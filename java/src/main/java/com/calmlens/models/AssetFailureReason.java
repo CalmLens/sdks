@@ -16,6 +16,7 @@ public enum AssetFailureReason implements ApiEnum {
   MEDIA_LIMIT("media-limit"),
   UPLOADS_PAUSED("uploads-paused"),
   TOO_MANY_ITEMS("too-many-items"),
+  WEBSITE_UNAVAILABLE("website-unavailable"),
   PROCESSING_ERROR("processing-error"),
   /** A value this SDK version doesn't know. It can't be sent. */
   UNKNOWN(null);

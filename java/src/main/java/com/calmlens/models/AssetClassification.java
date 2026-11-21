@@ -29,7 +29,7 @@ public final class AssetClassification extends CalmLensObject {
   /** @return classification progress */
   public AssetClassificationStatus getStatus() { return required(status, "status"); }
 
-  /** @return why processing failed: {@code file-too-large}, {@code duration-limit}, {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code multiple-tracks}, {@code type-mismatch}, {@code free-uploads-exhausted}, {@code media-limit}, {@code uploads-paused}, {@code too-many-items} or {@code processing-error}; null unless {@code status} is {@code failed}; empty when the API sends none */
+  /** @return why processing failed: {@code file-too-large}, {@code duration-limit}, {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code multiple-tracks}, {@code type-mismatch}, {@code free-uploads-exhausted}, {@code media-limit}, {@code uploads-paused}, {@code too-many-items}, {@code website-unavailable} or {@code processing-error}; null unless {@code status} is {@code failed}; empty when the API sends none */
   public Optional<AssetFailureReason> getFailureReason() { return Optional.ofNullable(failureReason); }
 
   /** @return how far analysis of a long audio or video asset has got, section by section; null when it isn't analysed in sections; empty when the API sends none */

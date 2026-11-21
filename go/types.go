@@ -129,6 +129,9 @@ const (
 	// AssetFailureReasonTooManyItems means a document holds more embedded images or audio and
 	// video files than can be moderated.
 	AssetFailureReasonTooManyItems AssetFailureReason = "too-many-items"
+	// AssetFailureReasonWebsiteUnavailable means a website refused its page with an HTTP error, or
+	// showed a bot check instead of its content.
+	AssetFailureReasonWebsiteUnavailable AssetFailureReason = "website-unavailable"
 	// AssetFailureReasonProcessingError means processing failed for another reason; retrying may succeed.
 	AssetFailureReasonProcessingError AssetFailureReason = "processing-error"
 )

@@ -39,6 +39,7 @@ final class AssetClassification extends CalmLensObject
     public const FAILURE_REASON_MEDIA_LIMIT = 'media-limit';
     public const FAILURE_REASON_UPLOADS_PAUSED = 'uploads-paused';
     public const FAILURE_REASON_TOO_MANY_ITEMS = 'too-many-items';
+    public const FAILURE_REASON_WEBSITE_UNAVAILABLE = 'website-unavailable';
     public const FAILURE_REASON_PROCESSING_ERROR = 'processing-error';
 
     protected const FIELDS = [

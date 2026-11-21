@@ -5017,6 +5017,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
     "processing-error": "processing-error";
     "resolution-limit": "resolution-limit";
     "too-many-items": "too-many-items";
+    "website-unavailable": "website-unavailable";
     "type-mismatch": "type-mismatch";
     "undecodable-content": "undecodable-content";
     "unsupported-format": "unsupported-format";
@@ -10139,6 +10140,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       "processing-error": "processing-error";
       "resolution-limit": "resolution-limit";
       "too-many-items": "too-many-items";
+      "website-unavailable": "website-unavailable";
       "type-mismatch": "type-mismatch";
       "undecodable-content": "undecodable-content";
       "unsupported-format": "unsupported-format";

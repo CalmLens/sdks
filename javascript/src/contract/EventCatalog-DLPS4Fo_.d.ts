@@ -963,6 +963,7 @@ declare const EVENT_TYPE_INFO: {
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
         "too-many-items": "too-many-items";
+        "website-unavailable": "website-unavailable";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
@@ -975,7 +976,7 @@ declare const EVENT_TYPE_INFO: {
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
       previousStatus?: "completed" | "failed" | "processing" | "queued" | null | undefined;
-      failureReason: "duration-limit" | "file-too-large" | "free-uploads-exhausted" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "too-many-items" | "type-mismatch" | "undecodable-content" | "unsupported-format" | "uploads-paused";
+      failureReason: "duration-limit" | "file-too-large" | "free-uploads-exhausted" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "too-many-items" | "type-mismatch" | "undecodable-content" | "unsupported-format" | "uploads-paused" | "website-unavailable";
     }>;
     factInfo: {
       label: string;
@@ -1025,6 +1026,7 @@ declare const EVENT_TYPE_INFO: {
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
         "too-many-items": "too-many-items";
+        "website-unavailable": "website-unavailable";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";

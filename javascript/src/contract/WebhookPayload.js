@@ -496,6 +496,7 @@ const ASSET_FAILURE_REASON_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"media-limit",
 	"uploads-paused",
 	"too-many-items",
+	"website-unavailable",
 	"processing-error"
 ]));
 const ASSET_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
@@ -588,6 +589,7 @@ const ASSET_FAILURE_REASON_LABELS = {
 	"media-limit": msg("Daily media limit"),
 	"uploads-paused": msg("Uploads paused"),
 	"too-many-items": msg("Too many parts"),
+	"website-unavailable": msg("Website unavailable"),
 	"processing-error": msg("Processing error")
 };
 const CATEGORY_LABELS = {

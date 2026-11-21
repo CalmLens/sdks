@@ -392,6 +392,8 @@ string_enum! {
         UploadsPaused = "uploads-paused",
         /// A document holds more embedded images or audio and video files than can be moderated.
         TooManyItems = "too-many-items",
+        /// A website refused its page with an HTTP error, or showed a bot check instead.
+        WebsiteUnavailable = "website-unavailable",
         /// Processing failed for another reason; retrying may succeed.
         ProcessingError = "processing-error",
     }
