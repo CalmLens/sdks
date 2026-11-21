@@ -722,6 +722,7 @@ type T_shared_4 = {
         | "media-limit"
         | "uploads-paused"
         | "too-many-items"
+        | "website-unavailable"
         | "processing-error"
       )
     | null;
@@ -2049,6 +2050,7 @@ export function checkTypes(): void {
                       | "media-limit"
                       | "uploads-paused"
                       | "too-many-items"
+                      | "website-unavailable"
                       | "processing-error";
                     url?: string;
                   }

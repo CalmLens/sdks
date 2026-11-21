@@ -5776,6 +5776,7 @@
                                   "media-limit",
                                   "uploads-paused",
                                   "too-many-items",
+                                  "website-unavailable",
                                   "processing-error"
                                 ]
                               },
@@ -13328,6 +13329,7 @@
                 "media-limit",
                 "uploads-paused",
                 "too-many-items",
+                "website-unavailable",
                 "processing-error"
               ]
             },
