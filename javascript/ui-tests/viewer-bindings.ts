@@ -12,22 +12,16 @@ import type { AssetViewerName, AssetViewerOptionsByKind } from "../src/ui";
 import * as vue from "../src/vue";
 
 const REACT = {
-  image: react.CalmLensImageViewer,
-  website: react.CalmLensWebsiteViewer,
   text: react.CalmLensTextViewer,
   document: react.CalmLensDocumentViewer,
   spreadsheet: react.CalmLensSpreadsheetViewer,
 };
 const VUE = {
-  image: vue.CalmLensImageViewer,
-  website: vue.CalmLensWebsiteViewer,
   text: vue.CalmLensTextViewer,
   document: vue.CalmLensDocumentViewer,
   spreadsheet: vue.CalmLensSpreadsheetViewer,
 };
 const SVELTE = {
-  image: svelte.CalmLensImageViewer,
-  website: svelte.CalmLensWebsiteViewer,
   text: svelte.CalmLensTextViewer,
   document: svelte.CalmLensDocumentViewer,
   spreadsheet: svelte.CalmLensSpreadsheetViewer,
@@ -45,8 +39,6 @@ export type ViewerBinding = {
 };
 
 const TAGS = {
-  image: "calmlens-image-viewer",
-  website: "calmlens-website-viewer",
   text: "calmlens-text-viewer",
   document: "calmlens-document-viewer",
   spreadsheet: "calmlens-spreadsheet-viewer",
@@ -56,7 +48,6 @@ const TAGS = {
 const ATTRIBUTES: Record<string, string> = {
   label: "label",
   src: "src",
-  sizes: "sizes",
   pageSize: "page-size",
   initialPage: "initial-page",
 };

@@ -1,7 +1,6 @@
-// The asset viewers (preview) as custom elements: `<calmlens-image-viewer>`,
-// `<calmlens-website-viewer>`, `<calmlens-text-viewer>`, `<calmlens-document-viewer>` and
-// `<calmlens-spreadsheet-viewer>`. Like `<calmlens-asset>`, they render into the page (no shadow
-// DOM), so `calmlens/styles.css` and your own CSS apply.
+// The asset viewers (preview) as custom elements: `<calmlens-text-viewer>`,
+// `<calmlens-document-viewer>` and `<calmlens-spreadsheet-viewer>`. Like `<calmlens-asset>`, they
+// render into the page (no shadow DOM), so `calmlens/styles.css` and your own CSS apply.
 
 import {
   ASSET_VIEWERS,
@@ -23,20 +22,12 @@ const PROPERTIES = ["asset", "onExpired", "getText", "text", "messages", "pdf"] 
 /**
  * An asset viewer element. Set the `src` attribute to the asset URL (public or signed) and the
  * `asset` property to its display info or the asset from the API, and `onExpired` to refresh a
- * signed URL; other attributes: `label`, `viewer-claims` (JSON), `sizes` (images), `page-size`
- * (spreadsheets) and `initial-page` (documents). The `text` and `getText` properties supply text
- * and spreadsheet viewers' text, `messages` replaces their text and `pdf` sets where pdf.js loads
- * its files from.
+ * signed URL; other attributes: `label`, `viewer-claims` (JSON), `page-size` (spreadsheets) and
+ * `initial-page` (documents). The `text` and `getText` properties supply text and spreadsheet
+ * viewers' text, `messages` replaces their text and `pdf` sets where pdf.js loads its files from.
  */
 abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
-  static observedAttributes = [
-    "src",
-    "label",
-    "viewer-claims",
-    "sizes",
-    "page-size",
-    "initial-page",
-  ];
+  static observedAttributes = ["src", "label", "viewer-claims", "page-size", "initial-page"];
 
   protected abstract readonly kind: K;
   #viewer?: AssetViewer<AssetViewerOptionsByKind[K]>;
@@ -137,7 +128,6 @@ abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
       pdf: this.#pdf,
       label: this.getAttribute("label") ?? undefined,
       viewerClaims: claims ? JSON.parse(claims) : undefined,
-      sizes: this.getAttribute("sizes") ?? undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
       initialPage: initialPage ? Number(initialPage) : undefined,
     } as AssetViewerOptionsByKind[K];
@@ -149,14 +139,6 @@ abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
   }
 }
 
-/** `<calmlens-image-viewer>`: an image asset's rendered file, fitted to the element. */
-export class CalmLensImageViewerElement extends ViewerElement<"image"> {
-  protected readonly kind = "image";
-}
-/** `<calmlens-website-viewer>`: a website's screenshot and a link to the page. */
-export class CalmLensWebsiteViewerElement extends ViewerElement<"website"> {
-  protected readonly kind = "website";
-}
 /** `<calmlens-text-viewer>`: text, escaped, in a scrolling region. */
 export class CalmLensTextViewerElement extends ViewerElement<"text"> {
   protected readonly kind = "text";
@@ -171,8 +153,6 @@ export class CalmLensSpreadsheetViewerElement extends ViewerElement<"spreadsheet
 }
 
 const ELEMENTS = {
-  "calmlens-image-viewer": CalmLensImageViewerElement,
-  "calmlens-website-viewer": CalmLensWebsiteViewerElement,
   "calmlens-text-viewer": CalmLensTextViewerElement,
   "calmlens-document-viewer": CalmLensDocumentViewerElement,
   "calmlens-spreadsheet-viewer": CalmLensSpreadsheetViewerElement,
@@ -190,8 +170,6 @@ defineCalmLensViewerElements();
 
 declare global {
   interface HTMLElementTagNameMap {
-    "calmlens-image-viewer": CalmLensImageViewerElement;
-    "calmlens-website-viewer": CalmLensWebsiteViewerElement;
     "calmlens-text-viewer": CalmLensTextViewerElement;
     "calmlens-document-viewer": CalmLensDocumentViewerElement;
     "calmlens-spreadsheet-viewer": CalmLensSpreadsheetViewerElement;

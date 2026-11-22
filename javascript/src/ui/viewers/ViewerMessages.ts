@@ -4,12 +4,6 @@
  */
 export interface ViewerMessages {
   loading: string;
-  /** An image that can't be loaded. */
-  imageFailed: string;
-  /** The website viewer's link to the original page; `{host}` is the page's host name. */
-  openWebsite: string;
-  /** The website screenshot's accessible name when no `label` is set. */
-  websiteLabel: string;
   textLabel: string;
   textFailed: string;
   documentLabel: string;
@@ -45,9 +39,6 @@ export interface ViewerMessages {
 
 export const DEFAULT_VIEWER_MESSAGES: ViewerMessages = {
   loading: "Loading…",
-  imageFailed: "This image can't be shown.",
-  openWebsite: "Open {host}",
-  websiteLabel: "Website screenshot",
   textLabel: "Text",
   textFailed: "This text can't be shown.",
   documentLabel: "Document",

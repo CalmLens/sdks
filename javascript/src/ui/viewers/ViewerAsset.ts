@@ -128,13 +128,6 @@ export interface ViewerTextOptions {
   getText?: () => Promise<string>;
 }
 
-export interface ImageViewerOptions extends ViewerOptions {
-  /** The `sizes` attribute of a public image's responsive widths. Defaults to `100vw`. */
-  sizes?: string;
-}
-
-export type WebsiteViewerOptions = ViewerOptions;
-
 export type TextViewerOptions = ViewerOptions & ViewerTextOptions;
 
 export interface SpreadsheetViewerOptions extends ViewerOptions, ViewerTextOptions {

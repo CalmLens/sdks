@@ -10,8 +10,6 @@ const publicUrl = (resource: string) => `${CDN}/assets/${PROJECT_ID}/a1/${resour
 /** Messages replaced with markers, so tests find controls without depending on the wording. */
 const messages = {
   loading: "msg:loading",
-  imageFailed: "msg:image-failed",
-  openWebsite: "msg:open {host}",
   textFailed: "msg:text-failed",
   documentFailed: "msg:document-failed",
   openDocument: "msg:open-document",
@@ -35,15 +33,8 @@ const asset = (
 ): ViewerAsset => ({
   id: "a1",
   projectId: PROJECT_ID,
-  type: "image",
+  type: "plaintext-document",
   ...overrides,
-});
-
-const imageAsset = asset({
-  content: {
-    rendered: { kind: "image", width: 1200, height: 800 },
-    preview: { width: 1200, height: 800, thumbhash: null, averageColor: null },
-  },
 });
 
 /** The signed asset URL a viewer starts with, and the fresh ones `onExpired` returns: `sig_1`, … */
@@ -130,145 +121,6 @@ afterAll(() => {
 });
 
 describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
-  describe("image", () => {
-    it("loads the rendered image from the signed URL and refreshes it once it expires", async () => {
-      const onExpired = refresher();
-      mounted = binding.mount("image", {
-        asset: imageAsset,
-        src: SIGNED,
-        onExpired,
-        label: "A harbour",
-        messages,
-      });
-      const view = within(mounted.container);
-      const image = await waitFor(() => {
-        const found = view.getByRole("img", { name: "A harbour" });
-        expect(found.getAttribute("src")).toBe("https://signed.example/sig_0/rendered");
-        return found;
-      });
-      expect(onExpired).toHaveBeenCalledTimes(0);
-      expect(mounted.container.querySelector("[aria-busy]")?.getAttribute("aria-busy")).toBe(
-        "true",
-      );
-
-      // An expired signature fails to load: the viewer asks for a fresh URL once.
-      image.dispatchEvent(new Event("error"));
-      await waitFor(() =>
-        expect(image.getAttribute("src")).toBe("https://signed.example/sig_1/rendered"),
-      );
-      image.dispatchEvent(new Event("load"));
-      await waitFor(() =>
-        expect(mounted!.container.querySelector("[aria-busy]")?.getAttribute("aria-busy")).toBe(
-          "false",
-        ),
-      );
-
-      // After the fresh URL worked, a later expiry refreshes again.
-      image.dispatchEvent(new Event("error"));
-      await waitFor(() =>
-        expect(image.getAttribute("src")).toBe("https://signed.example/sig_2/rendered"),
-      );
-      // A fresh URL that fails too ends in the failure notice, without asking again.
-      image.dispatchEvent(new Event("error"));
-      await waitFor(() => expect(view.getByRole("status").textContent).toBe(messages.imageFailed));
-      expect(onExpired).toHaveBeenCalledTimes(2);
-      expect(view.queryByRole("img", { name: "A harbour" })).toBeNull();
-    });
-
-    it("loads a public image from the CDN, with the viewer's claims", async () => {
-      mounted = binding.mount("image", {
-        asset: imageAsset,
-        label: "A harbour",
-        viewerClaims: { region: "GB" },
-      });
-      const image = await waitFor(() =>
-        within(mounted!.container).getByRole("img", { name: "A harbour" }),
-      );
-      await waitFor(() =>
-        expect(image.getAttribute("src")).toBe(
-          `${publicUrl("rendered")}?viewerClaims=${encodeURIComponent(JSON.stringify({ region: "GB" }))}`,
-        ),
-      );
-    });
-
-    it("keeps the placeholder for a cross-fade on a network load and skips it on a cached load", async () => {
-      let now = 1000;
-      const originalNow = performance.now;
-      performance.now = () => now;
-      try {
-        mounted = binding.mount("image", { asset: imageAsset, label: "A harbour" });
-        const image = await waitFor(() =>
-          within(mounted!.container).getByRole("img", { name: "A harbour" }),
-        );
-        const root = mounted.container.querySelector("[data-state]")!;
-        await waitFor(() => expect(image.getAttribute("src")).toBe(publicUrl("rendered")));
-
-        now += 200;
-        image.dispatchEvent(new Event("load"));
-        await waitFor(() => expect(root.getAttribute("data-state")).toBe("loaded"));
-        expect(root.hasAttribute("data-instant")).toBe(false);
-        expect(mounted.container.querySelector('img[aria-hidden="true"]')).not.toBeNull();
-
-        mounted.unmount();
-        mounted = binding.mount("image", { asset: imageAsset, label: "A harbour" });
-        const cached = await waitFor(() =>
-          within(mounted!.container).getByRole("img", { name: "A harbour" }),
-        );
-        const cachedRoot = mounted.container.querySelector("[data-state]")!;
-        await waitFor(() => expect(cached.getAttribute("src")).toBe(publicUrl("rendered")));
-
-        now += 5;
-        cached.dispatchEvent(new Event("load"));
-        await waitFor(() => expect(cachedRoot.getAttribute("data-state")).toBe("loaded"));
-        expect(cachedRoot.hasAttribute("data-instant")).toBe(true);
-        expect(mounted.container.querySelector('img[aria-hidden="true"]')).toBeNull();
-      } finally {
-        performance.now = originalNow;
-      }
-    });
-  });
-
-  describe("website", () => {
-    const website = (externalUrl: string) =>
-      asset({
-        type: "website",
-        externalUrl,
-        content: {
-          rendered: { kind: "image", width: 1280, height: 4000 },
-          preview: null,
-        },
-      });
-
-    it("shows the signed screenshot and links to the original page", async () => {
-      const onExpired = refresher();
-      mounted = binding.mount("website", {
-        asset: website("https://news.example.org/story?id=7"),
-        src: SIGNED,
-        onExpired,
-        label: "Story",
-        messages,
-      });
-      const view = within(mounted.container);
-      const link = view.getByRole("link", { name: "msg:open news.example.org" });
-      expect(link.getAttribute("href")).toBe("https://news.example.org/story?id=7");
-      expect(link.getAttribute("rel")?.split(" ")).toContain("noopener");
-      await waitFor(() =>
-        expect(view.getByRole("img", { name: "Story" }).getAttribute("src")).toBe(
-          "https://signed.example/sig_0/rendered",
-        ),
-      );
-      // The screenshot scrolls in a region keyboards can reach.
-      expect(view.getByRole("region", { name: "Story" }).tabIndex).toBe(0);
-    });
-
-    it("never links to an address that isn't a web page", async () => {
-      const script = ["javascript", "alert(1)"].join(":");
-      mounted = binding.mount("website", { asset: website(script), messages });
-      await waitFor(() => within(mounted!.container).getByRole("img"));
-      expect(within(mounted.container).queryByRole("link")).toBeNull();
-    });
-  });
-
   describe("text", () => {
     const hostile = `Line one\n<img src=x onerror="window.__viewerInjected = true"><script>window.__viewerInjected = true</script>\n<b>not bold</b>`;
 

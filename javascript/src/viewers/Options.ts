@@ -9,7 +9,6 @@ export const VIEWER_OPTION_NAMES = [
   "viewerClaims",
   "label",
   "messages",
-  "sizes",
   "text",
   "getText",
   "pageSize",

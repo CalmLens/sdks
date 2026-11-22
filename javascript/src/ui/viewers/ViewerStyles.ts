@@ -28,7 +28,7 @@ export const VIEWER_STYLES = `
   /* An opaque surface of its own, so sticky headers and the toolbar cover what scrolls under them. */
   background: var(--calmlens-viewer-background, Canvas); color: var(--calmlens-viewer-text, CanvasText);
 }
-.calmlens-viewer:is([data-kind="text"], [data-kind="document"], [data-kind="spreadsheet"], [data-kind="website"]) > .calmlens-viewer__frame { min-height: 320px; }
+.calmlens-viewer:is([data-kind="text"], [data-kind="document"], [data-kind="spreadsheet"]) > .calmlens-viewer__frame { min-height: 320px; }
 .calmlens-viewer :focus-visible {
   outline: 2px solid var(--calmlens-focus-ring); outline-offset: -2px;
 }
@@ -49,25 +49,6 @@ export const VIEWER_STYLES = `
 .calmlens-viewer__spacer { flex: 1; }
 .calmlens-viewer__link { text-decoration: none; overflow-wrap: anywhere; }
 .calmlens-viewer__scroll { flex: 1; min-height: 0; overflow: auto; position: relative; }
-/* Images fit inside the frame, keeping their shape; without a frame height, the box takes it. */
-.calmlens-viewer[data-kind="image"] > .calmlens-viewer__frame { aspect-ratio: var(--calmlens-viewer-ratio, auto); max-height: 100%; }
-.calmlens-viewer[data-kind="image"] > .calmlens-viewer__frame > img {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
-}
-.calmlens-viewer:not([data-kind="image"]) .calmlens-viewer__placeholder {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top;
-}
-.calmlens-viewer__placeholder { filter: blur(12px); transform: scale(1.05); opacity: 1; pointer-events: none; }
-.calmlens-viewer__image { opacity: 0; }
-.calmlens-viewer[data-state="loaded"] .calmlens-viewer__image { opacity: 1; }
-.calmlens-viewer[data-state="loaded"] .calmlens-viewer__placeholder { opacity: 0; visibility: hidden; }
-@media (prefers-reduced-motion: no-preference) {
-  .calmlens-viewer[data-state="loaded"]:not([data-instant]) .calmlens-viewer__image { transition: opacity 250ms; }
-  .calmlens-viewer[data-state="loaded"]:not([data-instant]) .calmlens-viewer__placeholder {
-    transition: opacity 250ms, visibility 0s linear 250ms;
-  }
-}
-.calmlens-viewer[data-kind="website"] .calmlens-viewer__image { position: relative; display: block; width: 100%; height: auto; }
 .calmlens-viewer__text {
   margin: 0 auto; padding: 20px 24px; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: inherit; font-size: 1rem; line-height: 1.6;

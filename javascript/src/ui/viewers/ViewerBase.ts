@@ -102,7 +102,6 @@ export abstract class ViewerBase<O extends ViewerOptions> implements AssetViewer
   }
 
   protected set state(state: ViewerState) {
-    if (state !== "loaded") delete this.root.dataset.instant;
     this.root.dataset.state = state;
     this.root.setAttribute("aria-busy", String(state === "loading"));
   }

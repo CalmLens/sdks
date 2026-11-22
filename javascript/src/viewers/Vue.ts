@@ -1,6 +1,6 @@
-// Vue asset viewers (preview): `CalmLensImageViewer`, `CalmLensWebsiteViewer`,
-// `CalmLensTextViewer`, `CalmLensDocumentViewer` and `CalmLensSpreadsheetViewer`. Each mounts the
-// shared viewer from `calmlens/ui` into its element once it is in the page.
+// Vue asset viewers (preview): `CalmLensTextViewer`, `CalmLensDocumentViewer` and
+// `CalmLensSpreadsheetViewer`. Each mounts the shared viewer from `calmlens/ui` into its element
+// once it is in the page.
 
 import { defineComponent, h, onBeforeUnmount, onMounted, type PropType, ref, watch } from "vue";
 import type { ViewerClaims } from "../client/CalmLensTypes";
@@ -29,8 +29,6 @@ const viewer = <K extends AssetViewerName>(name: string, kind: K) =>
       viewerClaims: optional(Object as PropType<ViewerClaims>),
       label: optional(String),
       messages: optional(Object as PropType<Partial<ViewerMessages>>),
-      /** Images: the `sizes` of a public image's responsive widths. */
-      sizes: optional(String),
       /** Text and spreadsheets: text your app already has. */
       text: optional(String),
       /** Text and spreadsheets: reads the text yourself. */
@@ -60,10 +58,6 @@ const viewer = <K extends AssetViewerName>(name: string, kind: K) =>
     },
   });
 
-/** Shows an image asset's rendered file, fitted to the element, over its placeholder. */
-export const CalmLensImageViewer = viewer("CalmLensImageViewer", "image");
-/** Shows a website asset's screenshot with a link to the original page. */
-export const CalmLensWebsiteViewer = viewer("CalmLensWebsiteViewer", "website");
 /** Shows a text asset's text, escaped, in a scrolling region. */
 export const CalmLensTextViewer = viewer("CalmLensTextViewer", "text");
 /** Shows a PDF, or a document rendered as one, a page at a time with pdf.js (loaded lazily). */

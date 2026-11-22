@@ -1,7 +1,7 @@
 "use client";
-// React asset viewers (preview): `CalmLensImageViewer`, `CalmLensWebsiteViewer`,
-// `CalmLensTextViewer`, `CalmLensDocumentViewer` and `CalmLensSpreadsheetViewer`. Each mounts the
-// shared viewer from `calmlens/ui` into its element once it is in the page.
+// React asset viewers (preview): `CalmLensTextViewer`, `CalmLensDocumentViewer` and
+// `CalmLensSpreadsheetViewer`. Each mounts the shared viewer from `calmlens/ui` into its element
+// once it is in the page.
 
 import { type CSSProperties, type HTMLAttributes, useEffect, useRef } from "react";
 import { CALMLENS_STYLES, CALMLENS_STYLES_ID } from "../ui/Styles";
@@ -11,10 +11,8 @@ import {
   type AssetViewerName,
   type AssetViewerOptionsByKind,
   type DocumentViewerOptions,
-  type ImageViewerOptions,
   type SpreadsheetViewerOptions,
   type TextViewerOptions,
-  type WebsiteViewerOptions,
 } from "../ui/viewers";
 import { splitViewerProps } from "./Options";
 
@@ -25,8 +23,6 @@ type ElementProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
   style?: CSSProperties;
 };
 
-export type CalmLensImageViewerProps = ImageViewerOptions & ElementProps;
-export type CalmLensWebsiteViewerProps = WebsiteViewerOptions & ElementProps;
 export type CalmLensTextViewerProps = TextViewerOptions & ElementProps;
 export type CalmLensDocumentViewerProps = DocumentViewerOptions & ElementProps;
 export type CalmLensSpreadsheetViewerProps = SpreadsheetViewerOptions & ElementProps;
@@ -73,16 +69,6 @@ function Viewer<K extends AssetViewerName>({
       />
     </>
   );
-}
-
-/** Shows an image asset's rendered file, fitted to the element, over its placeholder. */
-export function CalmLensImageViewer(props: CalmLensImageViewerProps) {
-  return <Viewer kind="image" props={props} />;
-}
-
-/** Shows a website asset's screenshot with a link to the original page. */
-export function CalmLensWebsiteViewer(props: CalmLensWebsiteViewerProps) {
-  return <Viewer kind="website" props={props} />;
 }
 
 /** Shows a text asset's text, escaped, in a scrolling region. */
