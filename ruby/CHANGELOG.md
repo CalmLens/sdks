@@ -1,5 +1,11 @@
 # @calmlens/sdk-ruby
 
+## 0.27.4
+
+### Patch Changes
+
+- 1bc5e45: Add the `website-unavailable` failure reason: a website that refuses its page with an HTTP error, or shows a bot check instead of its content, fails with it rather than `processing-error`. Retry it once the page is reachable.
+
 ## 0.27.3
 
 No changes in this release.
