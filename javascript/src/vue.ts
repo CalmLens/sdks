@@ -617,7 +617,9 @@ export const CalmLensAsset = defineComponent({
           class: "calmlens-asset__content",
           src: shown.src,
           srcset: shown.srcSet,
-          sizes: shown.srcSet ? props.image?.sizes : undefined,
+          sizes: shown.srcSet
+            ? (props.image?.sizes ?? (props.lazy ? "auto, 100vw" : "100vw"))
+            : undefined,
           alt: props.alt,
           width: shown.width,
           height: shown.height,

@@ -513,7 +513,7 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       className="calmlens-asset__content"
       src={shown.src}
       srcSet={shown.srcSet}
-      sizes={shown.srcSet ? image?.sizes : undefined}
+      sizes={shown.srcSet ? (image?.sizes ?? (lazy ? "auto, 100vw" : "100vw")) : undefined}
       alt={alt}
       width={shown.width}
       height={shown.height}

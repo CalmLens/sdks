@@ -167,6 +167,15 @@ const decodePlaceholderHash = (hash: string | null | undefined): string | undefi
   return decodedPlaceholders.get(hash);
 };
 
+/** Default responsive widths offered for full rendered images, up to 2560px. */
+export const DEFAULT_IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560] as const;
+
+const hasExplicitSize = (transform: CdnTransform | undefined): boolean => {
+  if (!transform) return false;
+  if (typeof transform === "string") return /(?:^|,)\s*(?:width|height)=/i.test(transform);
+  return transform.width !== undefined || transform.height !== undefined;
+};
+
 // A width joins the options of the transform; a structured transform's own width is replaced.
 const withWidth = (base: CdnTransform | undefined, width?: number): CdnTransform | undefined => {
   if (width === undefined) return base;
@@ -261,14 +270,27 @@ export const getAssetView = (
     resource: "rendered" | "preview",
     size?: { width?: number | null; height?: number | null } | null,
   ) => {
-    const widths = [...new Set(image.widths ?? [])]
-      .filter((width) => Number.isSafeInteger(width) && width > 0)
-      .sort((a, b) => a - b);
     const build = (width?: number) =>
       url(resource, { lens: image.lens, transform: withWidth(image.transform, width) });
-    const sources = widths.map((width) => ({ src: build(width), width }));
+    const explicitWidths = image.widths !== undefined;
+    let sources: AssetImageSource[];
+    if (explicitWidths) {
+      const widths = [...new Set(image.widths ?? [])]
+        .filter((width) => Number.isSafeInteger(width) && width > 0)
+        .sort((a, b) => a - b);
+      sources = widths.map((width) => ({ src: build(width), width }));
+    } else if (resource === "rendered" && !image.lens && !hasExplicitSize(image.transform)) {
+      const maxWidth = size?.width ?? undefined;
+      const candidates = DEFAULT_IMAGE_WIDTHS.filter((width) => !maxWidth || width < maxWidth);
+      sources = candidates.map((width) => ({ src: build(width), width }));
+      if (maxWidth && candidates.length > 0 && maxWidth <= DEFAULT_IMAGE_WIDTHS.at(-1)!) {
+        sources.push({ src: build(), width: maxWidth });
+      }
+    } else {
+      sources = [];
+    }
     return {
-      src: sources.at(-1)?.src ?? build(),
+      src: explicitWidths ? (sources.at(-1)?.src ?? build()) : build(),
       srcSet: sources.length
         ? sources.map(({ src: source, width }) => `${source} ${width}w`).join(", ")
         : undefined,

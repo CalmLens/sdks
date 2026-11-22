@@ -70,6 +70,33 @@ describe("getAssetView", () => {
     });
   });
 
+  it("offers default responsive widths up to 2560px for rendered images unless sized or opted out", () => {
+    const large = info("image", {
+      rendered: { kind: "image", width: 6000, height: 4000 },
+      preview: { width: 400, height: 267, thumbhash: null, averageColor: null },
+    });
+    expect(view({}, large)).toMatchObject({
+      kind: "image",
+      src: `${SRC}/rendered`,
+      srcSet: [320, 640, 960, 1280, 1920, 2560]
+        .map((w) => `${SRC}/rendered/width=${w} ${w}w`)
+        .join(", "),
+    });
+    // Capped at the image's own width when smaller than 2560px.
+    expect(view({}, IMAGE)).toMatchObject({
+      kind: "image",
+      src: `${SRC}/rendered`,
+      srcSet: `${SRC}/rendered/width=320 320w, ${SRC}/rendered/width=640 640w, ${SRC}/rendered 800w`,
+    });
+    // Opt out with widths: [], a lens, an explicit size transform, or display: "preview".
+    expect(view({ image: { widths: [] } }, large)).toMatchObject({ srcSet: undefined });
+    expect(view({ image: { lens: "card" } }, large)).toMatchObject({ srcSet: undefined });
+    expect(view({ image: { transform: { height: 400 } } }, large)).toMatchObject({
+      srcSet: undefined,
+    });
+    expect(view({ display: "preview" }, large)).toMatchObject({ srcSet: undefined });
+  });
+
   it("adds the viewer claims beyond the defaults to every URL, and only the region to the placeholder", () => {
     const claims = (url: string | undefined) => new URL(url!).searchParams.get("viewerClaims");
     const shown = view({ viewerClaims: { region: "GB", ageConfirmed: true } }, IMAGE);

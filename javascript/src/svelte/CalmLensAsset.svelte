@@ -189,7 +189,7 @@
       class="calmlens-asset__content"
       src={shown.src}
       srcset={shown.srcSet}
-      sizes={shown.srcSet ? imageOptions?.sizes : undefined}
+      sizes={shown.srcSet ? (imageOptions?.sizes ?? (lazy ? "auto, 100vw" : "100vw")) : undefined}
       {alt}
       width={shown.width}
       height={shown.height}

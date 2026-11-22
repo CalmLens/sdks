@@ -752,7 +752,9 @@ export class CalmLensAssetElement extends BaseElement {
         class: "calmlens-asset__content",
         src: shown.src,
         srcset: shown.srcSet,
-        sizes: shown.srcSet ? options.image.sizes : undefined,
+        sizes: shown.srcSet
+          ? (options.image.sizes ?? (this.hasAttribute("eager") ? "100vw" : "auto, 100vw"))
+          : undefined,
         alt,
         width: shown.width,
         height: shown.height,

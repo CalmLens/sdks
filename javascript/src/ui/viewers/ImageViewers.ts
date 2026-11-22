@@ -1,12 +1,9 @@
 import { placeholderHashToDataURL } from "../../contract/PlaceholderHashDecode.js";
-import { INSTANT_LOAD_MS, isImageReady } from "../Asset";
+import { DEFAULT_IMAGE_WIDTHS, INSTANT_LOAD_MS, isImageReady } from "../Asset";
 import type { ImageViewerOptions, ViewerAsset, WebsiteViewerOptions } from "./ViewerAsset";
 import { type AssetViewer, el, ViewerBase } from "./ViewerBase";
 import { formatViewerMessage } from "./ViewerMessages";
 import type { ViewerUrls } from "./ViewerUrls";
-
-/** Widths offered for a public image, so the browser fetches the smallest that fills the frame. */
-const IMAGE_WIDTHS = [320, 640, 960, 1280, 1920, 2560];
 
 /** The blurred placeholder shown while the image loads: the stored ThumbHash, or the CDN's. */
 const placeholderFor = (asset: ViewerAsset, urls: ViewerUrls): string | undefined => {
@@ -32,16 +29,18 @@ const loadRenderedImage = async (
   done: (outcome: "loaded" | "error", instant?: boolean) => void,
 ) => {
   // Widths are selectors beneath the asset URL, which a signed URL serves as freely as a public one.
-  const widths = IMAGE_WIDTHS.filter((candidate) => !width || candidate < width);
+  const widths = DEFAULT_IMAGE_WIDTHS.filter((candidate) => !width || candidate < width);
   let loadedThisSource = false;
   let startedAt = 0;
   const setSources = (src: string) => {
     loadedThisSource = false;
     startedAt = performance.now();
     if (widths.length) {
-      image.srcset = [...widths, ...(width ? [width] : [])]
-        .map((candidate) => `${urls.url("rendered", { width: candidate })} ${candidate}w`)
-        .join(", ");
+      const entries = widths.map(
+        (candidate) => `${urls.url("rendered", { width: candidate })} ${candidate}w`,
+      );
+      if (width && width <= DEFAULT_IMAGE_WIDTHS.at(-1)!) entries.push(`${src} ${width}w`);
+      image.srcset = entries.join(", ");
       image.sizes = sizes;
     }
     image.src = src;
