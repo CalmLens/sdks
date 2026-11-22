@@ -190,6 +190,42 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         ),
       );
     });
+
+    it("keeps the placeholder for a cross-fade on a network load and skips it on a cached load", async () => {
+      let now = 1000;
+      const originalNow = performance.now;
+      performance.now = () => now;
+      try {
+        mounted = binding.mount("image", { asset: imageAsset, label: "A harbour" });
+        const image = await waitFor(() =>
+          within(mounted!.container).getByRole("img", { name: "A harbour" }),
+        );
+        const root = mounted.container.querySelector("[data-state]")!;
+        await waitFor(() => expect(image.getAttribute("src")).toBe(publicUrl("rendered")));
+
+        now += 200;
+        image.dispatchEvent(new Event("load"));
+        await waitFor(() => expect(root.getAttribute("data-state")).toBe("loaded"));
+        expect(root.hasAttribute("data-instant")).toBe(false);
+        expect(mounted.container.querySelector('img[aria-hidden="true"]')).not.toBeNull();
+
+        mounted.unmount();
+        mounted = binding.mount("image", { asset: imageAsset, label: "A harbour" });
+        const cached = await waitFor(() =>
+          within(mounted!.container).getByRole("img", { name: "A harbour" }),
+        );
+        const cachedRoot = mounted.container.querySelector("[data-state]")!;
+        await waitFor(() => expect(cached.getAttribute("src")).toBe(publicUrl("rendered")));
+
+        now += 5;
+        cached.dispatchEvent(new Event("load"));
+        await waitFor(() => expect(cachedRoot.getAttribute("data-state")).toBe("loaded"));
+        expect(cachedRoot.hasAttribute("data-instant")).toBe(true);
+        expect(mounted.container.querySelector('img[aria-hidden="true"]')).toBeNull();
+      } finally {
+        performance.now = originalNow;
+      }
+    });
   });
 
   describe("website", () => {

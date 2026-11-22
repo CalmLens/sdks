@@ -12,6 +12,8 @@ import {
   getAssetViewKey,
   getPeakHeights,
   getPlayedPercent,
+  INSTANT_LOAD_MS,
+  isImageReady,
 } from "./ui/Asset";
 import {
   AssetViewerMount,
@@ -699,14 +701,19 @@ export class CalmLensAssetElement extends BaseElement {
     }
     this.#loadKey = loadKey;
     this.dataset.state = "loading";
+    delete this.dataset.instant;
     this.#viewers.destroy();
 
     const messages = resolveMessages(this.#messages);
     const { alt } = options;
-    const loaded = () => {
+    const loaded = (instant = false) => {
       this.#session.loaded();
+      if (this.dataset.state === "loaded") return;
+      if (instant) {
+        this.dataset.instant = "";
+        this.querySelector(":scope > .calmlens-asset__placeholder")?.remove();
+      }
       this.dataset.state = "loaded";
-      this.querySelector(":scope > .calmlens-asset__placeholder")?.remove();
       this.#emit("calmlens-load");
     };
     const placeholderUrl = "placeholderUrl" in view ? view.placeholderUrl : undefined;
@@ -740,6 +747,7 @@ export class CalmLensAssetElement extends BaseElement {
       return media;
     };
     const image = (shown: Extract<typeof view, { kind: "image" | "website" }>) => {
+      const startedAt = performance.now();
       const content = el("img", {
         class: "calmlens-asset__content",
         src: shown.src,
@@ -752,7 +760,9 @@ export class CalmLensAssetElement extends BaseElement {
         decoding: "async",
         fetchpriority: this.getAttribute("fetch-priority") ?? undefined,
       });
-      content.addEventListener("load", loaded);
+      content.addEventListener("load", () =>
+        loaded(performance.now() - startedAt < INSTANT_LOAD_MS),
+      );
       content.addEventListener("error", () => this.#session.failed());
       return content;
     };
@@ -792,7 +802,9 @@ export class CalmLensAssetElement extends BaseElement {
     } else if (view.kind === "pending") {
       present(placeholder);
     } else if (view.kind === "image") {
-      present(placeholder, image(view));
+      const content = image(view);
+      present(placeholder, content);
+      if (isImageReady(content)) loaded(true);
     } else if (view.kind === "website") {
       const bar = view.link
         ? el("div", { class: "calmlens-asset__bar" }, [
@@ -808,6 +820,7 @@ export class CalmLensAssetElement extends BaseElement {
             ),
           ])
         : undefined;
+      const content = image(view);
       present(
         placeholder,
         bar,
@@ -819,9 +832,10 @@ export class CalmLensAssetElement extends BaseElement {
             "aria-label": alt || undefined,
             tabindex: 0,
           },
-          [image(view)],
+          [content],
         ),
       );
+      if (isImageReady(content)) loaded(true);
     } else if (view.kind === "video") {
       present(
         playable(

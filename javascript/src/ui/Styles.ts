@@ -134,7 +134,7 @@ export const CALMLENS_STYLES = `
 }
 .calmlens-icon-button:hover { background: color-mix(in srgb, var(--calmlens-accent) 8%, transparent); border-color: var(--calmlens-border); }
 @media (prefers-reduced-motion: reduce) {
-  .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-asset__content { transition: none; }
+  .calmlens-dropzone, .calmlens-dropzone__icon { transition: none; }
   .calmlens-progress:indeterminate {
     --calmlens-progress-animation: calmlens-indeterminate-still 1s both;
   }
@@ -153,9 +153,17 @@ export const CALMLENS_STYLES = `
 .calmlens-asset:not([data-sized]) .calmlens-asset__content { position: relative; height: auto; }
 .calmlens-asset:not([data-sized])[data-kind="age-restricted"], .calmlens-asset:not([data-sized])[data-kind="unavailable"],
 .calmlens-asset:not([data-sized])[data-state="error"] { min-height: 160px; }
-.calmlens-asset__placeholder { transform: scale(1.1); filter: blur(12px); }
-.calmlens-asset__content { opacity: 0; transition: opacity 250ms; }
+.calmlens-asset__placeholder { transform: scale(1.1); filter: blur(12px); opacity: 1; pointer-events: none; }
+.calmlens-asset__content { opacity: 0; }
 .calmlens-asset[data-state="loaded"] .calmlens-asset__content { opacity: 1; }
+.calmlens-asset[data-state="loaded"]:not([data-kind="age-restricted"]) .calmlens-asset__placeholder { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .calmlens-asset[data-state="loaded"]:not([data-instant]) { transition: background-color 250ms; }
+  .calmlens-asset[data-state="loaded"]:not([data-instant]) .calmlens-asset__content { transition: opacity 250ms; }
+  .calmlens-asset[data-state="loaded"]:not([data-kind="age-restricted"], [data-instant]) .calmlens-asset__placeholder {
+    transition: opacity 250ms, visibility 0s linear 250ms;
+  }
+}
 .calmlens-asset[data-kind="video"] .calmlens-asset__content, .calmlens-asset[data-kind="audio"] .calmlens-asset__content { opacity: 1; }
 /* Documents, text and spreadsheets fill the box with their viewer; a document shows its first
    page's still and an open link until the viewer loads. */

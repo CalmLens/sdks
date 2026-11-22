@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type SyntheticEvent,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,8 @@ import {
   getAssetViewKey,
   getPeakHeights,
   getPlayedPercent,
+  INSTANT_LOAD_MS,
+  isImageReady,
 } from "./ui/Asset";
 import {
   AssetViewerMount,
@@ -304,6 +307,8 @@ export type CalmLensAssetProps = AssetProps &
 
 type LoadState = "loading" | "loaded" | "error";
 
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 /** Audio's waveform: the preview still, with the played part of its peaks drawn over it. */
 const Waveform = ({
   url,
@@ -412,13 +417,16 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
   const state = session.update(options);
   const view = getAssetView(options, state);
   const loadKey = getAssetViewKey(view);
-  const [load, setLoad] = useState<{ key: string; state: LoadState }>({
+  const [load, setLoad] = useState<{ key: string; state: LoadState; instant: boolean }>({
     key: loadKey,
     state: "loading",
+    instant: false,
   });
-  const current = load.key === loadKey ? load : { key: loadKey, state: "loading" as const };
+  const current =
+    load.key === loadKey ? load : { key: loadKey, state: "loading" as const, instant: false };
   const [played, setPlayed] = useState(0);
   const imageRef = useRef<HTMLImageElement>(null);
+  const loadStartedAt = useRef(0);
   const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const viewerRoot = useRef<HTMLDivElement>(null);
   const callbacks = useRef({ onLoad, onError, onAvailabilityChange });
@@ -427,16 +435,18 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
   useEffect(() => setMounted(true), []);
   // The info is read once mounted, never during server rendering.
   useEffect(() => session.load());
-  // An image that loaded before hydration fires no load event.
-  useEffect(() => {
-    if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
-      setLoad({ key: loadKey, state: "loaded" });
+  // An image already in the browser's memory cache (or loaded before hydration) shows immediately
+  // before first paint, without fading in.
+  useIsomorphicLayoutEffect(() => {
+    loadStartedAt.current = performance.now();
+    if (isImageReady(imageRef.current)) {
+      setLoad({ key: loadKey, state: "loaded", instant: true });
     }
   }, [loadKey]);
   useEffect(() => {
     if (current.state === "loaded") callbacks.current.onLoad?.();
     if (current.state === "error") callbacks.current.onError?.();
-  }, [current.state]);
+  }, [current.key, current.state]);
   const availability =
     view.kind === "unavailable"
       ? "unavailable"
@@ -457,7 +467,8 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       viewerKind,
       getMountedViewerOptions(options, session),
       (viewerState) => {
-        if (viewerState !== "loading") setLoad({ key: loadKey, state: viewerState });
+        if (viewerState !== "loading")
+          setLoad({ key: loadKey, state: viewerState, instant: false });
       },
     );
   });
@@ -469,7 +480,9 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
   const ratio = getAssetAspectRatio(view, state.info, aspectRatio);
   const placeholderUrl =
     "placeholderUrl" in view &&
-    (view.kind === "age-restricted" || view.kind === "pending" || current.state !== "loaded")
+    (view.kind === "age-restricted" ||
+      view.kind === "pending" ||
+      (current.state !== "error" && !(current.state === "loaded" && current.instant)))
       ? view.placeholderUrl
       : undefined;
   const onMediaError = (element: HTMLMediaElement) => {
@@ -482,7 +495,7 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
   const playerEvents = {
     onLoadedMetadata: (event: SyntheticEvent<HTMLMediaElement>) => {
       session.mediaLoaded(event.currentTarget);
-      setLoad({ key: loadKey, state: "loaded" });
+      setLoad({ key: loadKey, state: "loaded", instant: false });
     },
     onError: (event: SyntheticEvent<HTMLMediaElement>) => onMediaError(event.currentTarget),
     onPlay,
@@ -509,7 +522,15 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       fetchPriority={fetchPriority}
       onLoad={() => {
         session.loaded();
-        setLoad({ key: loadKey, state: "loaded" });
+        setLoad((prev) =>
+          prev.key === loadKey && prev.state === "loaded"
+            ? prev
+            : {
+                key: loadKey,
+                state: "loaded",
+                instant: performance.now() - loadStartedAt.current < INSTANT_LOAD_MS,
+              },
+        );
       }}
       onError={() => session.failed()}
     />
@@ -521,6 +542,7 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
       className={joinClassNames("calmlens-asset", className)}
       data-kind={view.kind}
       data-state={current.state}
+      data-instant={current.instant ? "" : undefined}
       data-sized={ratio ? "" : undefined}
       aria-busy={view.kind === "pending" ? true : undefined}
       style={

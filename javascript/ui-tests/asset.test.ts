@@ -363,5 +363,93 @@ for (const binding of BINDINGS) {
         expect(await linkTarget(link)).toBe(`${SRC}/rendered`);
       },
     );
+
+    it.skipIf(!binding.playsMedia)(
+      "keeps the placeholder in place to cross-fade when an image loads over the network",
+      async () => {
+        let now = 1000;
+        const originalNow = performance.now;
+        performance.now = () => now;
+        try {
+          mounted = binding.mountAsset({ src: SRC, info: IMAGE, alt: ALT, messages });
+          const image = await view().findByRole("img", { name: ALT });
+          const root = mounted.container.querySelector("[data-state]")!;
+          expect(root.getAttribute("data-state")).toBe("loading");
+          expect(mounted.container.querySelector('img[aria-hidden="true"]')).not.toBeNull();
+
+          now += 200;
+          await binding.settleImage(image, "load");
+
+          await waitFor(() => expect(root.getAttribute("data-state")).toBe("loaded"));
+          expect(root.hasAttribute("data-instant")).toBe(false);
+          expect(mounted.container.querySelector('img[aria-hidden="true"]')).not.toBeNull();
+        } finally {
+          performance.now = originalNow;
+        }
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "shows a cached image immediately without fading when it loads from cache",
+      async () => {
+        let now = 1000;
+        const originalNow = performance.now;
+        performance.now = () => now;
+        try {
+          mounted = binding.mountAsset({ src: SRC, info: IMAGE, alt: ALT, messages });
+          const image = await view().findByRole("img", { name: ALT });
+          const root = mounted.container.querySelector("[data-state]")!;
+
+          now += 10;
+          await binding.settleImage(image, "load");
+
+          await waitFor(() => expect(root.getAttribute("data-state")).toBe("loaded"));
+          expect(root.hasAttribute("data-instant")).toBe(true);
+          expect(mounted.container.querySelector('img[aria-hidden="true"]')).toBeNull();
+        } finally {
+          performance.now = originalNow;
+        }
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "shows an already-decoded image immediately on mount without waiting for a load event",
+      async () => {
+        const completeDescriptor = Object.getOwnPropertyDescriptor(
+          HTMLImageElement.prototype,
+          "complete",
+        );
+        const widthDescriptor = Object.getOwnPropertyDescriptor(
+          HTMLImageElement.prototype,
+          "naturalWidth",
+        );
+        Object.defineProperty(HTMLImageElement.prototype, "complete", {
+          configurable: true,
+          get: () => true,
+        });
+        Object.defineProperty(HTMLImageElement.prototype, "naturalWidth", {
+          configurable: true,
+          get: () => 640,
+        });
+        try {
+          const onLoad = mock(() => {});
+          mounted = binding.mountAsset({ src: SRC, info: IMAGE, alt: ALT, messages, onLoad });
+          await view().findByRole("img", { name: ALT });
+          const root = mounted.container.querySelector("[data-state]")!;
+
+          await waitFor(() => expect(root.getAttribute("data-state")).toBe("loaded"));
+          expect(root.hasAttribute("data-instant")).toBe(true);
+          expect(mounted.container.querySelector('img[aria-hidden="true"]')).toBeNull();
+          expect(onLoad).toHaveBeenCalledTimes(1);
+        } finally {
+          if (completeDescriptor) {
+            Object.defineProperty(HTMLImageElement.prototype, "complete", completeDescriptor);
+          }
+          if (widthDescriptor) {
+            Object.defineProperty(HTMLImageElement.prototype, "naturalWidth", widthDescriptor);
+          }
+        }
+      },
+    );
   });
 }

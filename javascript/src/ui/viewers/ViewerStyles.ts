@@ -57,9 +57,16 @@ export const VIEWER_STYLES = `
 .calmlens-viewer:not([data-kind="image"]) .calmlens-viewer__placeholder {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top;
 }
-.calmlens-viewer__placeholder { filter: blur(12px); transform: scale(1.05); }
-.calmlens-viewer__image { opacity: 0; transition: opacity 250ms; }
+.calmlens-viewer__placeholder { filter: blur(12px); transform: scale(1.05); opacity: 1; pointer-events: none; }
+.calmlens-viewer__image { opacity: 0; }
 .calmlens-viewer[data-state="loaded"] .calmlens-viewer__image { opacity: 1; }
+.calmlens-viewer[data-state="loaded"] .calmlens-viewer__placeholder { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .calmlens-viewer[data-state="loaded"]:not([data-instant]) .calmlens-viewer__image { transition: opacity 250ms; }
+  .calmlens-viewer[data-state="loaded"]:not([data-instant]) .calmlens-viewer__placeholder {
+    transition: opacity 250ms, visibility 0s linear 250ms;
+  }
+}
 .calmlens-viewer[data-kind="website"] .calmlens-viewer__image { position: relative; display: block; width: 100%; height: auto; }
 .calmlens-viewer__text {
   margin: 0 auto; padding: 20px 24px; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere;

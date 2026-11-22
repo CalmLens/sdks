@@ -19,6 +19,8 @@ export {
   getAssetViewKey,
   getPeakHeights,
   getPlayedPercent,
+  INSTANT_LOAD_MS,
+  isImageReady,
   pickAssetSource,
 } from "./Asset";
 export type { IconName } from "./Icons";

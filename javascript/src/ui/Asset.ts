@@ -385,6 +385,17 @@ export const getPlayedPercent = (media: { currentTime: number; duration: number 
     ? Math.round(Math.min(1, Math.max(0, media.currentTime / media.duration)) * 1000) / 10
     : 0;
 
+/**
+ * How soon after an image element mounts an `onload` still counts as a browser cache hit (such as
+ * the HTTP disk cache, where `complete` is false on mount) and appears immediately without fading.
+ */
+export const INSTANT_LOAD_MS = 50;
+
+/** True when an image element is already decoded in the browser's memory cache. */
+export const isImageReady = (
+  image: { complete: boolean; naturalWidth: number } | null | undefined,
+): boolean => Boolean(image?.complete && image.naturalWidth > 0);
+
 /** Where a video or audio element was when its URL failed, to resume once a fresh one loads. */
 export interface MediaPlayback {
   position: number;

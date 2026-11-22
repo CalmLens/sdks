@@ -37,6 +37,8 @@ import {
   getAssetViewKey,
   getPeakHeights,
   getPlayedPercent,
+  INSTANT_LOAD_MS,
+  isImageReady,
 } from "./ui/Asset";
 import {
   AssetViewerMount,
@@ -488,6 +490,8 @@ export const CalmLensAsset = defineComponent({
     const view = computed(() => getAssetView(options.value, state.value));
     const loadKey = computed(() => getAssetViewKey(view.value));
     const load = ref<LoadState>("loading");
+    const instant = ref(false);
+    let loadStartedAt = 0;
     const played = ref(0);
     const mounted = ref(false);
     const image = ref<HTMLImageElement>();
@@ -530,7 +534,20 @@ export const CalmLensAsset = defineComponent({
     });
     watch(loadKey, () => {
       load.value = "loading";
+      instant.value = false;
     });
+    watch(
+      [loadKey, image],
+      () => {
+        if (!image.value) return;
+        loadStartedAt = performance.now();
+        if (isImageReady(image.value)) {
+          instant.value = true;
+          load.value = "loaded";
+        }
+      },
+      { flush: "post" },
+    );
     watch(load, (value) => {
       if (value === "loaded") emit("load");
       if (value === "error") emit("error");
@@ -553,8 +570,12 @@ export const CalmLensAsset = defineComponent({
     );
     onMounted(() => {
       mounted.value = true;
-      // An image that loaded before hydration fires no load event.
-      if (image.value?.complete && image.value.naturalWidth > 0) load.value = "loaded";
+      loadStartedAt = performance.now();
+      // An image that loaded before hydration or from the browser cache shows without fading.
+      if (isImageReady(image.value)) {
+        instant.value = true;
+        load.value = "loaded";
+      }
     });
     const onMediaError = (event: Event) => {
       const element = event.target as HTMLMediaElement;
@@ -581,7 +602,9 @@ export const CalmLensAsset = defineComponent({
       const ratio = getAssetAspectRatio(current, state.value.info, props.aspectRatio);
       const placeholderUrl =
         "placeholderUrl" in current &&
-        (current.kind === "age-restricted" || current.kind === "pending" || load.value !== "loaded")
+        (current.kind === "age-restricted" ||
+          current.kind === "pending" ||
+          (load.value !== "error" && !(load.value === "loaded" && instant.value)))
           ? current.placeholderUrl
           : undefined;
       const notice = (children: VNodeArrayChildren) =>
@@ -603,6 +626,8 @@ export const CalmLensAsset = defineComponent({
           fetchpriority: props.fetchPriority,
           onLoad: () => {
             session.loaded();
+            if (load.value === "loaded") return;
+            instant.value = performance.now() - loadStartedAt < INSTANT_LOAD_MS;
             load.value = "loaded";
           },
           onError: () => session.failed(),
@@ -615,6 +640,7 @@ export const CalmLensAsset = defineComponent({
           class: "calmlens-asset",
           "data-kind": current.kind,
           "data-state": load.value,
+          "data-instant": instant.value ? "" : undefined,
           "data-sized": ratio ? "" : undefined,
           "aria-busy": current.kind === "pending" ? "true" : undefined,
           style: {

@@ -1,4 +1,5 @@
 import { placeholderHashToDataURL } from "../../contract/PlaceholderHashDecode.js";
+import { INSTANT_LOAD_MS, isImageReady } from "../Asset";
 import type { ImageViewerOptions, ViewerAsset, WebsiteViewerOptions } from "./ViewerAsset";
 import { type AssetViewer, el, ViewerBase } from "./ViewerBase";
 import { formatViewerMessage } from "./ViewerMessages";
@@ -28,11 +29,15 @@ const loadRenderedImage = async (
   image: HTMLImageElement,
   { sizes, width }: { sizes: string; width?: number | null },
   signal: AbortSignal,
-  done: (outcome: "loaded" | "error") => void,
+  done: (outcome: "loaded" | "error", instant?: boolean) => void,
 ) => {
   // Widths are selectors beneath the asset URL, which a signed URL serves as freely as a public one.
   const widths = IMAGE_WIDTHS.filter((candidate) => !width || candidate < width);
+  let loadedThisSource = false;
+  let startedAt = 0;
   const setSources = (src: string) => {
+    loadedThisSource = false;
+    startedAt = performance.now();
     if (widths.length) {
       image.srcset = [...widths, ...(width ? [width] : [])]
         .map((candidate) => `${urls.url("rendered", { width: candidate })} ${candidate}w`)
@@ -40,10 +45,17 @@ const loadRenderedImage = async (
       image.sizes = sizes;
     }
     image.src = src;
+    if (isImageReady(image)) {
+      loadedThisSource = true;
+      urls.loaded("rendered");
+      done("loaded", true);
+    }
   };
   image.addEventListener("load", () => {
+    if (loadedThisSource) return;
+    loadedThisSource = true;
     urls.loaded("rendered");
-    done("loaded");
+    done("loaded", performance.now() - startedAt < INSTANT_LOAD_MS);
   });
   image.addEventListener("error", () => {
     const fresh = urls.refresh("rendered");
@@ -103,11 +115,14 @@ class ImageViewer extends ViewerBase<ImageViewerOptions> {
       image,
       { sizes, width: rendered?.width },
       signal,
-      (outcome) => {
+      (outcome, instant) => {
         if (signal.aborted) return;
         if (outcome === "error") return this.fail();
+        if (instant) {
+          this.root.dataset.instant = "";
+          if (placeholder) placeholder.remove();
+        }
         this.state = "loaded";
-        if (placeholder) placeholder.remove();
       },
     );
   }
@@ -194,11 +209,14 @@ class WebsiteViewer extends ViewerBase<WebsiteViewerOptions> {
       image,
       { sizes: "100vw", width: rendered.width },
       signal,
-      (outcome) => {
+      (outcome, instant) => {
         if (signal.aborted) return;
         if (outcome === "error") return this.fail();
+        if (instant) {
+          this.root.dataset.instant = "";
+          if (placeholder) placeholder.remove();
+        }
         this.state = "loaded";
-        if (placeholder) placeholder.remove();
       },
     );
   }

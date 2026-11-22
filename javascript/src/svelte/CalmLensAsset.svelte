@@ -14,6 +14,8 @@
     getMountedViewerOptions,
     getPeakHeights,
     getPlayedPercent,
+    INSTANT_LOAD_MS,
+    isImageReady,
     isMountedViewerKind,
     MediaStreamPlayer,
     resolveMessages,
@@ -75,6 +77,8 @@
   const loadKey = $derived(getAssetViewKey(view));
   const ratio = $derived(getAssetAspectRatio(view, sessionState.info, aspectRatio));
   let load: "loading" | "loaded" | "error" = $state("loading");
+  let instant = $state(false);
+  let loadStartedAt = 0;
   let played = $state(0);
   let mounted = $state(false);
   let image: HTMLImageElement | undefined = $state();
@@ -109,8 +113,6 @@
   });
   onMount(() => {
     mounted = true;
-    // An image that loaded before hydration fires no load event.
-    if (image?.complete && image.naturalWidth > 0) load = "loaded";
     return () => {
       streams.stop();
       viewers.destroy();
@@ -119,6 +121,17 @@
   $effect.pre(() => {
     void loadKey;
     load = "loading";
+    instant = false;
+  });
+  $effect(() => {
+    void loadKey;
+    if (!image) return;
+    loadStartedAt = performance.now();
+    // An image that loaded before hydration or from the browser cache shows without fading.
+    if (isImageReady(image)) {
+      instant = true;
+      load = "loaded";
+    }
   });
   $effect(() => {
     if (load === "loaded") onLoad?.();
@@ -152,11 +165,15 @@
   };
   const onImageLoad = () => {
     session.loaded();
+    if (load === "loaded") return;
+    instant = performance.now() - loadStartedAt < INSTANT_LOAD_MS;
     load = "loaded";
   };
   const placeholderUrl = $derived(
     "placeholderUrl" in view &&
-      (view.kind === "age-restricted" || view.kind === "pending" || load !== "loaded")
+      (view.kind === "age-restricted" ||
+        view.kind === "pending" ||
+        (load !== "error" && !(load === "loaded" && instant)))
       ? view.placeholderUrl
       : undefined,
   );
@@ -189,6 +206,7 @@
   class="calmlens-asset"
   data-kind={view.kind}
   data-state={load}
+  data-instant={instant ? "" : undefined}
   data-sized={ratio ? "" : undefined}
   aria-busy={view.kind === "pending" ? "true" : undefined}
   style:aspect-ratio={ratio}
