@@ -36,8 +36,8 @@ const client = new CalmLensServerClient({
 // Text (comments, captions, bios): waits for the decision
 const comment = await client.text.classify({ text: "Great photo!", externalId: "comment-42" });
 
-const { status } = comment.classification.moderation;
-if (status === "allowed" || status === "limited") {
+const { decision } = comment.classification.moderation;
+if (decision === "allowed" || decision === "limited") {
   // publish it; keep "limited" out of recommendations, trending and notifications
 } else {
   // "age-restricted": show it only behind your own age check; "blocked" or "purged": don't publish it
