@@ -41,6 +41,7 @@ export const API_ERROR_CODES = {
   INVALID_IMAGE: "image/invalid",
   IMAGE_TOO_LARGE: "image/too-large",
   FREE_UPLOADS_EXHAUSTED: "usage/free-uploads-exhausted",
+  WEBSITE_BILLING_REQUIRED: "payment/billing-required",
   UPLOADS_PAUSED: "usage/uploads-paused",
   UNSUPPORTED_UPLOAD_TYPE: "upload/unsupported-type",
   INVALID_UPLOAD_PAYLOAD: "upload-payload/invalid",
@@ -80,6 +81,7 @@ export const API_ERROR_CODES = {
   HASH_LIST_ENTRY_NOT_FOUND: "hash-list-entry/not-found",
   HASH_LIST_LIMIT_REACHED: "hash-list/limit-reached",
   HASH_LIST_ENTRY_LIMIT_REACHED: "hash-list-entry/limit-reached",
+  HASH_LIST_ENTRY_QUALITY_TOO_LOW: "hash-list-entry/quality-too-low",
   HASH_LIST_ASSET_NOT_HASHED: "hash-list/asset-not-hashed",
   POLICY_NOT_FOUND: "policy/not-found",
   POLICY_REVISION_CONFLICT: "policy/revision-conflict",
@@ -286,6 +288,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 403,
     message: "This project's organisation has used its free uploads. Set up billing to continue uploading.",
   },
+  "payment/billing-required": {
+    status: 409,
+    message: "Set up billing to upload websites.",
+  },
   "usage/uploads-paused": {
     status: 402,
     message: "This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.",
@@ -441,6 +447,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "hash-list-entry/limit-reached": {
     status: 409,
     message: "This project's hash lists hold the most entries they can. Remove entries to add more.",
+  },
+  "hash-list-entry/quality-too-low": {
+    status: 422,
+    message: "This hash cannot be matched. Use a more detailed image or a hash of higher quality.",
   },
   "hash-list/asset-not-hashed": {
     status: 409,
