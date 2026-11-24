@@ -424,6 +424,106 @@
     },
     {
       "event": {
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+        "userId": null,
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.media-ready",
+        "severity": "low",
+        "title": "clip.mp4 has browser-ready media",
+        "description": "An audio or video asset's browser-safe file and preview are ready.",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "asset": {
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "clip.mp4"
+          },
+          {
+            "key": "asset-type",
+            "value": "video"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "notify": false,
+        "readAt": null,
+        "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
+        "assetSequence": 1,
+        "createdAt": 1760000000000,
+        "updatedAt": 1760000000000
+      },
+      "payload": {
+        "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.media-ready",
+        "severity": "low",
+        "title": "clip.mp4 has browser-ready media",
+        "description": "An audio or video asset's browser-safe file and preview are ready.",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "clip.mp4"
+          },
+          {
+            "key": "asset-type",
+            "value": "video"
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1760000000000
+      }
+    },
+    {
+      "event": {
         "id": "event-2",
         "projectId": "project-1",
         "type": "appeal.submitted",
@@ -1892,6 +1992,62 @@
           {
             "key": "total-sections",
             "value": 63
+          },
+          {
+            "key": "test",
+            "value": true
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "isTest": true
+    },
+    {
+      "name": "every event type: asset.media-ready",
+      "body": "{\"id\":\"evt_assetmediareadyxxxxx\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.media-ready\",\"severity\":\"low\",\"title\":\"clip.mp4 has browser-ready media\",\"description\":\"An audio or video asset's browser-safe file and preview are ready.\",\"assetId\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_e5Gm2Rk8XqT3wLp9VbN4\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"clip.mp4\"},{\"key\":\"asset-type\",\"value\":\"video\"},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=95859017e0a817c3d0116dbb064a1d727499b66a063e2a3f55e894f1b7c51739",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_assetmediareadyxxxxx",
+        "projectId": "project-1",
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "type": "asset.media-ready",
+        "severity": "low",
+        "title": "clip.mp4 has browser-ready media",
+        "description": "An audio or video asset's browser-safe file and preview are ready.",
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "assetSequence": 1,
+        "asset": {
+          "id": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+          "externalId": "post-123",
+          "uploadPresetId": null,
+          "upload": {
+            "status": "completed"
+          },
+          "classification": {
+            "status": "completed",
+            "testInput": false,
+            "moderation": {
+              "decision": "allowed"
+            }
+          },
+          "content": {
+            "status": "stored"
+          }
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "clip.mp4"
+          },
+          {
+            "key": "asset-type",
+            "value": "video"
           },
           {
             "key": "test",

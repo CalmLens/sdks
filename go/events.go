@@ -17,6 +17,7 @@ const (
 	EventAssetPurged                   EventType = "asset.purged"
 	EventAssetFailed                   EventType = "asset.failed"
 	EventAssetProgressUpdated          EventType = "asset.progress-updated"
+	EventAssetMediaReady               EventType = "asset.media-ready"
 	EventAssetDeleted                  EventType = "asset.deleted"
 	EventAssetContentRemoved           EventType = "asset.content-removed"
 	EventAssetRetried                  EventType = "asset.retried"

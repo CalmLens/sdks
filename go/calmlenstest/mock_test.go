@@ -178,7 +178,7 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 	if err != nil || signed.ExpiresAt != 61000 {
 		t.Fatal(signed, err)
 	}
-	fetch := func() (int, calmlens.ErrorCode) {
+	fetch := func() (int, string, calmlens.ErrorCode) {
 		res, err := c.FetchCDN(ctx, signed.URL)
 		if err != nil {
 			t.Fatal(err)
@@ -187,14 +187,18 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 		var failure struct{ Code calmlens.ErrorCode }
 		body, _ := io.ReadAll(res.Body)
 		_ = json.Unmarshal(body, &failure)
-		return res.StatusCode, failure.Code
+		return res.StatusCode, res.Header.Get("Cache-Control"), failure.Code
+	}
+	now = signed.ExpiresAt - 12_999
+	if status, cache, _ := fetch(); status != http.StatusOK || cache != "private, max-age=12, must-revalidate" {
+		t.Fatal("seconds remaining:", status, cache)
 	}
 	now = signed.ExpiresAt - 1
-	if status, code := fetch(); status != http.StatusOK {
-		t.Fatal("before expiry:", status, code)
+	if status, cache, _ := fetch(); status != http.StatusOK || cache != "private, max-age=0, must-revalidate" {
+		t.Fatal("before expiry:", status, cache)
 	}
 	now = signed.ExpiresAt
-	if status, code := fetch(); status != http.StatusForbidden || code != calmlens.CodeSignedURLExpired {
+	if status, _, code := fetch(); status != http.StatusForbidden || code != calmlens.CodeSignedURLExpired {
 		t.Fatal("at expiry:", status, code)
 	}
 	c.DatabaseStorage.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"reason": "csam-suspected"}
@@ -486,9 +490,9 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 	for _, tc := range []struct {
 		resource, transform, contentType, body, cache string
 	}{
-		{calmlens.ResourceOriginal, "", "audio/wav", "hello", "public, max-age=3600"},
-		{calmlens.ResourceRendered, "", "audio/mp4", "hello", "public, max-age=3600"},
-		{calmlens.ResourcePreview, "width=10", "image/png", string(placeholder), "public, max-age=31536000, immutable"},
+		{calmlens.ResourceOriginal, "", "audio/wav", "hello", "public, max-age=86400, must-revalidate"},
+		{calmlens.ResourceRendered, "", "audio/mp4", "hello", "public, max-age=86400, must-revalidate"},
+		{calmlens.ResourcePreview, "width=10", "image/png", string(placeholder), "public, max-age=86400, must-revalidate"},
 	} {
 		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: tc.resource, Transform: tc.transform}})
 		if err != nil {
@@ -499,7 +503,7 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 		if res.StatusCode != 200 || res.Header.Get("Content-Type") != tc.contentType || string(body) != tc.body || res.Header.Get("Cache-Control") != tc.cache {
 			t.Fatalf("%s: %d %s %q %s", tc.resource, res.StatusCode, res.Header.Get("Content-Type"), body, res.Header.Get("Cache-Control"))
 		}
-		if immutable := strings.Contains(tc.cache, "immutable"); (res.Header.Get("ETag") != "") != immutable || (res.Header.Get("Expires") != "") != immutable {
+		if (res.Header.Get("ETag") != "") != (tc.resource == calmlens.ResourcePreview) || res.Header.Get("Expires") != "" {
 			t.Fatalf("%s: ETag %q, Expires %q", tc.resource, res.Header.Get("ETag"), res.Header.Get("Expires"))
 		}
 	}

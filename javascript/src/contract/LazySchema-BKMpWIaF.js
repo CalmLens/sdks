@@ -21,9 +21,9 @@ const lazySchema = /* @__NO_SIDE_EFFECTS__ */ (build) => {
 		if (!schema) {
 			const built = build();
 			schema = built;
+			const internals = built._zod;
 			const meta = registryMap.get(built);
 			if (meta !== void 0) registryMap.set(proxy, meta);
-			const internals = built._zod;
 			const process = internals.processJSONSchema;
 			if (process) internals.processJSONSchema = (context, json, params) => {
 				const record = context.seen.get(proxy);

@@ -413,7 +413,8 @@ impl MockServerClient {
     /// key, a private asset answers `asset/not-found` whatever its state, including
     /// its placeholder and info. Served content has its stored `content-type` and
     /// the CDN's `cache-control`: `public` only when anyone may see the asset, otherwise
-    /// `private`, with `max-age=31536000, immutable` for images and `max-age=3600` otherwise.
+    /// `private` according to access. Public files are fresh for a day; signed files are capped by the
+    /// grant expiry, and unsigned private files must revalidate.
     /// Content is never classified or transformed.
     ///
     /// ```

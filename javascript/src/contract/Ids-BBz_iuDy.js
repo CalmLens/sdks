@@ -1,3 +1,4 @@
+import { t as ASSET_ID_REGION_CODES } from "./DataRegion-D0DeZ7K6.js";
 import * as zod from "zod";
 var __defProp = Object.defineProperty;
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod, mod.exports), cb = null), mod.exports);
@@ -10,7 +11,7 @@ var __exportAll = (all, no_symbols) => {
 	if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
 	return target;
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/util.js
+// node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
 	const numericValues = Object.values(entries).filter((v) => typeof v === "number");
 	return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -576,7 +577,7 @@ function constantCatch(value) {
 	fn[CONSTANT_CATCH] = true;
 	return fn;
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/core.js
+// node_modules/zod/v4/core/core.js
 var _a$1;
 const _zodDesc = {
 	value: void 0,
@@ -682,7 +683,7 @@ function config(newConfig) {
 	if (newConfig) Object.assign(globalConfig, newConfig);
 	return globalConfig;
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/errors.js
+// node_modules/zod/v4/core/errors.js
 function _getMessage() {
 	const internals = this._zod;
 	internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -797,7 +798,7 @@ function formatError(error, mapper = (issue) => issue.message) {
 	processError(error);
 	return fieldErrors;
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/parse.js
+// node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
 	return {
 		callee: params?.callee ?? callee,
@@ -1001,7 +1002,7 @@ const _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
 const _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 	return _safeParseAsync(_Err)(schema, value, _ctx);
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/regexes.js
+// node_modules/zod/v4/core/regexes.js
 var regexes_exports = /* @__PURE__ */ __exportAll({
 	anyString: () => anyString,
 	base64: () => base64$1,
@@ -1189,7 +1190,7 @@ const sha384_base64url = /*@__PURE__*/ fixedBase64url(64);
 const sha512_hex = /^[0-9a-fA-F]{128}$/;
 const sha512_base64 = /*@__PURE__*/ fixedBase64(86, "==");
 const sha512_base64url = /*@__PURE__*/ fixedBase64url(86);
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/checks.js
+// node_modules/zod/v4/core/checks.js
 const $ZodCheck = /*@__PURE__*/ $constructor("$ZodCheck", (inst, def) => {
 	var _a;
 	inst._zod ?? (inst._zod = {});
@@ -1636,7 +1637,7 @@ const $ZodCheckOverwrite = /*@__PURE__*/ $constructor("$ZodCheckOverwrite", (ins
 		payload.value = def.tx(payload.value);
 	};
 });
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/doc.js
+// node_modules/zod/v4/core/doc.js
 var Doc = class {
 	constructor(args = [], closed = {}) {
 		this.content = [];
@@ -1669,13 +1670,13 @@ var Doc = class {
 		return new F(...Object.keys(this.closed), `return function (${this.args.join(", ")}) {\n${content.join("\n")}\n};`)(...Object.values(this.closed));
 	}
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/versions.js
+// node_modules/zod/v4/core/versions.js
 const version = {
 	major: 4,
 	minor: 6,
 	patch: 7
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/schemas.js
+// node_modules/zod/v4/core/schemas.js
 const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
 	var _a;
 	inst ?? (inst = {});
@@ -3841,7 +3842,7 @@ function handleRefineResult(result, payload, input, inst) {
 		payload.issues.push(issue(_iss));
 	}
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/memoizer.js
+// node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
 	constructor() {
 		super(`Cannot parse a reference cycle that closes through a transform`);
@@ -4093,7 +4094,7 @@ function isBackEdge(ctx, value) {
 	const backEdges = ctx[STATE]?.backEdges;
 	return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/locales/en.js
+// node_modules/zod/v4/locales/en.js
 const error = () => {
 	const Sizable = {
 		string: {
@@ -4200,7 +4201,7 @@ const error = () => {
 function en_default() {
 	return { localeError: error() };
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/registries.js
+// node_modules/zod/v4/core/registries.js
 var _a;
 var $ZodRegistry = class {
 	constructor() {
@@ -4246,7 +4247,7 @@ function registry() {
 }
 (_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
 const globalRegistry$1 = globalThis.__zod_globalRegistry;
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/api.js
+// node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
 	if (def.checks) def.checks = [...def.checks];
 	return def;
@@ -5084,7 +5085,7 @@ function _stringFormat(Class, format, fnOrRegex, _params = {}) {
 	if (fnOrRegex instanceof RegExp) def.pattern = fnOrRegex;
 	return new Class(def);
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
 	for (const source of sources) for (const key of Reflect.ownKeys(source)) if (Object.prototype.propertyIsEnumerable.call(source, key)) assignProp(target, key, source[key]);
 	return target;
@@ -5527,7 +5528,7 @@ const createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params)
 	extractDefs(ctx, schema);
 	return finalize(ctx, schema);
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/zod/v4/core/json-schema-processors.js
 const narrowMin = (agg, key, value) => {
 	if (agg[key] === void 0 || value > agg[key]) agg[key] = value;
 };
@@ -6095,7 +6096,7 @@ const lazyProcessor = (schema, ctx, _json, params) => {
 	const seen = ctx.seen.get(schema);
 	seen.ref = innerType;
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/checks.js
+// node_modules/zod/v4/classic/checks.js
 var checks_exports = /* @__PURE__ */ __exportAll({
 	endsWith: () => _endsWith,
 	gt: () => _gt,
@@ -6128,7 +6129,7 @@ var checks_exports = /* @__PURE__ */ __exportAll({
 	trim: () => _trim,
 	uppercase: () => _uppercase
 });
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/errors.js
+// node_modules/zod/v4/classic/errors.js
 const _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
 	Object.defineProperty(proto, key, {
@@ -6177,7 +6178,7 @@ const initializer = (inst, issues) => {
 	});
 };
 const ZodRealError = /*@__PURE__*/ $constructor("ZodError", initializer, void 0, { Parent: Error });
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/parse.js
+// node_modules/zod/v4/classic/parse.js
 const parse = /* @__PURE__ */ _parse(ZodRealError);
 const parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 const safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -6190,7 +6191,7 @@ const safeEncode = /* @__PURE__ */ _safeEncode(ZodRealError);
 const safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 const safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 const safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/schemas.js
+// node_modules/zod/v4/classic/schemas.js
 var schemas_exports = /* @__PURE__ */ __exportAll({
 	ZodAny: () => ZodAny,
 	ZodArray: () => ZodArray,
@@ -7807,7 +7808,7 @@ function preprocess(fn, schema) {
 		out: schema
 	});
 }
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod/v4/classic/compat.js
+// node_modules/zod/v4/classic/compat.js
 /** @deprecated Do not use. Stub definition, only included for zod-to-json-schema compatibility. */
 var ZodFirstPartyTypeKind;
 ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
@@ -7815,7 +7816,7 @@ ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {});
 	...schemas_exports,
 	...checks_exports
 });
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/zod-meta/esm/index.js
+// node_modules/zod-meta/esm/index.js
 const ZOD_META_KEY = "__zod_meta__";
 const createMetaType = (type) => {
 	return Object.assign((value) => {
@@ -7893,7 +7894,7 @@ const metaStore = (meta) => {
 	}
 	module.exports = escapeString;
 })))();
-// ../../../../../../../Users/09jwater/Documents/safemind/packages/zodbase/src/ZodUtils.ts
+// packages/zodbase/src/ZodUtils.ts
 const isZodTypeExtends = (type, zodType) => {
 	if (type instanceof zodType) return type;
 	if (type.def.type === "union") {
@@ -7927,7 +7928,8 @@ createMetaType({
 createMetaType({ id: "updatedAt" });
 createMetaType({ id: "monotonicTimestamp" });
 createMetaType({ id: "backfill" });
-// ../../../../../../../Users/09jwater/Documents/safemind/packages/zodbase/src/index.browser.ts
+createMetaType({ id: "computed" });
+// packages/zodbase/src/index.browser.ts
 const noop = () => {};
 const primaryKey = noop;
 const updatedAt = noop;
@@ -7994,15 +7996,23 @@ const randomBase62 = (length) => {
 	}
 	return result;
 };
-/** A new random ID, such as `newId("proj")` → `proj_8fK2mQx7Lp4NvB3tRz9Y`. */
+/**
+* A new random ID, such as `newId("proj")` → `proj_8fK2mQx7Lp4NvB3tRz9Y`. Assets take theirs from
+* `newAssetId`, which names their region.
+*/
 const newId = (prefix) => `${prefix}_${randomBase62(20)}`;
+/**
+* A new asset ID for an asset that lives in `region`: its first character after `asset_` is the
+* region's code (`ASSET_ID_REGION_CODES`), then 19 random characters (about 113 bits).
+*/
+const newAssetId = (region) => `asset_${ASSET_ID_REGION_CODES[region]}${randomBase62(19)}`;
 /** Whether `value` is an ID with `prefix` (or with any registered prefix). */
 const isId = (value, prefix) => typeof value === "string" && idPattern(prefix).test(value);
 /** Example IDs for docs, OpenAPI and SDK fixtures: fixed, so generated output stays stable. */
 const EXAMPLE_IDS = {
 	org: "org_3hQ7tLk2Vb9XpR4mWc8N",
 	proj: "proj_8fK2mQx7Lp4NvB3tRz9Y",
-	asset: "asset_5Gm2Rk8XqT3wLp9VbN4c",
+	asset: "asset_e5Gm2Rk8XqT3wLp9VbN4",
 	fldr: "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
 	lens: "lens_2Xr9Lp4Vm7Qk3Tb8Nw5C",
 	key: "key_9Pt3Wm6Rk2Lx8Qv4Nb7C",
@@ -8040,4 +8050,4 @@ const primaryIdField = (prefix) => idField(prefix).meta({
 	...metaStore([primaryKey()]),
 	examples: [EXAMPLE_IDS[prefix]]
 });
-export { primaryIdField as a, metaStore as c, newId as i, idField as n, updatedAt as o, isId as r, createMetaType as s, EXAMPLE_IDS as t };
+export { newId as a, createMetaType as c, newAssetId as i, metaStore as l, idField as n, primaryIdField as o, isId as r, updatedAt as s, EXAMPLE_IDS as t };

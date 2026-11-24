@@ -17,7 +17,6 @@ import base64
 import builtins
 import copy
 import dataclasses
-import email.utils
 import hashlib
 import io
 import json
@@ -2810,8 +2809,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if resource == "embed":
                 return self._cdn_response(method, _MOCK_EMBED_HTML, {
                     "Content-Type": "text/html; charset=utf-8",
-                    "Cache-Control": "private, no-store" if claims
-                    else f"{'private' if private else 'public'}, max-age=3600",
+                    "Cache-Control": "private, no-store",
                     "Cache-Tag": f"asset-{asset['id']}", "X-Content-Type-Options": "nosniff"})
             # Then whether the asset has the resource, and whether it is a still image that takes a
             # lens or transform: the preview always is, the rendered file only when it is an image.
@@ -2841,19 +2839,18 @@ class MockCalmLensServerClient(CalmLensServerClient):
             else:
                 content = _thumbhash_png((preview or {}).get("thumbhash") or _MOCK_THUMBHASH)
                 content_type = "image/png"
-            immutable = still_image or (resource == "original" and asset["type"] == "image")
-            # Like the CDN: a still image's bytes are immutable for a year, other content is kept
-            # for an hour, by shared caches only when delivery is public.
-            headers = {"Content-Type": content_type,
-                       "Cache-Control": f"{'private' if private else 'public'}, "
-                                        f"{'max-age=31536000, immutable' if immutable else 'max-age=3600'}",
+            image_response = still_image or (resource == "original" and asset["type"] == "image")
+            if "viewerClaims" in query:
+                cache_control = "private, no-store"
+            elif private and grant is None:
+                cache_control = "private, no-cache"
+            else:
+                max_age = 86400 if grant is None else max(0, min(86400, (grant[2] - self.now()) // 1000))
+                cache_control = f"{'private' if private else 'public'}, max-age={max_age}, must-revalidate"
+            headers = {"Content-Type": content_type, "Cache-Control": cache_control,
                        "Cache-Tag": f"asset-{asset['id']}"}
-            if immutable:
+            if image_response:
                 headers["ETag"] = f'"{asset["id"]}"'
-                headers["Expires"] = email.utils.formatdate(self.now() / 1000 + 31536000, usegmt=True)
-            if claims:
-                headers["Cache-Control"] = "private, no-store"
-                headers.pop("Expires", None)
             headers.update({"X-Content-Type-Options": "nosniff",
                             "Content-Security-Policy": "sandbox; default-src 'none'"})
             normalized = content_type.lower().split(";", 1)[0].strip()

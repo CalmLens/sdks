@@ -1,13 +1,13 @@
-import { a as primaryIdField, c as metaStore, n as idField, o as updatedAt, s as createMetaType, t as EXAMPLE_IDS } from "./Ids-C2cLdFM0.js";
+import { c as createMetaType, l as metaStore, n as idField, o as primaryIdField, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-BBz_iuDy.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import "./Media-B2PMcUf7.js";
 import "./ModerationContextLimits-k930WU8i.js";
-import "./SharedConstants-DxUCZwLZ.js";
-import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
-import { i as msg, n as MODERATION_QUALIFIERS } from "./TestRegionalActions-BhyWuU49.js";
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-CQN8qnzX.js";
-import { t as ACCESS_ROLE_SCHEMA } from "./Permissions-CzuRcPMS.js";
+import "./SharedConstants-D-QkbICw.js";
+import { t as hmacSha256Hex } from "./CryptoUtils-BLCa-oZe.js";
+import { t as lazySchema } from "./LazySchema-BKMpWIaF.js";
+import { i as msg, n as MODERATION_QUALIFIERS } from "./TestRegionalActions-Ce8EVv4q.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-uODFGQGo.js";
+import { t as ACCESS_ROLE_SCHEMA } from "./Permissions-Dwk78TtG.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -94,33 +94,6 @@ const LINK_SAFETY_VERDICTS = [
 	"unresolved"
 ];
 const LINK_SAFETY_VERDICT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(LINK_SAFETY_VERDICTS));
-/** The verdicts a policy can act on, in the order the portal and docs list them. */
-const FLAGGED_LINK_VERDICTS = [
-	"phishing",
-	"malware",
-	"adult",
-	"gambling",
-	"unresolved"
-];
-/** The actions a link can take, weakest first. Purging content over a link is never offered. */
-const LINK_SAFETY_ACTIONS = [
-	"allow",
-	"limit",
-	"age-restrict",
-	"block"
-];
-const LINK_SAFETY_ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(LINK_SAFETY_ACTIONS));
-const DOMAIN_PATTERN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
-const LINK_SAFETY_SETTINGS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	verdictActions: zod.partialRecord(zod.enum(FLAGGED_LINK_VERDICTS), LINK_SAFETY_ACTION_SCHEMA).meta({ description: "What happens to an asset with a link of each verdict. A verdict left out is allowed." }),
-	offPlatformLinks: zod.object({
-		action: LINK_SAFETY_ACTION_SCHEMA.exclude(["allow"]),
-		allowedDomains: zod.array(zod.string().regex(DOMAIN_PATTERN, { message: msg("Use a bare lowercase domain such as example.com") }).meta({ examples: ["example.com"] })).max(100).refine((domains) => new Set(domains).size === domains.length, { message: msg("Domains must be unique") })
-	}).strict().optional().meta({ description: "Acts on every link whose destination is outside `allowedDomains`, whatever its verdict. A domain also covers its subdomains." })
-}).strict().meta(metaStore([docPropertyInfo({
-	description: "Preview. What happens to assets that link to unsafe destinations. Link checks never change a moderation category's score.",
-	namedType: "LinkSafetySettings"
-})])));
 /** Readable verdict names, shared by the portal, event messages and docs. */
 const LINK_SAFETY_VERDICT_LABELS = {
 	safe: msg("Safe"),
@@ -180,42 +153,6 @@ const MODERATION_CATEGORY_DEFINITIONS = {
 		docsHref: "/docs/guides/moderation-categories#criminal-and-dangerous-activity"
 	}
 };
-// packages/shared/src/PolicyRule.ts
-/**
-* What a policy does with content: deliver it (`allow`), deliver it but mark it so your app
-* reduces its reach (`limit`), keep it off its plain URL so your app limits it to adults
-* (`age-restrict`: `viewerClaims.ageConfirmed: true`), stop delivering it
-* (`block`), or stop delivering it and delete its stored content (`purge`).
-*/
-const POLICY_ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
-	"allow",
-	"limit",
-	"age-restrict",
-	"block",
-	"purge"
-]));
-const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
-	name: zod.string().trim().min(1).max(80).optional(),
-	when: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, msg("Qualifiers must be unique")).meta({ description: whenDescription }),
-	unless: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, msg("Qualifiers must be unique")).optional().meta({ description: "Exclude instances covered by any of these qualifiers from this rule. Does not exempt other content or other categories." }),
-	action: POLICY_ACTION_SCHEMA.meta({ description: actionDescription })
-}).strict().refine((rule) => !rule.unless || !rule.when.some((qualifier) => rule.unless.includes(qualifier)), {
-	message: msg("The exclusions prevent this rule from ever matching"),
-	path: ["unless"]
-});
-const POLICY_ALLOWANCE_SCHEMA = /* @__PURE__ */ lazySchema(() => policyRuleSchema("Qualifiers describing the content this allowance covers. Every selected qualifier must hold on the same instance. Eligible allowances may jointly cover all qualifying content.", "Softer than the category action: what happens to content the allowance covers.").refine((rule) => !rule.unless?.length, {
-	message: msg("Only restrictions can have exclusions"),
-	path: ["unless"]
-}));
-/** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
-const POLICY_RESTRICTION_SCHEMA = /* @__PURE__ */ lazySchema(() => policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action."));
-/** The built-in policies (`BUILT_IN_MODERATION_PROFILES`), in the order the portal offers them. */
-const POLICY_PRESET_IDS = [
-	"general-community",
-	"children-platform",
-	"education-support",
-	"wholesome-community"
-];
 // packages/shared/src/Subscriptions.ts
 /**
 * Product IDs are chosen by the repo (Stripe accepts an `id` on product creation) so the admin Stripe
@@ -354,97 +291,8 @@ const PRODUCTS = {
 	}
 };
 PRODUCTS.imageTransformed, PRODUCTS.websiteIngestion, PRODUCTS.linkChecking, PRODUCTS.textClassificationTokens, PRODUCTS.imageClassification, PRODUCTS.assetStorageGb, PRODUCTS.assetSearch, PRODUCTS.assetMediaSearchIndexing, PRODUCTS.assetRead, PRODUCTS.ocrClassification, PRODUCTS.personDetection, PRODUCTS.faceDetection, PRODUCTS.streamEncoding;
-// packages/shared/src/ProcessingFeatures.ts
-const PROVENANCE_SIGNAL_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	kind: zod.enum([
-		"c2pa",
-		"iptc-digital-source-type",
-		"generator-metadata"
-	]).describe("Where the evidence was found: a C2PA manifest, the IPTC digital source type in XMP, or settings an image generator wrote"),
-	value: zod.string().describe("What it says, such as the digital source type or the generator's name")
-}).strict().meta(metaStore([docPropertyInfo({
-	description: "Provenance metadata found in the image file",
-	namedType: "ProvenanceSignal"
-})])));
-zod.enum([
-	"ai-generated",
-	"ai-edited",
-	"unknown"
-]).describe("What the metadata says: `ai-generated`, `ai-edited` (a composite or edit made with AI), or `unknown` when the file carries no AI provenance. `unknown` doesn't mean a person made it: screenshots and re-saved images lose their metadata."), zod.array(PROVENANCE_SIGNAL_SCHEMA);
-// packages/shared/src/Classification.ts
-const CLASSIFICATION_CATEGORY_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(CLASSIFICATION_CATEGORIES));
 msg("Sexual Content"), MODERATION_CATEGORY_DEFINITIONS.sexual.summary, msg("Violence"), MODERATION_CATEGORY_DEFINITIONS.violence.summary, msg("Self-Harm"), MODERATION_CATEGORY_DEFINITIONS["self-harm"].summary, msg("Harassment & Bullying"), MODERATION_CATEGORY_DEFINITIONS.harassment.summary, msg("Hate & Identity Abuse"), MODERATION_CATEGORY_DEFINITIONS.hate.summary, msg("Personal Information"), MODERATION_CATEGORY_DEFINITIONS["personal-information"].summary, msg("Profanity"), MODERATION_CATEGORY_DEFINITIONS.profanity.summary, msg("Criminal & Dangerous Activity"), MODERATION_CATEGORY_DEFINITIONS["criminal-activity"].summary;
 new Set(MODERATION_QUALIFIERS);
-const POLICY_SCORE_DESCRIPTION = "How strongly the content meets the policy, from 0 to 1: the category score, lowered by allowances that cover the content and raised to the presence score of a restriction.";
-/** What decided an asset: the policy's categories, an override, its children, a list or a rule. */
-const DECISION_SOURCES = [
-	"policy",
-	"children",
-	"hash-list",
-	"mandatory-rule",
-	"link-safety"
-];
-const CATEGORY_SETTINGS_SNAPSHOT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	action: POLICY_ACTION_SCHEMA,
-	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
-	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
-}).strict().optional().describe("The category's default action and rules in force at decision time."));
-const RULE_INDEXES_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.array(zod.number().int().nonnegative()).min(1).describe("Indexes into the category's `settings.allowances` or `settings.restrictions` of the rules that decided the action, the decisive one first. Several allowances list every rule that covers the content together."));
-const CATEGORY_ASSESSMENT_FIELDS = {
-	score: zod.number().min(0).max(1).describe(POLICY_SCORE_DESCRIPTION),
-	action: POLICY_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below 0.5."),
-	settings: CATEGORY_SETTINGS_SNAPSHOT_SCHEMA
-};
-/** What the policy made of one category, as a decision records it. */
-const CATEGORY_ASSESSMENT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	...CATEGORY_ASSESSMENT_FIELDS,
-	source: zod.discriminatedUnion("kind", [
-		zod.object({ kind: zod.literal("default") }).strict(),
-		zod.object({ kind: zod.literal("below-threshold") }).strict(),
-		zod.object({
-			kind: zod.literal("allowance"),
-			indexes: RULE_INDEXES_SCHEMA
-		}).strict(),
-		zod.object({
-			kind: zod.literal("restriction"),
-			indexes: RULE_INDEXES_SCHEMA
-		}).strict()
-	]).optional()
-}).strict());
-/** The policy a decision was made with, as it was then. */
-const DECISION_POLICY_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	id: idField("pol").describe("The policy's ID"),
-	revision: zod.number().int().positive().describe("The policy's `revision` when it made the decision"),
-	preset: zod.object({
-		id: zod.enum(POLICY_PRESET_IDS).describe("The built-in preset the policy started from"),
-		version: zod.number().int().positive().describe("The preset release the policy used when it made the decision")
-	}).strict().nullable().describe("The preset release the policy used, `null` for a policy not made from a preset")
-}).strict().meta(metaStore([docPropertyInfo({
-	description: "The policy that made a decision, as it was when it made it",
-	namedType: "DecisionPolicy"
-})])));
-const ASSESSMENT_BASE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
-	policy: DECISION_POLICY_SCHEMA.optional().describe("The policy that made the decision. Absent from a preview, which no saved policy made."),
-	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
-	explanationComplete: zod.boolean().describe("Whether all questions needed for a complete explanation of this decision were answered. False means questions that could not change any action were skipped; the actions are still final."),
-	source: zod.enum(DECISION_SOURCES.filter((source) => source !== "link-safety")),
-	automatedAction: POLICY_ACTION_SCHEMA.describe("The original automated action. Manual reviews can change the current moderation status without changing this action."),
-	rule: zod.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
-	regions: zod.array(zod.object({
-		region: JURISDICTION_SCHEMA.exclude(["global"]),
-		action: POLICY_ACTION_SCHEMA.exclude(["allow"]),
-		rule: zod.string(),
-		category: CLASSIFICATION_CATEGORY_SCHEMA.optional()
-	}).strict()),
-	flaggedCategories: zod.array(CLASSIFICATION_CATEGORY_SCHEMA).describe("Categories acted on by the automated decision. Empty when none were acted on; manual reviews do not change this list."),
-	linkSafety: zod.object({
-		action: LINK_SAFETY_ACTION_SCHEMA.describe("The strongest action the asset's links take under the policy's link-safety settings."),
-		links: zod.array(zod.number().int().nonnegative()).describe("Indexes into the link-safety result's `links` of the links that take that action."),
-		settings: LINK_SAFETY_SETTINGS_SCHEMA
-	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links.")
-}).strict());
-/** What the project's policy made of the report when the asset was decided. */
-const MODERATION_ASSESSMENT_FIELDS_SCHEMA = /* @__PURE__ */ lazySchema(() => ASSESSMENT_BASE_SCHEMA.omit({ linkSafety: true }));
 // packages/shared/src/HumanReview.ts
 /**
 * Automated outcomes that can be sampled. Purged content is deleted as soon as it is decided, for
@@ -523,7 +371,6 @@ const PRESENTATION_MIME_TYPES = [
 	"application/vnd.oasis.opendocument.presentation"
 ];
 [...SPREADSHEET_MIME_TYPES, ...PRESENTATION_MIME_TYPES];
-MODERATION_ASSESSMENT_FIELDS_SCHEMA.shape;
 // packages/shared/src/ConnectorType.ts
 /** Where a connector delivers events. Kept apart from `Connector.ts`, which the event catalog can't import. */
 const CONNECTOR_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
@@ -535,24 +382,8 @@ const CONNECTOR_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 // packages/shared/src/ProjectAccess.ts
 const PROJECT_MEMBER_ROLE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]));
 // packages/shared/src/EventCatalog.ts
-const EVENT_SEVERITY_SCHEMA = zod.enum(["low", "high"]);
-zod.enum([
-	"assets",
-	"moderation",
-	"usage",
-	"team",
-	"api-keys",
-	"connectors"
-]);
+const EVENT_SEVERITY_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(["low", "high"]));
 msg("Assets"), msg("Moderation"), msg("Usage"), msg("Team"), msg("API keys"), msg("Connectors");
-zod.enum([
-	"text",
-	"code",
-	"enum",
-	"list",
-	"number",
-	"date"
-]);
 const ASSET_TYPE_LABELS = {
 	image: msg("Image"),
 	video: msg("Video"),
@@ -611,38 +442,39 @@ const PROJECT_ROLE_LABELS = {
 	custom: msg("Custom"),
 	reviewer: msg("Reviewer")
 };
+/** A fact's definition. Its schema is built on first use (`lazySchema`), as the catalog's are. */
 const field = (schema, info) => ({
 	...info,
-	schema: schema.meta(metaStore([docPropertyInfo({ description: info.description })]))
+	schema: /* @__PURE__ */ lazySchema(() => schema().meta(metaStore([docPropertyInfo({ description: info.description })])))
 });
 const dataSchemaFromFields = (fields, description) => zod.object(Object.fromEntries(Object.entries(fields).map(([key, definition]) => [key, definition.schema]))).meta(metaStore([docPropertyInfo({ description })]));
-const assetNameField = field(zod.string().nullish(), {
+const assetNameField = field(() => zod.string().nullish(), {
 	label: msg("Asset"),
 	description: "The asset's name when the event was created.",
 	display: "text"
 });
-const assetTypeField = field(ASSET_TYPE_SCHEMA.nullish(), {
+const assetTypeField = field(() => ASSET_TYPE_SCHEMA.nullish(), {
 	label: msg("Asset type"),
 	description: "The asset's type, such as `image` or `video`.",
 	display: "enum",
 	valueLabels: ASSET_TYPE_LABELS
 });
 /** Set on assets CalmLens extracts from an upload, such as the text and images of a document. */
-const parentAssetField = field(zod.string().optional(), {
+const parentAssetField = field(() => zod.string().optional(), {
 	label: msg("Parent asset"),
 	description: "ID of the uploaded asset this one was extracted from, such as the text or an image of a document, as in the asset's `parentId`. Absent for uploaded assets.",
 	display: "code"
 });
-const reviewerNameField = field(zod.string().nullish(), {
+const reviewerNameField = field(() => zod.string().nullish(), {
 	label: msg("Reviewer"),
 	description: "Name or email of the user who made the decision, or the API key's name, when known.",
 	display: "text",
 	inAppOnly: true,
 	names: "actor"
 });
-const flaggedCategoriesSchema = zod.array(zod.enum(CLASSIFICATION_CATEGORIES));
+const flaggedCategoriesSchema = /* @__PURE__ */ lazySchema(() => zod.array(zod.enum(CLASSIFICATION_CATEGORIES)));
 /** Set on the events of an asset batch operation (`POST /assets/batch`). */
-const batchIdField = field(idField("batch").optional(), {
+const batchIdField = field(() => idField("batch").optional(), {
 	label: msg("Batch ID"),
 	description: "ID of the batch operation that caused the event, as `batchId` in the batch response. Absent when the asset was changed on its own.",
 	display: "code",
@@ -655,7 +487,7 @@ const defineEventType = (definition) => ({
 		key: eventFactKey(key),
 		...info
 	})),
-	values: dataSchemaFromFields(definition.fields, `Data for \`${definition.id}\` events.`)
+	values: /* @__PURE__ */ lazySchema(() => dataSchemaFromFields(definition.fields, `Data for \`${definition.id}\` events.`))
 });
 const ASSET_UPLOADED = defineEventType({
 	id: "asset.uploaded",
@@ -668,7 +500,7 @@ const ASSET_UPLOADED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
-		fileFormat: field(zod.string().nullish(), {
+		fileFormat: field(() => zod.string().nullish(), {
 			label: msg("File format"),
 			description: "The uploaded file's format, such as `jpg`.",
 			display: "code"
@@ -698,14 +530,14 @@ const ASSET_CLASSIFIED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		flaggedCategories: field(flaggedCategoriesSchema, FLAGGED_CATEGORIES_INFO),
-		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
+		flaggedCategories: field(() => flaggedCategoriesSchema, FLAGGED_CATEGORIES_INFO),
+		moderationStatus: field(() => ASSET_MODERATION_STATUS_SCHEMA, {
 			label: msg("Moderation status"),
 			description: "The asset's status once classification finished: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. Usually the status the policy decided; when a reviewer decided the asset while it was being processed, their decision stands and this is their status.",
 			display: "enum",
 			valueLabels: MODERATION_STATUS_LABELS
 		}),
-		automatedStatus: field(ASSET_MODERATION_DECISION_SCHEMA.optional(), {
+		automatedStatus: field(() => ASSET_MODERATION_DECISION_SCHEMA.optional(), {
 			label: msg("Automated status"),
 			description: "Present only when a reviewer decided the asset while it was being processed: the status the policy decided, which was not applied. The report and scores are still stored with the asset.",
 			display: "enum",
@@ -731,17 +563,17 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		region: field(JURISDICTION_SCHEMA.exclude(["global"]), {
+		region: field(() => JURISDICTION_SCHEMA.exclude(["global"]), {
 			label: msg("Region"),
 			description: "Jurisdiction whose mandatory rule raises the delivery action.",
 			display: "code"
 		}),
-		rule: field(zod.string(), {
+		rule: field(() => zod.string(), {
 			label: msg("Rule"),
 			description: "Stable mandatory rule key.",
 			display: "code"
 		}),
-		status: field(ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed"]), {
+		status: field(() => ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed"]), {
 			label: msg("Status"),
 			description: "The asset's status for viewers in the region: `limited`, `age-restricted`, `blocked` or `purged`.",
 			display: "enum",
@@ -769,19 +601,19 @@ const defineModerationOutcome = (outcome) => defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		flaggedCategories: field(flaggedCategoriesSchema.optional(), FLAGGED_CATEGORIES_INFO),
+		flaggedCategories: field(() => flaggedCategoriesSchema.optional(), FLAGGED_CATEGORIES_INFO),
 		reviewerName: reviewerNameField,
-		note: field(zod.string().nullish(), {
+		note: field(() => zod.string().nullish(), {
 			label: msg("Note"),
 			description: "The reviewer's note, or `null`.",
 			display: "text"
 		}),
-		childAsset: field(zod.string().optional(), {
+		childAsset: field(() => zod.string().optional(), {
 			label: msg("Child asset"),
 			description: "Present when a reviewer's decision on one of this asset's child assets changed this asset's status: the ID of that child. The event's `actor` is that reviewer.",
 			display: "code"
 		}),
-		childStatus: field(ASSET_MODERATION_DECISION_SCHEMA.optional(), {
+		childStatus: field(() => ASSET_MODERATION_DECISION_SCHEMA.optional(), {
 			label: msg("Child status"),
 			description: "Present with `child-asset`: the status the reviewer gave that child, such as `blocked`.",
 			display: "enum",
@@ -841,13 +673,13 @@ const ASSET_FAILED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		previousStatus: field(ASSET_CLASSIFICATION_STATUS_SCHEMA.nullish(), {
+		previousStatus: field(() => ASSET_CLASSIFICATION_STATUS_SCHEMA.nullish(), {
 			label: msg("Previous status"),
 			description: "The asset's processing status before it failed, such as `processing`.",
 			display: "enum",
 			valueLabels: PROCESSING_STATUS_LABELS
 		}),
-		failureReason: field(ASSET_FAILURE_REASON_SCHEMA, {
+		failureReason: field(() => ASSET_FAILURE_REASON_SCHEMA, {
 			label: msg("Reason"),
 			description: "Why processing failed, as in the asset's `classification.failureReason`, such as `duration-limit`.",
 			display: "enum",
@@ -861,6 +693,23 @@ const ASSET_FAILED = defineEventType({
 		failureReason: "duration-limit"
 	}
 });
+const ASSET_MEDIA_READY = defineEventType({
+	id: "asset.media-ready",
+	name: msg("Media ready"),
+	description: msg("An audio or video asset's browser-safe file and preview are ready."),
+	category: "assets",
+	severity: "low",
+	notify: false,
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField
+	},
+	example: {
+		assetName: "clip.mp4",
+		assetType: "video"
+	}
+});
 const ASSET_PROGRESS_UPDATED = defineEventType({
 	id: "asset.progress-updated",
 	name: msg("Processing progress"),
@@ -872,12 +721,12 @@ const ASSET_PROGRESS_UPDATED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
-		completedSections: field(zod.number().int().nonnegative(), {
+		completedSections: field(() => zod.number().int().nonnegative(), {
 			label: msg("Sections done"),
 			description: "Sections analysed so far, as in the asset's `classification.progress.completedSections`.",
 			display: "number"
 		}),
-		totalSections: field(zod.number().int().positive(), {
+		totalSections: field(() => zod.number().int().positive(), {
 			label: msg("Sections"),
 			description: "Sections the media is analysed in, as in `classification.progress.totalSections`.",
 			display: "number"
@@ -899,17 +748,17 @@ const USAGE_FREE_UPLOADS_EXHAUSTED = defineEventType({
 	notify: true,
 	permission: "assets:read",
 	fields: {
-		limit: field(zod.number().int(), {
+		limit: field(() => zod.number().int(), {
 			label: msg("Limit"),
 			description: "Number of free uploads in the allowance.",
 			display: "number"
 		}),
-		used: field(zod.number().int(), {
+		used: field(() => zod.number().int(), {
 			label: msg("Used"),
 			description: "Number of free uploads used.",
 			display: "number"
 		}),
-		organisationId: field(idField("org"), {
+		organisationId: field(() => idField("org"), {
 			label: msg("Organisation ID"),
 			description: "ID of the organisation whose allowance was used.",
 			display: "code",
@@ -923,7 +772,7 @@ const USAGE_FREE_UPLOADS_EXHAUSTED = defineEventType({
 		organisationId: EXAMPLE_IDS.org
 	}
 });
-const MEMBER_ROLE_SCHEMA = zod.enum(PROJECT_MEMBER_ROLE_SCHEMA.options);
+const MEMBER_ROLE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(PROJECT_MEMBER_ROLE_SCHEMA.options));
 const PROJECT_MEMBER_JOINED = defineEventType({
 	id: "project.member-joined",
 	name: msg("Member joined"),
@@ -933,20 +782,20 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 	notify: true,
 	permission: "members:read",
 	fields: {
-		memberUserId: field(idField("user"), {
+		memberUserId: field(() => idField("user"), {
 			label: msg("Member ID"),
 			description: "User ID of the new member.",
 			display: "code",
 			hidden: true
 		}),
-		memberName: field(zod.string().nullish(), {
+		memberName: field(() => zod.string().nullish(), {
 			label: msg("Member"),
 			description: "The new member's name or email.",
 			display: "text",
 			inAppOnly: true,
 			names: "member"
 		}),
-		role: field(MEMBER_ROLE_SCHEMA, {
+		role: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The member's role: `admin`, `configurator`, `editor`, `viewer` or `custom`.",
 			display: "enum",
@@ -968,18 +817,18 @@ const CONNECTOR_DISABLED = defineEventType({
 	notify: true,
 	permission: "connectors:read",
 	fields: {
-		connectorId: field(idField("conn"), {
+		connectorId: field(() => idField("conn"), {
 			label: msg("Connector ID"),
 			description: "ID of the connector that was turned off.",
 			display: "code",
 			hidden: true
 		}),
-		connectorName: field(zod.string(), {
+		connectorName: field(() => zod.string(), {
 			label: msg("Connector"),
 			description: "The connector's name.",
 			display: "text"
 		}),
-		connectorType: field(CONNECTOR_TYPE_SCHEMA, {
+		connectorType: field(() => CONNECTOR_TYPE_SCHEMA, {
 			label: msg("Connector type"),
 			description: "The connector's type, such as `webhook`, `slack` or `email`.",
 			display: "enum",
@@ -990,12 +839,12 @@ const CONNECTOR_DISABLED = defineEventType({
 				email: msg("Email")
 			}
 		}),
-		consecutiveFailures: field(zod.number().int(), {
+		consecutiveFailures: field(() => zod.number().int(), {
 			label: msg("Failures in a row"),
 			description: "Number of deliveries in a row that failed after their retries.",
 			display: "number"
 		}),
-		lastError: field(zod.string().nullish(), {
+		lastError: field(() => zod.string().nullish(), {
 			label: msg("Last error"),
 			description: "Summary of the most recent failure, or `null`.",
 			display: "text",
@@ -1011,13 +860,13 @@ const CONNECTOR_DISABLED = defineEventType({
 	}
 });
 /** Project roles a member can hold; reviewers only exist while the human review beta is on. */
-const memberUserIdField = field(zod.string(), {
+const memberUserIdField = field(() => zod.string(), {
 	label: msg("Member ID"),
 	description: "User ID of the member.",
 	display: "code",
 	hidden: true
 });
-const memberNameField = field(zod.string().nullish(), {
+const memberNameField = field(() => zod.string().nullish(), {
 	label: msg("Member"),
 	description: "The member's name or email.",
 	display: "text",
@@ -1090,13 +939,13 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		automatedStatus: field(HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA, {
+		automatedStatus: field(() => HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA, {
 			label: msg("Automated status"),
 			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted` or `blocked`.",
 			display: "enum",
 			valueLabels: MODERATION_STATUS_LABELS
 		}),
-		reviewReason: field(HUMAN_REVIEW_REASON_SCHEMA, {
+		reviewReason: field(() => HUMAN_REVIEW_REASON_SCHEMA, {
 			label: msg("Reason"),
 			description: "Why the asset was queued: `sampled` by the project's random sample, or `uncertain` because a category's policy score was close to the threshold or evidence could not be assessed. An asset the sample draws is `sampled` even when it is also uncertain.",
 			display: "enum",
@@ -1105,7 +954,7 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 				uncertain: msg("Uncertain")
 			}
 		}),
-		uncertainCategories: field(HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA, {
+		uncertainCategories: field(() => HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA, {
 			label: msg("Uncertain categories"),
 			description: "The parent policy categories whose decision was uncertain under the project's review settings, or none.",
 			display: "list",
@@ -1133,24 +982,24 @@ const ASSET_REVIEW_COMPLETED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		reviewId: field(idField("rev"), {
+		reviewId: field(() => idField("rev"), {
 			label: msg("Review"),
 			description: "The completed review's ID.",
 			display: "code"
 		}),
-		decision: field(ASSET_MODERATION_DECISION_SCHEMA, {
+		decision: field(() => ASSET_MODERATION_DECISION_SCHEMA, {
 			label: msg("Decision"),
 			description: "The reviewer's decision.",
 			display: "enum",
 			valueLabels: MODERATION_STATUS_LABELS
 		}),
-		appliedToAsset: field(zod.boolean(), {
+		appliedToAsset: field(() => zod.boolean(), {
 			label: msg("Applied to asset"),
 			description: "Whether the review changed the asset's decision.",
 			display: "text"
 		}),
 		reviewerName: reviewerNameField,
-		note: field(zod.string().nullable(), {
+		note: field(() => zod.string().nullable(), {
 			label: msg("Note"),
 			description: "The reviewer's note, or null.",
 			display: "text"
@@ -1177,23 +1026,23 @@ const ASSET_HASH_MATCHED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		hashListId: field(idField("hl"), {
+		hashListId: field(() => idField("hl"), {
 			label: msg("Hash list ID"),
 			description: "ID of the hash list with the closest match.",
 			display: "code",
 			hidden: true
 		}),
-		hashListName: field(zod.string(), {
+		hashListName: field(() => zod.string(), {
 			label: msg("Hash list"),
 			description: "Name of the hash list with the closest match.",
 			display: "text"
 		}),
-		distance: field(zod.number().int(), {
+		distance: field(() => zod.number().int(), {
 			label: msg("Distance"),
 			description: "Number of bits that differ between the image's PDQ hash and the listed hash. 0 is the same picture.",
 			display: "number"
 		}),
-		matchAction: field(HASH_LIST_ACTION_SCHEMA, {
+		matchAction: field(() => HASH_LIST_ACTION_SCHEMA, {
 			label: msg("Action"),
 			description: "What the match did: `block` blocked the asset, `flag` only reported it.",
 			display: "enum",
@@ -1225,23 +1074,23 @@ const ASSET_LINK_FLAGGED = defineEventType({
 		assetName: assetNameField,
 		assetType: assetTypeField,
 		parentAsset: parentAssetField,
-		linkVerdict: field(LINK_SAFETY_VERDICT_SCHEMA, {
+		linkVerdict: field(() => LINK_SAFETY_VERDICT_SCHEMA, {
 			label: msg("Verdict"),
 			description: "What the link's destination is: `adult`, `gambling`, `phishing`, `malware`, `unresolved` when a short link or redirect chain could not be followed or a check failed, or `safe` when only the off-platform setting acted. The most severe verdict of any address on the way decides.",
 			display: "enum",
 			valueLabels: LINK_SAFETY_VERDICT_LABELS
 		}),
-		linkUrl: field(zod.string(), {
+		linkUrl: field(() => zod.string(), {
 			label: msg("Link"),
 			description: "The link as it appears in the asset.",
 			display: "text"
 		}),
-		linkFinalUrl: field(zod.string().nullish(), {
+		linkFinalUrl: field(() => zod.string().nullish(), {
 			label: msg("Destination"),
 			description: "Where the link leads after its redirects. Absent when a short link or redirect chain could not be followed.",
 			display: "text"
 		}),
-		linkStatus: field(ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed", "purged"]), {
+		linkStatus: field(() => ASSET_MODERATION_DECISION_SCHEMA.exclude(["allowed", "purged"]), {
 			label: msg("Status"),
 			description: "The status the policy's link-safety settings decided for the asset: `limited`, `age-restricted` or `blocked`.",
 			display: "enum",
@@ -1266,7 +1115,7 @@ const USAGE_UPLOADS_PAUSED = defineEventType({
 	notify: true,
 	permission: "assets:read",
 	fields: {
-		reason: field(zod.enum([
+		reason: field(() => zod.enum([
 			"spend-limit",
 			"usage-cap",
 			"project-budget",
@@ -1282,7 +1131,7 @@ const USAGE_UPLOADS_PAUSED = defineEventType({
 				"payment-failed": msg("Payment failed")
 			}
 		}),
-		resumesAt: field(zod.number().int().nonnegative().nullish(), {
+		resumesAt: field(() => zod.number().int().nonnegative().nullish(), {
 			label: msg("Uploads resume"),
 			description: "When uploads resume at the latest, in milliseconds since the Unix epoch: the end of the billing period, or sooner if the limit is raised. Null while an invoice is unpaid: uploads resume once it is paid.",
 			display: "date"
@@ -1302,18 +1151,18 @@ const UPLOAD_PRESET_DAILY_LIMIT_REACHED = defineEventType({
 	notify: false,
 	permission: "upload-presets:read",
 	fields: {
-		presetId: field(idField("preset"), {
+		presetId: field(() => idField("preset"), {
 			label: msg("Preset ID"),
 			description: "ID of the upload preset.",
 			display: "code",
 			hidden: true
 		}),
-		presetName: field(zod.string(), {
+		presetName: field(() => zod.string(), {
 			label: msg("Preset"),
 			description: "The upload preset's name.",
 			display: "text"
 		}),
-		dailyLimit: field(zod.number().int(), {
+		dailyLimit: field(() => zod.number().int(), {
 			label: msg("Daily limit"),
 			description: "Number of uploads the preset allows each day.",
 			display: "number"
@@ -1336,7 +1185,7 @@ const PROJECT_MEMBER_REMOVED = defineEventType({
 	fields: {
 		memberUserId: memberUserIdField,
 		memberName: memberNameField,
-		role: field(MEMBER_ROLE_SCHEMA, {
+		role: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The role the member held.",
 			display: "enum",
@@ -1360,7 +1209,7 @@ const PROJECT_MEMBER_LEFT = defineEventType({
 	fields: {
 		memberUserId: memberUserIdField,
 		memberName: memberNameField,
-		role: field(MEMBER_ROLE_SCHEMA, {
+		role: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The role the member held.",
 			display: "enum",
@@ -1384,13 +1233,13 @@ const PROJECT_MEMBER_ROLE_CHANGED = defineEventType({
 	fields: {
 		memberUserId: memberUserIdField,
 		memberName: memberNameField,
-		previousRole: field(MEMBER_ROLE_SCHEMA, {
+		previousRole: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Previous role"),
 			description: "The member's role before the change.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
-		role: field(MEMBER_ROLE_SCHEMA, {
+		role: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The member's role after the change; `custom` roles may have changed permissions.",
 			display: "enum",
@@ -1413,13 +1262,13 @@ const PROJECT_INVITATION_SENT = defineEventType({
 	notify: false,
 	permission: "members:read",
 	fields: {
-		inviteeEmail: field(zod.string(), {
+		inviteeEmail: field(() => zod.string(), {
 			label: msg("Invitee"),
 			description: "The email address that was invited.",
 			display: "text",
 			inAppOnly: true
 		}),
-		role: field(MEMBER_ROLE_SCHEMA, {
+		role: field(() => MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The role the invitation grants.",
 			display: "enum",
@@ -1440,29 +1289,29 @@ const PROJECT_TRANSFERRED = defineEventType({
 	notify: true,
 	permission: "members:read",
 	fields: {
-		previousOrganisationId: field(idField("org"), {
+		previousOrganisationId: field(() => idField("org"), {
 			label: msg("Previous organisation ID"),
 			description: "ID of the organisation the project left.",
 			display: "code",
 			hidden: true
 		}),
-		previousOrganisationName: field(zod.string(), {
+		previousOrganisationName: field(() => zod.string(), {
 			label: msg("Previous organisation"),
 			description: "Name of the organisation the project left.",
 			display: "text"
 		}),
-		organisationId: field(idField("org"), {
+		organisationId: field(() => idField("org"), {
 			label: msg("Organisation ID"),
 			description: "ID of the organisation that now owns the project.",
 			display: "code",
 			hidden: true
 		}),
-		organisationName: field(zod.string(), {
+		organisationName: field(() => zod.string(), {
 			label: msg("Organisation"),
 			description: "Name of the organisation that now owns the project.",
 			display: "text"
 		}),
-		method: field(zod.enum(["handover", "move"]), {
+		method: field(() => zod.enum(["handover", "move"]), {
 			label: msg("Method"),
 			description: "`handover` when an owner of the receiving organisation accepted it from another organisation, `move` when someone who owns both moved it.",
 			display: "enum",
@@ -1471,12 +1320,12 @@ const PROJECT_TRANSFERRED = defineEventType({
 				move: msg("Move")
 			}
 		}),
-		apiKeysRevoked: field(zod.number().int().nonnegative(), {
+		apiKeysRevoked: field(() => zod.number().int().nonnegative(), {
 			label: msg("API keys revoked"),
 			description: "Number of the project's API keys revoked by a handover.",
 			display: "number"
 		}),
-		connectorsPaused: field(zod.number().int().nonnegative(), {
+		connectorsPaused: field(() => zod.number().int().nonnegative(), {
 			label: msg("Connectors paused"),
 			description: "Number of the project's webhooks and other connectors paused by a handover.",
 			display: "number"
@@ -1501,24 +1350,24 @@ const API_KEY_CREATED = defineEventType({
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
-		keyId: field(idField("key"), {
+		keyId: field(() => idField("key"), {
 			label: msg("Key ID"),
 			description: "ID of the API key.",
 			display: "code",
 			hidden: true
 		}),
-		keyName: field(zod.string().nullish(), {
+		keyName: field(() => zod.string().nullish(), {
 			label: msg("Key"),
 			description: "The API key's name.",
 			display: "text"
 		}),
-		role: field(ACCESS_ROLE_SCHEMA, {
+		role: field(() => ACCESS_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The access the key was created with: `admin`, `configurator`, `editor`, `viewer` or `custom`.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),
-		createdByName: field(zod.string().nullish(), {
+		createdByName: field(() => zod.string().nullish(), {
 			label: msg("Created by"),
 			description: "Name or email of the person who created the key, when known.",
 			display: "text",
@@ -1542,18 +1391,18 @@ const API_KEY_REVOKED = defineEventType({
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
-		keyId: field(idField("key"), {
+		keyId: field(() => idField("key"), {
 			label: msg("Key ID"),
 			description: "ID of the API key.",
 			display: "code",
 			hidden: true
 		}),
-		keyName: field(zod.string().nullish(), {
+		keyName: field(() => zod.string().nullish(), {
 			label: msg("Key"),
 			description: "The API key's name.",
 			display: "text"
 		}),
-		revokedByName: field(zod.string().nullish(), {
+		revokedByName: field(() => zod.string().nullish(), {
 			label: msg("Revoked by"),
 			description: "Name or email of the person who revoked the key, when known.",
 			display: "text",
@@ -1576,18 +1425,18 @@ const API_KEY_DELETED = defineEventType({
 	notify: false,
 	permission: "api-keys:read",
 	fields: {
-		keyId: field(idField("key"), {
+		keyId: field(() => idField("key"), {
 			label: msg("Key ID"),
 			description: "ID of the API key.",
 			display: "code",
 			hidden: true
 		}),
-		keyName: field(zod.string().nullish(), {
+		keyName: field(() => zod.string().nullish(), {
 			label: msg("Key"),
 			description: "The API key's name.",
 			display: "text"
 		}),
-		deletedByName: field(zod.string().nullish(), {
+		deletedByName: field(() => zod.string().nullish(), {
 			label: msg("Deleted by"),
 			description: "Name or email of the person who deleted the key, when known.",
 			display: "text",
@@ -1602,12 +1451,12 @@ const API_KEY_DELETED = defineEventType({
 	}
 });
 const appealFields = {
-	appealId: field(idField("apl"), {
+	appealId: field(() => idField("apl"), {
 		label: msg("Appeal"),
 		description: "The appeal identifier.",
 		display: "code"
 	}),
-	subjectType: field(zod.enum([
+	subjectType: field(() => zod.enum([
 		"post",
 		"user",
 		"reported-post",
@@ -1623,7 +1472,7 @@ const appealFields = {
 			"reported-user": msg("Reported user")
 		}
 	}),
-	subjectId: field(zod.string(), {
+	subjectId: field(() => zod.string(), {
 		label: msg("Subject"),
 		description: "The customer's subject identifier.",
 		display: "code"
@@ -1641,6 +1490,7 @@ const EVENT_TYPE_INFO = {
 	"asset.purged": ASSET_PURGED,
 	"asset.failed": ASSET_FAILED,
 	"asset.progress-updated": ASSET_PROGRESS_UPDATED,
+	"asset.media-ready": ASSET_MEDIA_READY,
 	"asset.deleted": ASSET_DELETED,
 	"asset.content-removed": ASSET_CONTENT_REMOVED,
 	"asset.retried": ASSET_RETRIED,
@@ -1686,7 +1536,7 @@ const EVENT_TYPE_INFO = {
 		permission: "project:manage",
 		fields: {
 			...appealFields,
-			decision: field(zod.enum(["upheld", "overturned"]), {
+			decision: field(() => zod.enum(["upheld", "overturned"]), {
 				label: msg("Decision"),
 				description: "The appeal outcome.",
 				display: "enum",
@@ -1695,12 +1545,12 @@ const EVENT_TYPE_INFO = {
 					overturned: msg("Overturned")
 				}
 			}),
-			action: field(zod.string(), {
+			action: field(() => zod.string(), {
 				label: msg("Action"),
 				description: "The final action for the customer's integration. For an appeal about an asset it is the asset's moderation status, such as `allowed`; for other subjects it is the action the customer defined for the decision, so it is not limited to a fixed set of values.",
 				display: "code"
 			}),
-			appliedToAsset: field(zod.boolean(), {
+			appliedToAsset: field(() => zod.boolean(), {
 				label: msg("Applied to asset"),
 				description: "Whether CalmLens updated the linked asset.",
 				display: "enum"
@@ -1717,7 +1567,7 @@ const EVENT_TYPE_INFO = {
 	})
 };
 const EVENT_TYPES = Object.keys(EVENT_TYPE_INFO).filter((type) => !type.startsWith("appeal.") && EVENT_TYPE_INFO[type].enabled !== false);
-const EVENT_TYPE_SCHEMA = zod.enum(EVENT_TYPES);
+const EVENT_TYPE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(EVENT_TYPES));
 Object.fromEntries(EVENT_TYPES.map((type) => [type, EVENT_TYPE_INFO[type].values]));
 const getEventFactUrl = (fact) => {
 	if (!fact.url || fact.url.includes("\\")) return void 0;
@@ -1729,21 +1579,21 @@ const getEventFactUrl = (fact) => {
 		return;
 	}
 };
-const factUrl = zod.string().refine((url) => getEventFactUrl({ url }) !== void 0, "Fact links must be app paths or HTTP(S) URLs").optional();
+const factUrl = /* @__PURE__ */ lazySchema(() => zod.string().refine((url) => getEventFactUrl({ url }) !== void 0, "Fact links must be app paths or HTTP(S) URLs").optional());
 const factSchema = (key, value) => zod.strictObject({
 	key: zod.literal(key),
 	value: value.nonoptional(),
 	url: factUrl
 });
-const EVENT_FACT_SCHEMAS = Object.fromEntries(EVENT_TYPES.map((type) => [type, zod.array(zod.discriminatedUnion("key", [...Object.entries(EVENT_TYPE_INFO[type].fields).map(([key, definition]) => factSchema(eventFactKey(key), definition.schema)), factSchema("test", zod.boolean())]))]));
-const EVENT_FACT_SCHEMA = zod.strictObject({
+const EVENT_FACT_SCHEMAS = Object.fromEntries(EVENT_TYPES.map((type) => [type, /* @__PURE__ */ lazySchema(() => zod.array(zod.discriminatedUnion("key", [...Object.entries(EVENT_TYPE_INFO[type].fields).map(([key, definition]) => factSchema(eventFactKey(key), definition.schema)), factSchema("test", zod.boolean())])))]));
+const EVENT_FACT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.strictObject({
 	key: zod.string(),
 	value: zod.unknown().refine((value) => value !== void 0, "Facts require a value"),
 	url: factUrl
-});
-const EVENT_FACTS_SCHEMA = zod.array(EVENT_FACT_SCHEMA);
+}));
+const EVENT_FACTS_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.array(EVENT_FACT_SCHEMA));
 // packages/shared/src/Event.ts
-const EVENT_ASSET_SCHEMA = zod.object({
+const EVENT_ASSET_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.object({
 	id: zod.string().describe("Asset ID"),
 	externalId: zod.string().nullish().describe("The asset's `externalId`, if you set one"),
 	uploadPresetId: zod.string().nullish().describe("The upload preset used to create the asset, if any"),
@@ -1754,8 +1604,8 @@ const EVENT_ASSET_SCHEMA = zod.object({
 		moderation: zod.object({ decision: ASSET_MODERATION_DECISION_SCHEMA.nullable() })
 	}),
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")
-});
-const EVENT_FIELDS = {
+}));
+const buildEventFields = () => ({
 	id: primaryIdField("evt").describe("Unique event ID"),
 	projectId: idField("proj").describe("ID of the project the event belongs to"),
 	userId: saneStringField().nullish().describe("ID of the user the event concerns in the portal, such as an asset's uploader"),
@@ -1772,7 +1622,9 @@ const EVENT_FIELDS = {
 	createdAt: createdAtField().describe("When the event was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the event was last updated, in milliseconds since the Unix epoch"),
 	readAt: zod.number().int().nullish().describe("When the event was marked as read in the portal, in milliseconds since the Unix epoch")
-};
+});
+let eventFields;
+const getEventFields = () => eventFields ??= buildEventFields();
 /** Fields only the portal uses: who caused the event and its in-app notification state. */
 const PORTAL_EVENT_FIELD_KEYS = [
 	"userId",
@@ -1780,10 +1632,10 @@ const PORTAL_EVENT_FIELD_KEYS = [
 	"updatedAt",
 	"readAt"
 ];
-const PUBLIC_EVENT_FIELDS = Object.fromEntries(Object.entries(EVENT_FIELDS).filter(([key]) => !PORTAL_EVENT_FIELD_KEYS.includes(key)));
-zod.strictObject(EVENT_FIELDS);
+let publicEventFields;
+const getPublicEventFields = () => publicEventFields ??= Object.fromEntries(Object.entries(getEventFields()).filter(([key]) => !PORTAL_EVENT_FIELD_KEYS.includes(key)));
 /** An event as `GET /events` lists it and webhooks deliver it. */
-const PUBLIC_EVENT_SCHEMA = zod.strictObject(PUBLIC_EVENT_FIELDS).meta(metaStore([docPropertyInfo({
+const PUBLIC_EVENT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.strictObject(getPublicEventFields()).meta(metaStore([docPropertyInfo({
 	description: "An event or alert in the system",
 	namedType: "Event",
 	example: {
@@ -1814,7 +1666,7 @@ const PUBLIC_EVENT_SCHEMA = zod.strictObject(PUBLIC_EVENT_FIELDS).meta(metaStore
 		],
 		createdAt: 17672256e5
 	}
-})]));
+})])));
 /** The event as the API lists it and webhooks deliver it: its public fields, in one shape. */
 const toPublicEvent = (event) => ({
 	id: event.id,
@@ -1831,12 +1683,12 @@ const toPublicEvent = (event) => ({
 	createdAt: event.createdAt
 });
 const typedEventVariant = (type) => zod.strictObject({
-	...PUBLIC_EVENT_FIELDS,
+	...getPublicEventFields(),
 	type: zod.literal(type).meta(metaStore([docPropertyInfo({ description: EVENT_TYPE_INFO[type].description })])),
 	facts: EVENT_FACT_SCHEMAS[type]
 }).meta(metaStore([docPropertyInfo({ description: `${EVENT_TYPE_INFO[type].name}: ${EVENT_TYPE_INFO[type].description}` })]));
 /** An event whose `facts` is typed by its `type`. Used for the public events feed. */
-const TYPED_EVENT_SCHEMA = zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type))).meta(metaStore([docPropertyInfo({
+const TYPED_EVENT_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.discriminatedUnion("type", EVENT_TYPES.map((type) => typedEventVariant(type))).meta(metaStore([docPropertyInfo({
 	description: "An event; `facts` depends on `type`",
 	namedType: "Event",
 	example: {
@@ -1868,7 +1720,7 @@ const TYPED_EVENT_SCHEMA = zod.discriminatedUnion("type", EVENT_TYPES.map((type)
 		createdAt: 17672256e5
 	},
 	docsSchema: PUBLIC_EVENT_SCHEMA
-})]));
+})])));
 EVENT_TYPES.filter((type) => Object.values(EVENT_TYPE_INFO[type].fields).some((definition) => Boolean(definition.names)));
 EXAMPLE_IDS.asset;
 // packages/shared/src/WebhookPayload.ts

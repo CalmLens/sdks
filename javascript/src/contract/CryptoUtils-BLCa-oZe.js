@@ -2,7 +2,6 @@
 const encoder = new TextEncoder();
 /** Lowercase hex of `bytes`, two characters per byte. */
 const bytesToHex = (bytes) => Array.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
-/** SHA-256 of the UTF-8 encoding of `value`, as lowercase hex. */
 const sha256Hex = async (value) => bytesToHex(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
 /** HMAC-SHA256 of `message` keyed with `secret` (both UTF-8 encoded), as lowercase hex. */
 const hmacSha256Hex = async (secret, message) => {

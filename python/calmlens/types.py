@@ -147,7 +147,7 @@ SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], 
 #: The event types this SDK version knows (request values, such as ``events.list`` ``types``).
 KnownEventType = Literal["asset.uploaded", "asset.classified", "asset.region-restricted", "asset.allowed",
                          "asset.limited", "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed",
-                         "asset.progress-updated", "asset.deleted", "asset.content-removed", "asset.retried",
+                         "asset.progress-updated", "asset.media-ready", "asset.deleted", "asset.content-removed", "asset.retried",
                          "asset.review-requested", "asset.review-completed", "asset.hash-matched", "asset.link-flagged",
                          "usage.free-uploads-exhausted", "usage.uploads-paused", "upload-preset.daily-limit-reached",
                          "project.member-joined", "project.member-removed", "project.member-left",

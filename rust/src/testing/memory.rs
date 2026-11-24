@@ -2974,19 +2974,11 @@ impl Backend {
         // The embed page shows any asset that may be delivered, as its viewer for the asset's type
         // or a notice that the type has none.
         if resource == "embed" {
-            let access = if public { "public" } else { "private" };
             return cdn_response(
                 MOCK_EMBED_HTML.as_bytes().to_vec(),
                 &[
                     ("content-type", "text/html; charset=utf-8".into()),
-                    (
-                        "cache-control",
-                        if claims.as_object().is_some_and(|c| !c.is_empty()) {
-                            "private, no-store".into()
-                        } else {
-                            format!("{access}, max-age=3600")
-                        },
-                    ),
+                    ("cache-control", "private, no-store".into()),
                     ("cache-tag", format!("asset-{id}")),
                     ("x-content-type-options", "nosniff".into()),
                 ],
@@ -3042,30 +3034,25 @@ impl Backend {
             };
             (png, "image/png".to_owned())
         };
-        // Like the CDN: a still image's bytes are immutable for a year, other content is kept
-        // for an hour, by shared caches only when delivery is public.
-        let immutable = still_image || (resource == "original" && asset["type"] == "image");
+        let image_response = still_image || (resource == "original" && asset["type"] == "image");
         let access = if restricted { "private" } else { "public" };
-        let lifetime = if immutable {
-            "max-age=31536000, immutable"
+        let cache_control = if q.contains_key("viewerClaims") {
+            "private, no-store".into()
+        } else if restricted && grant.is_none() {
+            "private, no-cache".into()
         } else {
-            "max-age=3600"
+            let max_age = grant.as_ref().map_or(86_400, |grant| {
+                (grant.expires_at.saturating_sub(self.now()) / 1000).min(86_400)
+            });
+            format!("{access}, max-age={max_age}, must-revalidate")
         };
         let mut response_headers = vec![
             ("content-type", content_type.clone()),
-            (
-                "cache-control",
-                if claims.as_object().is_some_and(|c| !c.is_empty()) {
-                    "private, no-store".into()
-                } else {
-                    format!("{access}, {lifetime}")
-                },
-            ),
+            ("cache-control", cache_control),
             ("cache-tag", format!("asset-{id}")),
         ];
-        if immutable {
+        if image_response {
             response_headers.push(("etag", format!("\"{id}\"")));
-            response_headers.push(("expires", http_date(self.now() / 1000 + 31_536_000)));
         }
         response_headers.push(("x-content-type-options", "nosniff".into()));
         response_headers.push((
@@ -3272,39 +3259,6 @@ fn is_active_content_type(content_type: &str) -> bool {
     ]
     .contains(&normalized.as_str())
         || normalized.ends_with("+xml")
-}
-
-/// An HTTP date (IMF-fixdate) for `seconds` since the Unix epoch.
-fn http_date(seconds: u64) -> String {
-    const DAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
-    const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    let days = (seconds / 86_400) as i64;
-    let time = seconds % 86_400;
-    // The civil date from days since the epoch (Howard Hinnant's algorithm).
-    let shifted = days + 719_468;
-    let era = shifted.div_euclid(146_097);
-    let day_of_era = shifted - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_index = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = if month_index < 10 {
-        month_index + 3
-    } else {
-        month_index - 9
-    };
-    let year = year_of_era + era * 400 + i64::from(month <= 2);
-    format!(
-        "{}, {day:02} {} {year} {:02}:{:02}:{:02} GMT",
-        DAYS[(days % 7) as usize],
-        MONTHS[(month - 1) as usize],
-        time / 3600,
-        time % 3600 / 60,
-        time % 60
-    )
 }
 
 /// Keyword search fields, in the order matches are reported.

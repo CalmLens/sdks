@@ -2197,7 +2197,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=86400, must-revalidate"
               }
             }
           }
@@ -2471,7 +2471,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=86400, must-revalidate"
               }
             }
           }
@@ -2546,7 +2546,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=86400, must-revalidate"
               }
             }
           }
@@ -9072,7 +9072,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
+                "Cache-Control": "private, no-cache"
               }
             }
           }
@@ -9137,7 +9137,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
+                "Cache-Control": "private, no-cache"
               }
             }
           }
@@ -9216,7 +9216,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
+                "Cache-Control": "private, no-cache"
               }
             }
           }
@@ -9235,7 +9235,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "private, max-age=31536000, immutable"
+                "Cache-Control": "private, no-cache"
               }
             }
           }
@@ -10166,7 +10166,7 @@
       ]
     },
     {
-      "name": "originals carry the CDN's cache tag and protection headers, and images an ETag and Expires",
+      "name": "originals carry the CDN's cache tag and protection headers, and images an ETag",
       "mock": {},
       "steps": [
         {
@@ -10201,7 +10201,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable",
+                "Cache-Control": "public, max-age=86400, must-revalidate",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -10215,7 +10215,6 @@
               },
               "headersPresent": [
                 "ETag",
-                "Expires",
                 "Content-Length"
               ]
             }
@@ -10252,7 +10251,7 @@
               "status": 200,
               "body": "hello",
               "headers": {
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "public, max-age=86400, must-revalidate",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -12181,7 +12180,7 @@
               "body": "hello",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=86400, must-revalidate"
               }
             }
           }

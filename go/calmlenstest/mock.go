@@ -1191,7 +1191,6 @@ const (
 	minMultipartPart    = 5 * 1024 * 1024
 	maxMultipartImage   = 20 * 1024 * 1024
 	maxUploadParts      = 10_000 // the most parts an upload can have, as in the API
-	imageCacheLifetime  = 31536000
 	mockThumbHash       = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
 	mockAverageColor    = "#7f7f7f"
 	defaultContentType  = "application/octet-stream"
@@ -2928,13 +2927,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// The embed page shows any asset that may be delivered, as its viewer for the asset's type or
 	// a notice that the type has none.
 	if resource == calmlens.ResourceEmbed {
-		header.Set("Cache-Control", "public, max-age=3600")
-		if restricted {
-			header.Set("Cache-Control", "private, max-age=3600")
-		}
-		if len(claims) > 0 {
-			header.Set("Cache-Control", "private, no-store")
-		}
+		header.Set("Cache-Control", "private, no-store")
 		header.Set("Cache-Tag", tag)
 		header.Set("X-Content-Type-Options", "nosniff")
 		return http.StatusOK, []byte(mockEmbedHTML), "text/html; charset=utf-8"
@@ -2994,21 +2987,24 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		}
 		data, contentType = png, "image/png"
 	}
-	// Like the CDN: a still image's bytes are immutable for a year, other content is kept for an
-	// hour, by shared caches only when delivery is public.
-	access, lifetime := "public", "max-age=3600"
+	access := "public"
 	if restricted {
 		access = "private"
 	}
-	if still || resource == calmlens.ResourceOriginal && text(asset["type"]) == string(calmlens.AssetTypeImage) {
-		lifetime = fmt.Sprintf("max-age=%d, immutable", imageCacheLifetime)
-		header.Set("ETag", strconv.Quote(text(asset["id"])))
-		header.Set("Expires", time.UnixMilli(m.options.Now()).Add(imageCacheLifetime*time.Second).UTC().Format(http.TimeFormat))
+	maxAge := int64(86400)
+	if grant != nil {
+		maxAge = max(0, min(maxAge, (grant.expiresAt-m.options.Now())/1000))
 	}
-	header.Set("Cache-Control", access+", "+lifetime)
-	if len(claims) > 0 {
+	switch {
+	case req.URL.Query().Has("viewerClaims"):
 		header.Set("Cache-Control", "private, no-store")
-		header.Del("Expires")
+	case restricted && grant == nil:
+		header.Set("Cache-Control", "private, no-cache")
+	default:
+		header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, must-revalidate", access, maxAge))
+	}
+	if still || resource == calmlens.ResourceOriginal && text(asset["type"]) == string(calmlens.AssetTypeImage) {
+		header.Set("ETag", strconv.Quote(text(asset["id"])))
 	}
 	header.Set("Cache-Tag", tag)
 	header.Set("X-Content-Type-Options", "nosniff")

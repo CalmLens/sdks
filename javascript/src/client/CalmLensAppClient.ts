@@ -191,7 +191,7 @@ export default class CalmLensAppClient {
         return expectUploadedAsset(data);
       },
 
-      /** Checks an upload this client made. `status` is present when the preset shows decisions. */
+      /** Checks an upload this client made. `classification.moderation.decision` is present when the preset shows decisions. */
       retrieve: async (
         options: RetrieveAssetOptions,
         requestOptions?: RequestOptions,

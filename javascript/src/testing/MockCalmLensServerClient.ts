@@ -4,8 +4,9 @@ import CalmLensServerClient from "../client/CalmLensServerClient";
 import { sleep } from "../client/CalmLensTransport";
 import type { Asset, CalmLensServerClientOptions } from "../client/CalmLensTypes";
 import { randomUuid, validateServerClientOptions } from "../client/CalmLensUtils";
+import { DEFAULT_DATA_REGION } from "../contract/DataRegion.js";
 import type { TypedEvent } from "../contract/Event.js";
-import { type IdPrefix, newId } from "../contract/Ids.js";
+import { type IdPrefix, newAssetId, newId } from "../contract/Ids.js";
 import type { PermissionGrant } from "../contract/Permissions.js";
 import { createMockApiKey, getMockApiKeyGrants } from "./MockApiKey";
 import {
@@ -143,7 +144,9 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       grants: getMockApiKeyGrants(options.apiKey),
       databaseStorage: mockOptions.databaseStorage ?? new InMemoryMockDatabaseStorage(),
       imageStorage: mockOptions.imageStorage ?? new InMemoryMockImageStorage(),
-      createId: mockOptions.createId ?? newId,
+      createId:
+        mockOptions.createId ??
+        ((prefix) => (prefix === "asset" ? newAssetId(DEFAULT_DATA_REGION) : newId(prefix))),
       now: mockOptions.now ?? createMonotonicClock(),
       moderate: mockOptions.moderate ?? defaultModerate,
     });

@@ -564,6 +564,8 @@ string_enum! {
         AssetFailed = "asset.failed",
         /// `asset.progress-updated`.
         AssetProgressUpdated = "asset.progress-updated",
+        /// `asset.media-ready`.
+        AssetMediaReady = "asset.media-ready",
         /// `asset.deleted`.
         AssetDeleted = "asset.deleted",
         /// `asset.content-removed`.

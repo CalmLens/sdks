@@ -90168,7 +90168,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "asset.deleted"
+        "asset.media-ready"
       ]
     },
     "fullModel": true
@@ -90219,6 +90219,71 @@
             },
             "content": {
               "status": "removed"
+            }
+          },
+          "facts": [
+            {
+              "key": "asset-name",
+              "value": "example"
+            }
+          ],
+          "createdAt": 1767225600000
+        }
+      ],
+      "nextCursor": "example",
+      "hasMore": true,
+      "excludedTypes": [
+        "asset.deleted"
+      ]
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "events.list",
+    "options": {
+      "cursor": "123_abc",
+      "pageSize": 100
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/events",
+      "query": {
+        "cursor": "123_abc",
+        "pageSize": "100"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
+          "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+          "actor": {
+            "type": "user",
+            "id": "example"
+          },
+          "type": "asset.uploaded",
+          "severity": "low",
+          "title": "example",
+          "description": "example",
+          "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+          "assetSequence": 1,
+          "asset": {
+            "id": "example",
+            "externalId": "example",
+            "uploadPresetId": "example",
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "queued",
+              "testInput": true,
+              "moderation": {
+                "decision": "age-restricted"
+              }
+            },
+            "content": {
+              "status": "temporary"
             }
           },
           "facts": [
@@ -90259,11 +90324,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "user",
+            "type": "api-key",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "low",
+          "severity": "high",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90273,17 +90338,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "uploading"
+              "status": "completed"
             },
             "classification": {
-              "status": "queued",
+              "status": "processing",
               "testInput": true,
               "moderation": {
-                "decision": "age-restricted"
+                "decision": "blocked"
               }
             },
             "content": {
-              "status": "temporary"
+              "status": "stored"
             }
           },
           "facts": [
@@ -90324,11 +90389,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "api-key",
+            "type": "automated",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "high",
+          "severity": "low",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90338,17 +90403,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "completed"
+              "status": "uploading"
             },
             "classification": {
-              "status": "processing",
+              "status": "completed",
               "testInput": true,
               "moderation": {
-                "decision": "blocked"
+                "decision": "purged"
               }
             },
             "content": {
-              "status": "stored"
+              "status": "removed"
             }
           },
           "facts": [
@@ -90389,11 +90454,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "automated",
+            "type": "system",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "low",
+          "severity": "high",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90403,17 +90468,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "uploading"
+              "status": "completed"
             },
             "classification": {
-              "status": "completed",
+              "status": "failed",
               "testInput": true,
               "moderation": {
-                "decision": "purged"
+                "decision": "allowed"
               }
             },
             "content": {
-              "status": "removed"
+              "status": "temporary"
             }
           },
           "facts": [
@@ -90454,11 +90519,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "system",
+            "type": "user",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "high",
+          "severity": "low",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90468,17 +90533,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "completed"
+              "status": "uploading"
             },
             "classification": {
-              "status": "failed",
+              "status": "queued",
               "testInput": true,
               "moderation": {
-                "decision": "allowed"
+                "decision": "limited"
               }
             },
             "content": {
-              "status": "temporary"
+              "status": "stored"
             }
           },
           "facts": [
@@ -90519,11 +90584,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "user",
+            "type": "api-key",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "low",
+          "severity": "high",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90533,17 +90598,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "uploading"
+              "status": "completed"
             },
             "classification": {
-              "status": "queued",
+              "status": "processing",
               "testInput": true,
               "moderation": {
-                "decision": "limited"
+                "decision": "age-restricted"
               }
             },
             "content": {
-              "status": "stored"
+              "status": "removed"
             }
           },
           "facts": [
@@ -90584,11 +90649,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "api-key",
+            "type": "automated",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "high",
+          "severity": "low",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90598,17 +90663,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "completed"
+              "status": "uploading"
             },
             "classification": {
-              "status": "processing",
+              "status": "completed",
               "testInput": true,
               "moderation": {
-                "decision": "age-restricted"
+                "decision": "blocked"
               }
             },
             "content": {
-              "status": "removed"
+              "status": "temporary"
             }
           },
           "facts": [
@@ -90649,11 +90714,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "automated",
+            "type": "system",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "low",
+          "severity": "high",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90663,17 +90728,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "uploading"
+              "status": "completed"
             },
             "classification": {
-              "status": "completed",
+              "status": "failed",
               "testInput": true,
               "moderation": {
-                "decision": "blocked"
+                "decision": "purged"
               }
             },
             "content": {
-              "status": "temporary"
+              "status": "stored"
             }
           },
           "facts": [
@@ -90714,11 +90779,11 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "system",
+            "type": "user",
             "id": "example"
           },
           "type": "asset.uploaded",
-          "severity": "high",
+          "severity": "low",
           "title": "example",
           "description": "example",
           "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
@@ -90728,17 +90793,17 @@
             "externalId": "example",
             "uploadPresetId": "example",
             "upload": {
-              "status": "completed"
+              "status": "uploading"
             },
             "classification": {
-              "status": "failed",
+              "status": "queued",
               "testInput": true,
               "moderation": {
-                "decision": "purged"
+                "decision": "allowed"
               }
             },
             "content": {
-              "status": "stored"
+              "status": "removed"
             }
           },
           "facts": [
@@ -90779,71 +90844,6 @@
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
           "actor": {
-            "type": "user",
-            "id": "example"
-          },
-          "type": "asset.uploaded",
-          "severity": "low",
-          "title": "example",
-          "description": "example",
-          "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
-          "assetSequence": 1,
-          "asset": {
-            "id": "example",
-            "externalId": "example",
-            "uploadPresetId": "example",
-            "upload": {
-              "status": "uploading"
-            },
-            "classification": {
-              "status": "queued",
-              "testInput": true,
-              "moderation": {
-                "decision": "allowed"
-              }
-            },
-            "content": {
-              "status": "removed"
-            }
-          },
-          "facts": [
-            {
-              "key": "asset-name",
-              "value": "example"
-            }
-          ],
-          "createdAt": 1767225600000
-        }
-      ],
-      "nextCursor": "example",
-      "hasMore": true,
-      "excludedTypes": [
-        "project.member-removed"
-      ]
-    },
-    "fullModel": true
-  },
-  {
-    "operation": "events.list",
-    "options": {
-      "cursor": "123_abc",
-      "pageSize": 100
-    },
-    "request": {
-      "method": "GET",
-      "path": "/v1/projects/project-1/events",
-      "query": {
-        "cursor": "123_abc",
-        "pageSize": "100"
-      },
-      "body": null
-    },
-    "response": {
-      "items": [
-        {
-          "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
-          "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
-          "actor": {
             "type": "api-key",
             "id": "example"
           },
@@ -90883,7 +90883,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "project.member-left"
+        "project.member-removed"
       ]
     },
     "fullModel": true
@@ -90948,7 +90948,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "project.member-role-changed"
+        "project.member-left"
       ]
     },
     "fullModel": true
@@ -91013,7 +91013,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "project.invitation-sent"
+        "project.member-role-changed"
       ]
     },
     "fullModel": true
@@ -91078,7 +91078,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "project.transferred"
+        "project.invitation-sent"
       ]
     },
     "fullModel": true
@@ -91143,7 +91143,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "api-key.created"
+        "project.transferred"
       ]
     },
     "fullModel": true
@@ -91208,7 +91208,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "api-key.revoked"
+        "api-key.created"
       ]
     },
     "fullModel": true
@@ -91273,7 +91273,7 @@
       "nextCursor": "example",
       "hasMore": true,
       "excludedTypes": [
-        "api-key.deleted"
+        "api-key.revoked"
       ]
     },
     "fullModel": true
@@ -91324,6 +91324,71 @@
             },
             "content": {
               "status": "stored"
+            }
+          },
+          "facts": [
+            {
+              "key": "asset-name",
+              "value": "example"
+            }
+          ],
+          "createdAt": 1767225600000
+        }
+      ],
+      "nextCursor": "example",
+      "hasMore": true,
+      "excludedTypes": [
+        "api-key.deleted"
+      ]
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "events.list",
+    "options": {
+      "cursor": "123_abc",
+      "pageSize": 100
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/events",
+      "query": {
+        "cursor": "123_abc",
+        "pageSize": "100"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
+          "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+          "actor": {
+            "type": "api-key",
+            "id": "example"
+          },
+          "type": "asset.uploaded",
+          "severity": "high",
+          "title": "example",
+          "description": "example",
+          "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+          "assetSequence": 1,
+          "asset": {
+            "id": "example",
+            "externalId": "example",
+            "uploadPresetId": "example",
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "testInput": true,
+              "moderation": {
+                "decision": "purged"
+              }
+            },
+            "content": {
+              "status": "removed"
             }
           },
           "facts": [
@@ -108941,6 +109006,36 @@
         "cursor": "123_abc",
         "pageSize": "100",
         "types": "asset.progress-updated"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [],
+      "nextCursor": "123_abc",
+      "hasMore": false,
+      "excludedTypes": []
+    },
+    "inputContract": {
+      "field": "types",
+      "location": "query"
+    }
+  },
+  {
+    "operation": "events.list",
+    "options": {
+      "cursor": "123_abc",
+      "pageSize": 100,
+      "types": [
+        "asset.media-ready"
+      ]
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/events",
+      "query": {
+        "cursor": "123_abc",
+        "pageSize": "100",
+        "types": "asset.media-ready"
       },
       "body": null
     },

@@ -1775,7 +1775,7 @@ module CalmLens
         return not_available if item['content']['safetyHold']
         return placeholder(method, item, authorised) if resource == 'placeholder'
 
-        deliver(method, item, resource, params, selected ? options || {} : nil, authorised)
+        deliver(method, item, resource, params, selected ? options || {} : nil, authorised, grant)
       end
 
       # What a grant doesn't cover, or, like the CDN, removed content for anyone (isAssetContentNotKept)
@@ -1862,13 +1862,13 @@ module CalmLens
       # Serves a found asset's resource after the delivery, age and access checks, then whether it
       # has the resource and takes the selector, then the transform options' schema check.
       # `selector` is the selector's options (empty for a lens alone), or nil without one.
-      def deliver(method, item, resource, params, selector, authorised)
+      def deliver(method, item, resource, params, selector, authorised, grant)
         stored = @state.content[item['id']]
         refused = refuse_delivery(item, resource, stored, params, authorised)
         return refused if refused
 
         restricted = item['visibility'] != 'public'
-        return embed(method, item, restricted, params) if resource == 'embed'
+        return embed(method, item) if resource == 'embed'
 
         # Then whether the asset has the resource, and whether it is a still image that takes a lens
         # or transform: the preview always is, the rendered file only when it is an image.
@@ -1886,8 +1886,9 @@ module CalmLens
         bytes, type = resource_body(item, resource, stored)
         return not_available unless bytes
 
-        immutable = still || (resource == 'original' && item['type'] == 'image')
-        cdn_response(method, bytes, viewer_delivery_headers(item, type, restricted, immutable, params))
+        image_response = still || (resource == 'original' && item['type'] == 'image')
+        cache = delivery_cache_control(restricted, grant, params)
+        cdn_response(method, bytes, delivery_headers(item, type, image_response, cache))
       end
 
       # The delivery checks, which refuse everyone, then age and access, as an error response, or nil.
@@ -1926,19 +1927,17 @@ module CalmLens
         JSON.parse(params.fetch('viewerClaims', '{}'))['ageConfirmed'] == true
       end
 
-      def viewer_delivery_headers(item, type, restricted, immutable, params)
-        headers = delivery_headers(item, type, restricted, immutable)
-        headers['Cache-Control'] = 'private, no-store' if params.key?('viewerClaims')
-        headers
+      def delivery_cache_control(restricted, grant, params)
+        return 'private, no-store' if params.key?('viewerClaims')
+        return 'private, no-cache' if restricted && !grant
+
+        max_age = grant ? ((grant[:expires_at] - @now.call) / 1000).clamp(0, 86_400) : 86_400
+        "#{restricted ? 'private' : 'public'}, max-age=#{max_age}, must-revalidate"
       end
 
-      # The embed page, which shows any asset that may be delivered, as its viewer for the asset's
-      # type or a notice that the type has none; cached like other non-image content.
-      def embed(method, item, restricted, params)
-        cache = if params.key?('viewerClaims') then 'private, no-store'
-                else "#{restricted ? 'private' : 'public'}, max-age=3600"
-                end
-        cdn_response(method, EMBED_HTML, { 'content-type' => 'text/html; charset=utf-8', 'cache-control' => cache,
+      def embed(method, item)
+        cdn_response(method, EMBED_HTML, { 'content-type' => 'text/html; charset=utf-8',
+                                           'cache-control' => 'private, no-store',
                                            'cache-tag' => "asset-#{item['id']}", 'x-content-type-options' => 'nosniff' })
       end
 
@@ -1963,13 +1962,10 @@ module CalmLens
                      'cache-tag' => "asset-#{item['id']}", 'etag' => "\"#{thumbhash}\"")
       end
 
-      # Like the CDN: a still image's bytes are immutable for a year, other content is kept for an
-      # hour, by shared caches only when delivery is public. Active content is served as a download.
-      def delivery_headers(item, type, restricted, immutable)
-        lifetime = immutable ? 'max-age=31536000, immutable' : 'max-age=3600'
-        headers = { 'content-type' => type, 'cache-control' => "#{restricted ? 'private' : 'public'}, #{lifetime}",
-                    'cache-tag' => "asset-#{item['id']}" }
-        headers.merge!('etag' => "\"#{item['id']}\"", 'expires' => Time.at((@now.call / 1000) + 31_536_000).utc.httpdate) if immutable
+      # Active content is served as a download.
+      def delivery_headers(item, type, image_response, cache)
+        headers = { 'content-type' => type, 'cache-control' => cache, 'cache-tag' => "asset-#{item['id']}" }
+        headers['etag'] = "\"#{item['id']}\"" if image_response
         headers.merge!('x-content-type-options' => 'nosniff', 'content-security-policy' => "sandbox; default-src 'none'")
         mime = type.downcase.split(';', 2).first.to_s.strip
         headers['content-disposition'] = 'attachment' if ACTIVE_TYPES.include?(mime) || mime.end_with?('+xml')

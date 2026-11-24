@@ -88,6 +88,8 @@ public final class ErrorCodes {
   public static final String IMAGE_TOO_LARGE = "image/too-large";
   /** {@code usage/free-uploads-exhausted} (HTTP 403). */
   public static final String FREE_UPLOADS_EXHAUSTED = "usage/free-uploads-exhausted";
+  /** {@code payment/billing-required} (HTTP 409). */
+  public static final String BILLING_REQUIRED = "payment/billing-required";
   /** {@code usage/uploads-paused} (HTTP 402). */
   public static final String UPLOADS_PAUSED = "usage/uploads-paused";
   /** {@code upload/unsupported-type} (HTTP 415). */
@@ -166,6 +168,8 @@ public final class ErrorCodes {
   public static final String HASH_LIST_LIMIT_REACHED = "hash-list/limit-reached";
   /** {@code hash-list-entry/limit-reached} (HTTP 409). */
   public static final String HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list-entry/limit-reached";
+  /** {@code hash-list-entry/quality-too-low} (HTTP 422). */
+  public static final String HASH_LIST_ENTRY_QUALITY_TOO_LOW = "hash-list-entry/quality-too-low";
   /** {@code hash-list/asset-not-hashed} (HTTP 409). */
   public static final String HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed";
   /** {@code policy/not-found} (HTTP 404). */
@@ -308,6 +312,7 @@ public final class ErrorCodes {
       Map.entry(DOCUMENT_TOO_MANY_ITEMS, 422),
       Map.entry(MEDIA_DURATION_LIMIT, 422),
       Map.entry(FREE_UPLOADS_EXHAUSTED, 403),
+      Map.entry(BILLING_REQUIRED, 409),
       Map.entry(UPLOADS_PAUSED, 402),
       Map.entry(UNSUPPORTED_UPLOAD_TYPE, 415),
       Map.entry(INVALID_UPLOAD_PAYLOAD, 400),
@@ -347,6 +352,7 @@ public final class ErrorCodes {
       Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),
       Map.entry(HASH_LIST_LIMIT_REACHED, 409),
       Map.entry(HASH_LIST_ENTRY_LIMIT_REACHED, 409),
+      Map.entry(HASH_LIST_ENTRY_QUALITY_TOO_LOW, 422),
       Map.entry(HASH_LIST_ASSET_NOT_HASHED, 409),
       Map.entry(POLICY_NOT_FOUND, 404),
       Map.entry(POLICY_REVISION_CONFLICT, 409),

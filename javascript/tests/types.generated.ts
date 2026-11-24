@@ -1781,6 +1781,7 @@ export function checkTypes(): void {
           | "asset.purged"
           | "asset.failed"
           | "asset.progress-updated"
+          | "asset.media-ready"
           | "asset.deleted"
           | "asset.content-removed"
           | "asset.retried"
@@ -2074,6 +2075,24 @@ export function checkTypes(): void {
                 | T_shared_48
                 | { key: "completed-sections"; value: number; url?: string }
                 | { key: "total-sections"; value: number; url?: string }
+                | { key: "test"; value: boolean; url?: string }
+              )[];
+              createdAt: number;
+            }
+          | {
+              id: string;
+              projectId: string;
+              actor: { type: "user" | "api-key" | "automated" | "system"; id: string | null };
+              type: "asset.media-ready";
+              severity: "low" | "high";
+              title: string;
+              description?: string | null;
+              assetId?: string | null;
+              assetSequence?: number | null;
+              asset?: T_shared_45 | null;
+              facts: (
+                | { key: "asset-name"; value: string | null; url?: string }
+                | T_shared_48
                 | { key: "test"; value: boolean; url?: string }
               )[];
               createdAt: number;
@@ -2507,6 +2526,7 @@ export function checkTypes(): void {
           | "asset.purged"
           | "asset.failed"
           | "asset.progress-updated"
+          | "asset.media-ready"
           | "asset.deleted"
           | "asset.content-removed"
           | "asset.retried"

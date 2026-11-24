@@ -336,6 +336,7 @@ export function checkSignatures(client: CalmLensServerClient): void {
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.purged"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.failed"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.progress-updated"]});
+  void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.media-ready"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.deleted"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.content-removed"]});
   void client.events.list({"cursor":"123_abc","pageSize":100,"types":["asset.retried"]});

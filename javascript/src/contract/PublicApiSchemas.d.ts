@@ -1,13 +1,13 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
-import "./Asset-fBl1Vw-k.js";
+import "./Asset-NnmJcKiz.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-C0e4ODal.js";
+import { r as TypedEvent } from "./Event-BIWwdsqc.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
-import { o as EventType } from "./EventCatalog-DLPS4Fo_.js";
-import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
+import { o as EventType } from "./EventCatalog-CUN5tz56.js";
 import "./Lens-CLZcyVve.js";
-import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-RcONpNbl.js";
-import "./PublicErrorCodes-se5X1hdL.js";
+import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
+import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-CSNXLbcB.js";
+import "./PublicErrorCodes-FXVkoMOc.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -4139,6 +4139,7 @@ declare const GET_EVENTS_QUERY_SCHEMA: zod.ZodObject<{
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.link-flagged": "asset.link-flagged";
+    "asset.media-ready": "asset.media-ready";
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";

@@ -46,6 +46,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly INVALID_IMAGE: RequestErrorCode;
   readonly IMAGE_TOO_LARGE: RequestErrorCode;
   readonly FREE_UPLOADS_EXHAUSTED: RequestErrorCode;
+  readonly WEBSITE_BILLING_REQUIRED: RequestErrorCode;
   readonly UPLOADS_PAUSED: RequestErrorCode;
   readonly UNSUPPORTED_UPLOAD_TYPE: RequestErrorCode;
   readonly INVALID_UPLOAD_PAYLOAD: RequestErrorCode;
@@ -85,6 +86,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly HASH_LIST_ENTRY_NOT_FOUND: RequestErrorCode;
   readonly HASH_LIST_LIMIT_REACHED: RequestErrorCode;
   readonly HASH_LIST_ENTRY_LIMIT_REACHED: RequestErrorCode;
+  readonly HASH_LIST_ENTRY_QUALITY_TOO_LOW: RequestErrorCode;
   readonly HASH_LIST_ASSET_NOT_HASHED: RequestErrorCode;
   readonly POLICY_NOT_FOUND: RequestErrorCode;
   readonly POLICY_REVISION_CONFLICT: RequestErrorCode;
@@ -99,6 +101,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly UPLOAD_PRESET_DISABLED: RequestErrorCode;
   readonly UPLOAD_PRESET_TOKEN_REQUIRED: RequestErrorCode;
   readonly REMOTE_URL_NOT_ALLOWED: RequestErrorCode;
+  readonly UPLOAD_RATE_LIMIT_REACHED: RequestErrorCode;
   readonly UPLOAD_PRESET_DAILY_LIMIT_REACHED: RequestErrorCode;
   readonly UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: RequestErrorCode;
   readonly UPLOAD_PRESET_FIELD_NOT_ALLOWED: RequestErrorCode;

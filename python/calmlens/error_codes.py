@@ -39,6 +39,7 @@ MEDIA_DURATION_LIMIT = "media/duration-limit"
 INVALID_IMAGE = "image/invalid"
 IMAGE_TOO_LARGE = "image/too-large"
 FREE_UPLOADS_EXHAUSTED = "usage/free-uploads-exhausted"
+WEBSITE_BILLING_REQUIRED = "payment/billing-required"
 UPLOADS_PAUSED = "usage/uploads-paused"
 UNSUPPORTED_UPLOAD_TYPE = "upload/unsupported-type"
 INVALID_UPLOAD_PAYLOAD = "upload-payload/invalid"
@@ -78,6 +79,7 @@ HASH_LIST_NOT_FOUND = "hash-list/not-found"
 HASH_LIST_ENTRY_NOT_FOUND = "hash-list-entry/not-found"
 HASH_LIST_LIMIT_REACHED = "hash-list/limit-reached"
 HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list-entry/limit-reached"
+HASH_LIST_ENTRY_QUALITY_TOO_LOW = "hash-list-entry/quality-too-low"
 HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed"
 POLICY_NOT_FOUND = "policy/not-found"
 POLICY_REVISION_CONFLICT = "policy/revision-conflict"
@@ -171,6 +173,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "image/invalid": 422,
     "image/too-large": 422,
     "usage/free-uploads-exhausted": 403,
+    "payment/billing-required": 409,
     "usage/uploads-paused": 402,
     "upload/unsupported-type": 415,
     "upload-payload/invalid": 400,
@@ -210,6 +213,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "hash-list-entry/not-found": 404,
     "hash-list/limit-reached": 409,
     "hash-list-entry/limit-reached": 409,
+    "hash-list-entry/quality-too-low": 422,
     "hash-list/asset-not-hashed": 409,
     "policy/not-found": 404,
     "policy/revision-conflict": 409,

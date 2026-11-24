@@ -1,11 +1,11 @@
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
+// node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
+// node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
+// node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -52,7 +52,7 @@ var ErrorCode = class ErrorCode {
 		return this.getId();
 	}
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
+// node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -69,7 +69,7 @@ let currentLogger = defaultErrorLogger;
 const getErrorLogger = () => {
 	return currentLogger;
 };
-// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
+// node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;
@@ -480,6 +480,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This project's organisation has used its free uploads. Set up billing to continue uploading.",
 		status: 403
 	}),
+	WEBSITE_BILLING_REQUIRED: new ErrorCode({
+		id: "payment/billing-required",
+		defaultMessage: "Set up billing to upload websites.",
+		status: 409
+	}),
 	UPLOADS_PAUSED: new ErrorCode({
 		id: "usage/uploads-paused",
 		defaultMessage: "This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.",
@@ -674,6 +679,11 @@ const PUBLIC_ERROR_CODES = {
 		id: "hash-list-entry/limit-reached",
 		defaultMessage: "This project's hash lists hold the most entries they can. Remove entries to add more.",
 		status: 409
+	}),
+	HASH_LIST_ENTRY_QUALITY_TOO_LOW: new ErrorCode({
+		id: "hash-list-entry/quality-too-low",
+		defaultMessage: "This hash cannot be matched. Use a more detailed image or a hash of higher quality.",
+		status: 422
 	}),
 	HASH_LIST_ASSET_NOT_HASHED: new ErrorCode({
 		id: "hash-list/asset-not-hashed",
@@ -871,7 +881,6 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	})
 };
-PUBLIC_ERROR_CODES.INVALID_TYPE, PUBLIC_ERROR_CODES.TOO_SMALL, PUBLIC_ERROR_CODES.TOO_BIG, PUBLIC_ERROR_CODES.INVALID_FORMAT, PUBLIC_ERROR_CODES.INVALID_VALUE, PUBLIC_ERROR_CODES.UNKNOWN_FIELD;
 PUBLIC_ERROR_CODES.INVALID_REQUEST;
 PUBLIC_ERROR_CODES.INTERNAL_ERROR;
 PUBLIC_ERROR_CODES.MISSING_API_KEY, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH, PUBLIC_ERROR_CODES.PERMISSION_DENIED;

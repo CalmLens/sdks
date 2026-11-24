@@ -1287,6 +1287,39 @@
     }
   },
   {
+    "code": "payment/billing-required",
+    "status": 409,
+    "kind": "conflict",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-payment-billing-required"
+      },
+      "body": {
+        "code": "payment/billing-required",
+        "message": "Set up billing to upload websites.",
+        "requestId": "req-payment-billing-required",
+        "details": {
+          "reason": "website_billing_required"
+        }
+      }
+    },
+    "expected": {
+      "code": "payment/billing-required",
+      "status": 409,
+      "requestId": "req-payment-billing-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "website_billing_required"
+      }
+    }
+  },
+  {
     "code": "usage/uploads-paused",
     "status": 402,
     "kind": "api",
@@ -2571,6 +2604,39 @@
       "retryAfter": null,
       "details": {
         "reason": "hash_list_entry_limit_reached"
+      }
+    }
+  },
+  {
+    "code": "hash-list-entry/quality-too-low",
+    "status": 422,
+    "kind": "unprocessable-entity",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-hash-list-entry-quality-too-low"
+      },
+      "body": {
+        "code": "hash-list-entry/quality-too-low",
+        "message": "This hash cannot be matched. Use a more detailed image or a hash of higher quality.",
+        "requestId": "req-hash-list-entry-quality-too-low",
+        "details": {
+          "reason": "hash_list_entry_quality_too_low"
+        }
+      }
+    },
+    "expected": {
+      "code": "hash-list-entry/quality-too-low",
+      "status": 422,
+      "requestId": "req-hash-list-entry-quality-too-low",
+      "retryAfter": null,
+      "details": {
+        "reason": "hash_list_entry_quality_too_low"
       }
     }
   },

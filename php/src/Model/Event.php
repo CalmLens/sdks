@@ -38,6 +38,7 @@ final class Event extends CalmLensObject
     public const TYPE_ASSET_PURGED = 'asset.purged';
     public const TYPE_ASSET_FAILED = 'asset.failed';
     public const TYPE_ASSET_PROGRESS_UPDATED = 'asset.progress-updated';
+    public const TYPE_ASSET_MEDIA_READY = 'asset.media-ready';
     public const TYPE_ASSET_DELETED = 'asset.deleted';
     public const TYPE_ASSET_CONTENT_REMOVED = 'asset.content-removed';
     public const TYPE_ASSET_RETRIED = 'asset.retried';

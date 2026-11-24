@@ -3475,9 +3475,7 @@ export class MockCalmLensApi {
     if (resource === "embed") {
       return this.cdnResponse(isHead, new TextEncoder().encode(MOCK_EMBED_HTML), url, {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": Object.keys(claims).length
-          ? "private, no-store"
-          : `${isPrivate ? "private" : "public"}, max-age=3600`,
+        "Cache-Control": "private, no-store",
         "Cache-Tag": `asset-${asset.id}`,
         "X-Content-Type-Options": "nosniff",
       });
@@ -3536,23 +3534,21 @@ export class MockCalmLensApi {
       bytes = mockPlaceholderPng(preview?.thumbhash ?? MOCK_THUMBHASH);
       contentType = "image/png";
     }
-    const immutable = stillImage || (resource === "original" && asset.type === "image");
+    const imageResponse = stillImage || (resource === "original" && asset.type === "image");
+    const maxAge = grant
+      ? Math.max(0, Math.min(86_400, Math.floor((grant.expiresAt - this.now()) / 1000)))
+      : 86_400;
+    const cacheControl =
+      query.has("viewerClaims") || request.headers.has("X-CalmLens-Viewer-Claims")
+        ? "private, no-store"
+        : isPrivate && !grant
+          ? "private, no-cache"
+          : `${isPrivate ? "private" : "public"}, max-age=${maxAge}, must-revalidate`;
     return this.cdnResponse(isHead, bytes, url, {
       "Content-Type": contentType,
-      // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
-      // an hour, publicly only when delivery is public.
-      "Cache-Control": Object.keys(claims).length
-        ? "private, no-store"
-        : `${isPrivate ? "private" : "public"}, ${
-            immutable ? "max-age=31536000, immutable" : "max-age=3600"
-          }`,
+      "Cache-Control": cacheControl,
       "Cache-Tag": `asset-${asset.id}`,
-      ...(immutable
-        ? {
-            ETag: `"${asset.id}"`,
-            Expires: new Date(this.now() + 31536000 * 1000).toUTCString(),
-          }
-        : {}),
+      ...(imageResponse ? { ETag: `"${asset.id}"` } : {}),
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "sandbox; default-src 'none'",
       ...(isActiveContentType(contentType) ? { "Content-Disposition": "attachment" } : {}),

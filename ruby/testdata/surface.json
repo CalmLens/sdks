@@ -2165,6 +2165,13 @@
       "kind": "permission-denied"
     },
     {
+      "code": "payment/billing-required",
+      "status": 409,
+      "retryable": false,
+      "local": false,
+      "kind": "conflict"
+    },
+    {
       "code": "usage/uploads-paused",
       "status": 402,
       "retryable": false,
@@ -2436,6 +2443,13 @@
       "retryable": false,
       "local": false,
       "kind": "conflict"
+    },
+    {
+      "code": "hash-list-entry/quality-too-low",
+      "status": 422,
+      "retryable": false,
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "hash-list/asset-not-hashed",

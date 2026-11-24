@@ -1,8 +1,9 @@
-import { n as idField } from "./Ids-C2cLdFM0.js";
-import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
+import { n as idField } from "./Ids-BBz_iuDy.js";
+import { t as lazySchema } from "./LazySchema-BKMpWIaF.js";
 import * as zod from "zod";
 // packages/shared/src/Permissions.ts
-const ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
+/** Every permission action, in the order the docs and the portal list them. */
+const PERMISSION_ACTIONS = [
 	"assets:read",
 	"assets:download",
 	"assets:create",
@@ -34,7 +35,8 @@ const ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"reviews:read",
 	"reviews:write",
 	"project:manage"
-]));
+];
+const ACTION_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum(PERMISSION_ACTIONS));
 const PROJECT_ACTIONS = [...[
 	"settings",
 	"members",
@@ -63,8 +65,8 @@ const ACCESS_ROLE_SCHEMA = /* @__PURE__ */ lazySchema(() => zod.enum([
 	"viewer",
 	"custom"
 ]));
-[...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
-[...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
+[...PERMISSION_ACTIONS.filter((a) => !isProjectAction(a))];
+[...PERMISSION_ACTIONS.filter((a) => !isProjectAction(a))];
 const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	if (![action, ...actionsImplying(action)].some((held) => grant.actions.includes(held))) return false;
 	if (grant.folderId === null) return true;

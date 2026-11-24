@@ -190,6 +190,7 @@ fn public_signatures(client: &ServerClient) {
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.purged"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.failed"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.progress-updated"]}"###, |options| { let _ = &options.types; });
+    check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.media-ready"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.deleted"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.content-removed"]}"###, |options| { let _ = &options.types; });
     check(|options| async move { client.events().list(options).await }, r###"{"cursor":"123_abc","pageSize":100,"types":["asset.retried"]}"###, |options| { let _ = &options.types; });

@@ -1,6 +1,5 @@
-import "./Asset-fBl1Vw-k.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-DLPS4Fo_.js";
-import "./Page-Bwn9Pb4k.js";
+import "./Asset-NnmJcKiz.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-CUN5tz56.js";
 import * as zod from "zod";
 declare const ACTOR_SCHEMA: zod.ZodObject<{
   type: zod.ZodEnum<{
@@ -79,6 +78,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.link-flagged": "asset.link-flagged";
+    "asset.media-ready": "asset.media-ready";
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
@@ -181,6 +181,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.link-flagged": "asset.link-flagged";
+    "asset.media-ready": "asset.media-ready";
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";

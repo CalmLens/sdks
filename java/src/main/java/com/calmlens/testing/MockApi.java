@@ -24,9 +24,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -2682,7 +2679,7 @@ final class MockApi {
     // notice that the type has none.
     if (resource.equals("embed")) {
       return served(request, MOCK_EMBED_HTML.getBytes(StandardCharsets.UTF_8), "text/html; charset=utf-8",
-          "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", max-age=3600",
+          "Cache-Control", "private, no-store",
           "Cache-Tag", "asset-" + str(asset, "id"), "X-Content-Type-Options", "nosniff");
     }
     // Then whether the asset has the resource (the mock prepares no HLS stream), and whether it is
@@ -2718,15 +2715,15 @@ final class MockApi {
       bytes = Thumbhash.toPng(Base64.getDecoder().decode(thumbhash == null ? MOCK_THUMBHASH : thumbhash));
       type = "image/png";
     }
-    boolean immutable = stillImage || resource.equals("original") && image;
+    boolean imageResponse = stillImage || resource.equals("original") && image;
+    long maxAge = grant == null ? 86400 : Math.max(0, Math.min(86400, (grant.expiresAt() - now()) / 1000));
+    String cacheControl = request.query().containsKey("viewerClaims") ? "private, no-store"
+        : isPrivate && grant == null ? "private, no-cache"
+        : (isPrivate ? "private" : "public") + ", max-age=" + maxAge + ", must-revalidate";
     List<String> headers = new ArrayList<>(List.of(
-        // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
-        // an hour, publicly only when delivery is public.
-        "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", " + (immutable ? "max-age=31536000, immutable" : "max-age=3600"),
-        "Cache-Tag", "asset-" + str(asset, "id")));
-    if (immutable) {
-      headers.addAll(List.of("ETag", "\"" + str(asset, "id") + "\"",
-          "Expires", DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant.ofEpochMilli(now() + 31536000L * 1000).atOffset(ZoneOffset.UTC))));
+        "Cache-Control", cacheControl, "Cache-Tag", "asset-" + str(asset, "id")));
+    if (imageResponse) {
+      headers.addAll(List.of("ETag", "\"" + str(asset, "id") + "\""));
     }
     headers.addAll(List.of("X-Content-Type-Options", "nosniff", "Content-Security-Policy", "sandbox; default-src 'none'"));
     if (isActiveContentType(type)) headers.addAll(List.of("Content-Disposition", "attachment"));

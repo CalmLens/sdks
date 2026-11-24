@@ -3668,6 +3668,7 @@
                   "asset.purged",
                   "asset.failed",
                   "asset.progress-updated",
+                  "asset.media-ready",
                   "asset.deleted",
                   "asset.content-removed",
                   "asset.retried",
@@ -5982,6 +5983,159 @@
                               "value"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "const": "test"
+                              },
+                              "value": {
+                                "type": "boolean"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "actor",
+                    "type",
+                    "severity",
+                    "title",
+                    "facts",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "actor": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "api-key",
+                            "automated",
+                            "system"
+                          ]
+                        },
+                        "id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "asset.media-ready"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "high"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "assetId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "assetSequence": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "asset": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/definitions/shared.45"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "const": "asset-name"
+                              },
+                              "value": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -9881,6 +10035,7 @@
                 "asset.purged",
                 "asset.failed",
                 "asset.progress-updated",
+                "asset.media-ready",
                 "asset.deleted",
                 "asset.content-removed",
                 "asset.retried",

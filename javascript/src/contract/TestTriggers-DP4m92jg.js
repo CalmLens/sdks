@@ -1,7 +1,7 @@
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
-import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { t as lazySchema } from "./LazySchema-D_3-dV1e.js";
-import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-BhyWuU49.js";
+import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-BLCa-oZe.js";
+import { t as lazySchema } from "./LazySchema-BKMpWIaF.js";
+import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-Ce8EVv4q.js";
 import * as z from "zod";
 // packages/shared/src/TestImageGrid.ts
 /**
@@ -464,19 +464,19 @@ const TEST_FACE_AGE_PRESETS = {
 	}
 };
 const TEST_FACE_AGE_MAX = 120;
-const basisPoints = z.number().int().min(0).max(TEST_DETECTION_BOX_MAX);
+const basisPoints = /* @__PURE__ */ lazySchema(() => z.number().int().min(0).max(TEST_DETECTION_BOX_MAX));
 const detectionShape = {
-	box: z.tuple([
+	box: /* @__PURE__ */ lazySchema(() => z.tuple([
 		basisPoints,
 		basisPoints,
 		basisPoints,
 		basisPoints
-	]),
-	confidence: z.number().int().min(0).max(100).optional()
+	])),
+	confidence: /* @__PURE__ */ lazySchema(() => z.number().int().min(0).max(100).optional())
 };
 const fitsImage = ({ box: [left, top, width, height] }) => left + width <= 1e4 && top + height <= 1e4;
 const BOX_MESSAGE = msg("A box must lie inside the image: left + width and top + height are at most 10000.");
-const ageYears = z.number().int().min(0).max(120);
+const ageYears = /* @__PURE__ */ lazySchema(() => z.number().int().min(0).max(120));
 const TEST_DETECTED_PERSON_SCHEMA = /* @__PURE__ */ lazySchema(() => z.object(detectionShape).strict().refine(fitsImage, BOX_MESSAGE));
 const TEST_DETECTED_FACE_SCHEMA = /* @__PURE__ */ lazySchema(() => z.object({
 	...detectionShape,

@@ -2765,7 +2765,7 @@ final class MockServerClient
         // or a notice that the type has none.
         if ($resource === 'embed') {
             return $this->cdnResponse($method, self::EMBED_HTML, ['Content-Type' => 'text/html; charset=utf-8',
-                'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', max-age=3600',
+                'Cache-Control' => 'private, no-store',
                 'Cache-Tag' => 'asset-' . $asset['id'], 'X-Content-Type-Options' => 'nosniff']);
         }
         // Then whether the asset has the resource, and whether it is a still image that takes a
@@ -2801,14 +2801,15 @@ final class MockServerClient
             $bytes = Placeholder::png($preview['thumbhash'] ?? self::THUMBHASH);
             $type = 'image/png';
         }
-        $immutable = $still || ($resource === 'original' && $asset['type'] === 'image');
+        $imageResponse = $still || ($resource === 'original' && $asset['type'] === 'image');
         $base = strtolower(trim(explode(';', $type)[0]));
-        // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
-        // an hour, by shared caches only when delivery is public.
+        $maxAge = $grant === null ? 86400 : max(0, min(86400, intdiv($grant['expiresAt'] - ($this->now)(), 1000)));
+        $cacheControl = array_key_exists('viewerClaims', $query) ? 'private, no-store'
+            : ($private && $grant === null ? 'private, no-cache'
+                : ($private ? 'private' : 'public') . ", max-age=$maxAge, must-revalidate");
         return $this->cdnResponse($method, $bytes, ['Content-Type' => $type,
-            'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', ' . ($immutable ? 'max-age=31536000, immutable' : 'max-age=3600'),
-            'Cache-Tag' => 'asset-' . $asset['id']]
-            + ($immutable ? ['ETag' => '"' . $asset['id'] . '"', 'Expires' => gmdate('D, d M Y H:i:s', intdiv(($this->now)(), 1000) + 31536000) . ' GMT'] : [])
+            'Cache-Control' => $cacheControl, 'Cache-Tag' => 'asset-' . $asset['id']]
+            + ($imageResponse ? ['ETag' => '"' . $asset['id'] . '"'] : [])
             + ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'"]
             // Content a browser could run as a document is served as a download.
             + (in_array($base, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($base, '+xml') ? ['Content-Disposition' => 'attachment'] : []));

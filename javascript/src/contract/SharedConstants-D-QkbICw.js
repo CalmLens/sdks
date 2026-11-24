@@ -111,7 +111,7 @@ const FIRST_PARTY_COOKIES = {
 	},
 	ASSET_DASHBOARD_STATE: {
 		name: "CL_assetDashboardState",
-		description: "Remembers your asset dashboard view (view mode, filters, sorting and folder)",
+		description: "Remembers your asset dashboard view (view mode and metadata grouping)",
 		expirationDescription: "1 year",
 		expirationMs: YEAR_MS,
 		type: "functional",
@@ -157,6 +157,14 @@ const FIRST_PARTY_COOKIES = {
 		expirationDescription: "1 year",
 		expirationMs: YEAR_MS,
 		type: "functional",
+		providerName: "CalmLens"
+	},
+	CHATGPT_AD_CLICK: {
+		name: "CL_chatgptAdClick",
+		description: "Links a ChatGPT ad click to signups, moderation checks and credit checkouts",
+		expirationDescription: "30 days",
+		expirationMs: 30 * DAY_MS,
+		type: "marketing",
 		providerName: "CalmLens"
 	},
 	SEARCH_SDK_LANGUAGE: {

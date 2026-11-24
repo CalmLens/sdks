@@ -15,6 +15,7 @@ public enum EventType implements ApiEnum {
   ASSET_PURGED("asset.purged"),
   ASSET_FAILED("asset.failed"),
   ASSET_PROGRESS_UPDATED("asset.progress-updated"),
+  ASSET_MEDIA_READY("asset.media-ready"),
   ASSET_DELETED("asset.deleted"),
   ASSET_CONTENT_REMOVED("asset.content-removed"),
   ASSET_RETRIED("asset.retried"),

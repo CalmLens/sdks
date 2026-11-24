@@ -1,3 +1,4 @@
+import { n as DataRegion } from "./DataRegion-BKOU0Ajp.js";
 import "zod";
 /**
  * The prefix of every kind of object customers can see, so an ID says what it identifies:
@@ -37,8 +38,16 @@ type IdKind = keyof typeof ID_PREFIXES;
 type IdPrefix = (typeof ID_PREFIXES)[IdKind];
 /** An ID with its prefix, such as `Id<"proj">`. */
 type Id<P extends IdPrefix = IdPrefix> = `${P}_${string}`;
-/** A new random ID, such as `newId("proj")` → `proj_8fK2mQx7Lp4NvB3tRz9Y`. */
-export declare const newId: <P extends IdPrefix>(prefix: P) => Id<P>;
+/**
+ * A new random ID, such as `newId("proj")` → `proj_8fK2mQx7Lp4NvB3tRz9Y`. Assets take theirs from
+ * `newAssetId`, which names their region.
+ */
+export declare const newId: <P extends Exclude<IdPrefix, "asset">>(prefix: P) => Id<P>;
+/**
+ * A new asset ID for an asset that lives in `region`: its first character after `asset_` is the
+ * region's code (`ASSET_ID_REGION_CODES`), then 19 random characters (about 113 bits).
+ */
+export declare const newAssetId: (region: DataRegion) => Id<"asset">;
 /** Whether `value` is an ID with `prefix` (or with any registered prefix). */
 export declare const isId: <P extends IdPrefix = IdPrefix>(value: unknown, prefix?: P) => value is Id<P>;
 /** Example IDs for docs, OpenAPI and SDK fixtures: fixed, so generated output stays stable. */

@@ -161,6 +161,8 @@ const (
 	CodeHashListLimitReached ErrorCode = "hash-list/limit-reached"
 	// CodeHashListEntryLimitReached is returned with HTTP 409.
 	CodeHashListEntryLimitReached ErrorCode = "hash-list-entry/limit-reached"
+	// CodeHashListEntryQualityTooLow is returned with HTTP 422.
+	CodeHashListEntryQualityTooLow ErrorCode = "hash-list-entry/quality-too-low"
 	// CodeHashListAssetNotHashed is returned with HTTP 409.
 	CodeHashListAssetNotHashed ErrorCode = "hash-list/asset-not-hashed"
 	// CodePolicyNotFound is returned with HTTP 404.
@@ -320,6 +322,7 @@ var publicErrorStatuses = map[ErrorCode]int{
 	CodeHashListEntryNotFound:             404,
 	CodeHashListLimitReached:              409,
 	CodeHashListEntryLimitReached:         409,
+	CodeHashListEntryQualityTooLow:        422,
 	CodeHashListAssetNotHashed:            409,
 	CodePolicyNotFound:                    404,
 	CodePolicyRevisionConflict:            409,

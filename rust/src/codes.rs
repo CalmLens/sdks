@@ -78,6 +78,8 @@ error_codes! {
     ImageTooLarge = "image/too-large", 422;
     /// `usage/free-uploads-exhausted` (HTTP 403): This project's organisation has used its free uploads. Set up billing to continue uploading.
     FreeUploadsExhausted = "usage/free-uploads-exhausted", 403;
+    /// `payment/billing-required` (HTTP 409): Set up billing to upload websites.
+    WebsiteBillingRequired = "payment/billing-required", 409;
     /// `usage/uploads-paused` (HTTP 402): This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.
     UploadsPaused = "usage/uploads-paused", 402;
     /// `upload/unsupported-type` (HTTP 415): The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it (details.contentType and details.allowedContentTypes say what was sent and what it accepts).
@@ -156,6 +158,8 @@ error_codes! {
     HashListLimitReached = "hash-list/limit-reached", 409;
     /// `hash-list-entry/limit-reached` (HTTP 409): This project's hash lists hold the most entries they can. Remove entries to add more.
     HashListEntryLimitReached = "hash-list-entry/limit-reached", 409;
+    /// `hash-list-entry/quality-too-low` (HTTP 422): This hash cannot be matched. Use a more detailed image or a hash of higher quality.
+    HashListEntryQualityTooLow = "hash-list-entry/quality-too-low", 422;
     /// `hash-list/asset-not-hashed` (HTTP 409): This asset has no perceptual hash. Only image assets that finished processing can be added.
     HashListAssetNotHashed = "hash-list/asset-not-hashed", 409;
     /// `policy/not-found` (HTTP 404): Policy not found. Check the policy ID in the portal.
