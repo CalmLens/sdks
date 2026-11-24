@@ -277,6 +277,12 @@ def _body_bytes(data: Any) -> bytes:
 # ---- requests.json, paths.json, errors.json ---------------------------------------------------
 
 class RequestTests(unittest.TestCase):
+    def test_rejects_empty_and_whitespace_review_notes_before_transport(self) -> None:
+        for note in ("", " \t\n"):
+            with self.subTest(note=note), self.assertRaises(CalmLensInvalidArgumentError) as raised:
+                _client().assets.decide(asset_id="asset-1", decision="blocked", note=note)
+            self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+
     def test_javascript_requests(self) -> None:
         """Each request fixture sends the recorded request and returns the recorded response."""
         for index, fixture in enumerate(_fixture("requests.json"), 1):

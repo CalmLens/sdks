@@ -27,6 +27,55 @@ final class MockServerClientTest extends TestCase
         ]);
     }
 
+    public function testInjectsOcrAndLinkFindingsForEnabledImageFeatures(): void
+    {
+        $box = [100, 200, 1000, 2000];
+        $url = 'https://example.com/offer';
+        $mock = new MockServerClient(moderate: static fn () => MockDecision::of('allowed')
+            ->withOcr('Community offer', [['box' => $box, 'personalInformation' => false]])
+            ->withLinkDetection([['value' => $url, 'box' => $box]], [['url' => $url, 'source' => 'qr-code']]));
+        $input = [
+            'name' => 'offer.png',
+            'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
+        ];
+        $create = static fn (array $features, bool $retain) => $mock->client()->assets->classify($input + [
+            'processingOptions' => ['retainContent' => $retain, 'features' => $features],
+        ])->toArray();
+        $features = ['ocr' => ['enabled' => true]];
+        $kept = $create($features, true);
+        self::assertSame(['type' => 'string', 'content' => 'Community offer'], $kept['content']['extractedText']);
+        self::assertSame([['box' => $box, 'personalInformation' => false]], $kept['classification']['ocr']['textRegions']);
+        self::assertSame([['value' => $url, 'box' => $box]], $kept['classification']['linkDetection']['qrCodes']);
+        self::assertSame([['url' => $url, 'source' => 'qr-code']], $kept['classification']['linkDetection']['links']);
+        self::assertNull($create($features, false)['content']['extractedText']);
+        $disabled = $create(['linkDetection' => ['enabled' => false]], true);
+        self::assertNull($disabled['classification']['ocr']);
+        self::assertNull($disabled['classification']['linkDetection']);
+    }
+
+    public function testSignsLateAndRepeatedWebhookDeliveriesWithoutReorderingTheFeed(): void
+    {
+        $mock = new MockServerClient();
+        $old = $mock->enqueueEvent(['type' => 'asset.allowed', 'assetId' => 'asset-1']);
+        $new = $mock->enqueueEvent(['type' => 'asset.blocked', 'assetId' => 'asset-1']);
+        $url = 'https://example.com/hook';
+        $secret = 'test-secret';
+        $timestamp = 1760000000;
+        $deliver = static fn (Event $event) => \CalmLens\Webhooks::parseRequest(
+            $mock->webhookRequest($event, $url, $secret, timestamp: $timestamp), $secret, now: $timestamp,
+        );
+        $latest = $deliver($new);
+        self::assertSame($new['id'], $latest['id']);
+        self::assertSame(2, $latest['assetSequence']);
+        $late = $deliver($old);
+        self::assertSame($old['id'], $late['id']);
+        self::assertFalse(\CalmLens\Webhooks::isNewerAssetEvent($late, $latest['assetSequence']));
+        self::assertFalse(\CalmLens\Webhooks::isNewerAssetEvent($deliver($new), $latest['assetSequence']));
+        self::assertSame($new['assetSequence'] + 1, $mock->enqueueEvent([
+            'type' => 'asset.allowed', 'assetId' => 'asset-1',
+        ])['assetSequence']);
+    }
+
     /** A grant serves until its expiry, then the CDN refuses it; a held asset can't be signed. */
     public function testSignedAssetUrlExpiresAndHeldAssetsAreNotSigned(): void
     {

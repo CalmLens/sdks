@@ -2131,7 +2131,9 @@ class Assets:
         merged = _merge("assets.decide", asset_id=asset_id, decision=decision, note=note, confirm_purge=confirm_purge)
         path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/decision"
         _require(merged, "decision")
-        _require(merged, "note")
+        review_note = _require(merged, "note")
+        if not isinstance(review_note, str) or not review_note.strip():
+            raise _invalid("note must contain text")
         return _load(Asset, self._c._request("POST", path, body={k: v for k, v in merged.items() if k != "assetId"}))
 
     def remove_content(self, *, asset_id: str, options: RequestOptions | None = None) -> Asset:

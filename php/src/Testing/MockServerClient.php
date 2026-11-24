@@ -18,9 +18,12 @@ use CalmLens\Model\UploadToken;
 use CalmLens\ModerationContext;
 use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
+use CalmLens\Webhooks;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\ServerRequest;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * An offline CalmLens for tests. Calls run the real client's validation, encoding, retries and
@@ -333,8 +336,8 @@ final class MockServerClient
      * `['type' => 'api-key', 'id' => null]`), `facts` and `createdAt` are filled in; when `assetId` names a stored
      * asset, the event carries a snapshot of its status, as the API's events do, with the moderation
      * status an `asset.<status>` event announces. `assetSequence` is assigned like the API's (any
-     * given one is ignored): the asset's next number, from 1, or null without an `assetId`. Pass the result to
-     * `Webhooks::toPayload` to build a matching webhook body.
+     * given one is ignored): the asset's next number, from 1, or null without an `assetId`. Pass the
+     * result to `webhookRequest` to simulate a delivery.
      */
     public function enqueueEvent(array $event): Event
     {
@@ -357,6 +360,19 @@ final class MockServerClient
             'asset' => $snapshot, 'actor' => self::API_KEY_ACTOR, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return Event::constructFrom($event);
+    }
+
+    /**
+     * Creates a signed request for the event without sending it or changing the feed. Pass events
+     * in reverse order to test late delivery, or pass an event twice to test replay handling.
+     */
+    public function webhookRequest(Event $event, string $url, #[\SensitiveParameter] string $secret,
+        ?string $deliveryId = null, ?int $timestamp = null): ServerRequestInterface
+    {
+        $body = json_encode(Webhooks::toPayload($event), JSON_THROW_ON_ERROR);
+        $headers = Webhooks::createHeaders($body, $deliveryId ?? ($this->createId)('dlv'), $secret,
+            $timestamp ?? intdiv(($this->now)(), 1000));
+        return new ServerRequest('POST', $url, $headers, $body);
     }
 
     /**
@@ -1153,10 +1169,16 @@ final class MockServerClient
         }
         $features = $this->processingOptions[$asset['id']]['features'] ?? null;
         if (($features['ocr']['enabled'] ?? null) === true) {
-            $next['classification']['ocr'] = ['status' => 'evaluated', 'textRegions' => []];
+            $ocr = $decision->ocrFindings();
+            $next['classification']['ocr'] = ['status' => 'evaluated', 'textRegions' => $ocr['textRegions'] ?? []];
+            $text = $ocr['text'] ?? null;
+            if ($text !== null && $next['content']['status'] === 'stored') {
+                $next['content']['extractedText'] = ['type' => 'string', 'content' => $text];
+            }
         }
         if (($features['linkDetection']['enabled'] ?? null) !== false) {
-            $next['classification']['linkDetection'] = ['status' => 'evaluated', 'qrCodes' => [], 'links' => []];
+            $next['classification']['linkDetection'] = ['status' => 'evaluated']
+                + ($decision->linkFindings() ?? ['qrCodes' => [], 'links' => []]);
         }
         if (($features['personDetection']['enabled'] ?? null) === true) {
             $next['classification']['personDetection'] = ['status' => 'evaluated', 'people' => []];

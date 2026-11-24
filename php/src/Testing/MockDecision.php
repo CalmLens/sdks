@@ -30,6 +30,11 @@ final class MockDecision
     /** @var ?array{reason: string, uncertainCategories: list<string>} */
     private ?array $pendingReview = null;
 
+    /** @var ?array{text: ?string, textRegions: list<array{box: list<int>, personalInformation: bool}>} */
+    private ?array $ocr = null;
+    /** @var ?array{qrCodes: list<array{value: string, box: list<int>}>, links: list<array{url: string, source: 'qr-code'|'text'}>} */
+    private ?array $linkDetection = null;
+
     private function __construct(public readonly string $status)
     {
     }
@@ -101,6 +106,42 @@ final class MockDecision
         }
         $this->pendingReview = ['reason' => $reason, 'uncertainCategories' => array_values($uncertainCategories)];
         return $this;
+    }
+
+    /**
+     * Sets evaluated OCR findings for image uploads that enabled OCR. Text is kept only when the
+     * mock retains the asset's content.
+     *
+     * @param list<array{box: list<int>, personalInformation: bool}> $textRegions
+     */
+    public function withOcr(?string $text, array $textRegions = []): self
+    {
+        $this->ocr = ['text' => $text, 'textRegions' => $textRegions];
+        return $this;
+    }
+
+    /**
+     * Sets evaluated QR codes and links for image uploads with link detection enabled.
+     *
+     * @param list<array{value: string, box: list<int>}> $qrCodes
+     * @param list<array{url: string, source: 'qr-code'|'text'}> $links
+     */
+    public function withLinkDetection(array $qrCodes = [], array $links = []): self
+    {
+        $this->linkDetection = ['qrCodes' => $qrCodes, 'links' => $links];
+        return $this;
+    }
+
+    /** @internal */
+    public function ocrFindings(): ?array
+    {
+        return $this->ocr;
+    }
+
+    /** @internal */
+    public function linkFindings(): ?array
+    {
+        return $this->linkDetection;
     }
 
     /**
