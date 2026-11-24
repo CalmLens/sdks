@@ -83,6 +83,8 @@ const (
 	CodeImageTooLarge ErrorCode = "image/too-large"
 	// CodeFreeUploadsExhausted is returned with HTTP 403.
 	CodeFreeUploadsExhausted ErrorCode = "usage/free-uploads-exhausted"
+	// CodeWebsiteBillingRequired is returned with HTTP 409.
+	CodeWebsiteBillingRequired ErrorCode = "payment/billing-required"
 	// CodeUploadsPaused is returned with HTTP 402.
 	CodeUploadsPaused ErrorCode = "usage/uploads-paused"
 	// CodeUnsupportedUploadType is returned with HTTP 415.
@@ -283,6 +285,7 @@ var publicErrorStatuses = map[ErrorCode]int{
 	CodeInvalidImage:                      422,
 	CodeImageTooLarge:                     422,
 	CodeFreeUploadsExhausted:              403,
+	CodeWebsiteBillingRequired:            409,
 	CodeUploadsPaused:                     402,
 	CodeUnsupportedUploadType:             415,
 	CodeInvalidUploadPayload:              400,

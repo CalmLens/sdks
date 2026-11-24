@@ -9,3 +9,5 @@
 ---
 
 Support the `asset.media-ready` event and the `hash-list-entry/quality-too-low` error code. Offline CDN mocks now use the CDN's cache lifetimes for public, private and signed delivery.
+
+Go also recognises `payment/billing-required` as an HTTP 409 error.
