@@ -352,12 +352,12 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 	decideAsset(stored, string(calmlens.ModerationDecisionAllowed))
 	rec := get(a, "/media?id="+item.ID)
 	location, _ := url.Parse(rec.Header().Get("Location"))
-	if rec.Code != 303 || location.Scheme != "https" || !strings.HasSuffix(location.Path, "/"+calmlens.ResourceRendered) {
+	if rec.Code != 303 || location.Scheme != "https" || !strings.HasSuffix(location.Path, "/"+string(calmlens.ResourceRendered)) {
 		t.Fatal(rec.Code, rec.Header().Get("Location"))
 	}
 	requests := mock.Requests()
 	if len(requests) != 2 || requests[0].Method != "GET" || requests[0].Path != "/assets/"+item.ID || !strings.HasSuffix(requests[1].Path, "/signed-asset-urls") ||
-		requests[1].Body["assetId"] != item.ID || requests[1].Body["expiresIn"] != float64(signedURLSeconds) || requests[1].Body["original"] != false {
+		requests[1].Body["assetId"] != item.ID || requests[1].Body["expiresIn"] != float64(signedURLSeconds) || requests[1].Body["resource"] != string(calmlens.ResourceRendered) {
 		t.Fatalf("signature not preceded by a retrieve: %+v", requests)
 	}
 	// The browser loads the signed URL without the API key.

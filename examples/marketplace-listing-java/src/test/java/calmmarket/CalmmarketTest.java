@@ -713,7 +713,7 @@ class CalmmarketTest {
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("lenses", List.of(Map.of("id", "lens-1",
             "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true, "createdAt", 1760000000000L))))
-        .enqueue(200, Map.of("url", "https://cdn.calmlens.com/v1/assets/project-1/sig_photo1", "expiresAt", 1760000060000L));
+        .enqueue(200, Map.of("url", "https://cdn.calmlens.com/v1/assets/project-1/sig_photo1/rendered", "expiresAt", 1760000060000L));
     Calmmarket.Response first = get(app, "/listings/" + listing.id + "/photos/1");
     assertEquals(303, first.status());
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/sig_photo1/rendered/@" + Calmmarket.CARD_LENS, first.headers().get("location"));
@@ -727,11 +727,11 @@ class CalmmarketTest {
     JsonObject body = JsonParser.parseString(signing.bodyText()).getAsJsonObject();
     assertEquals("photo-1", body.get("assetId").getAsString());
     assertEquals(60, body.get("expiresIn").getAsInt());
-    assertFalse(body.get("original").getAsBoolean(), "the original upload is not granted");
+    assertEquals("rendered", body.get("resource").getAsString(), "signed for the rendered photo, not the original upload");
 
     // The lens is ensured once; an unsafe signed URL is refused.
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
-        .enqueue(200, Map.of("url", "http://cdn.example.com/v1/assets/project-1/sig_photo1", "expiresAt", 1760000060000L));
+        .enqueue(200, Map.of("url", "http://cdn.example.com/v1/assets/project-1/sig_photo1/rendered", "expiresAt", 1760000060000L));
     assertEquals(502, get(app, "/listings/" + listing.id + "/photos/1").status());
     assertEquals(List.of("GET /assets/photo-1", "POST /projects/project-1/signed-asset-urls"), paths(mock, 6));
   }

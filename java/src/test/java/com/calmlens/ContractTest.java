@@ -523,7 +523,7 @@ class ContractTest {
       assertEquals(options, transformRoundTrip(options), "decodes into ImageTransformOptions");
       ImageTransformOptions typed = Json.GSON.fromJson(options, ImageTransformOptions.class);
       CalmLensException error = assertThrows(CalmLensException.class,
-          () -> refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1").setResource("rendered").setTransform(typed).build()));
+          () -> refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1").setResource(CdnResource.RENDERED).setTransform(typed).build()));
       assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
       List<String> unknownKeys = Json.GSON.fromJson(testCase.get("unknownKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
       List<String> invalidKeys = Json.GSON.fromJson(testCase.get("invalidKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
@@ -1138,7 +1138,8 @@ class ContractTest {
         return want.equals(accessor.invoke(error));
       }
       case "cdn-resource":
-        return refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1").setResource(name).build()).endsWith("/asset-1/" + capability.get("path").getAsString());
+        return refusing().cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("asset-1")
+            .setResource(CdnResource.valueOf(name.substring(name.indexOf('.') + 1))).build()).endsWith("/asset-1/" + capability.get("path").getAsString());
       case "cdn-option":
       case "mock-option": {
         int dot = name.lastIndexOf('.');

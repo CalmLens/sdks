@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.calmlens.models.CdnResource;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.calmlens.exception.*;
@@ -308,7 +310,7 @@ class ClientTest {
     assertEquals(ErrorCodes.INVALID_UPLOAD_PAYLOAD, assertThrows(CalmLensException.class,
         () -> client.assets().create(AssetCreateParams.builder().setName("x").setContent(Content.base64("!", "text/plain")).build())).getCode());
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,format=avif,%5Bx%5D",
-        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("x").setResource("rendered").setLens("one").setTransform("format=avif,[x]").build()));
+        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("x").setResource(CdnResource.RENDERED).setLens("one").setTransform("format=avif,[x]").build()));
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(InvalidArgumentException.class, () -> client.assets().retrieve("")).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(InvalidArgumentException.class, () -> client.assets().retrieve(null)).getCode());
     for (String value : List.of("a\r\nX-Injected: 1", "a\nb", "a\u0000b")) {
@@ -360,7 +362,7 @@ class ClientTest {
   }
 
   private static String url(CalmLensServerClient client, ImageTransformOptions transform) {
-    return client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource("rendered").setTransform(transform).build());
+    return client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource(CdnResource.RENDERED).setTransform(transform).build());
   }
 
   @Test void typedImageTransformOptionsSerializeLikeJavaScriptNumbers() {
@@ -372,7 +374,7 @@ class ClientTest {
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
         () -> url(client, new ImageTransformOptions().blur(Double.NaN))).getCode());
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/@thumb,blur=2,format=webp,sharpen=0.25,width=640",
-        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource("rendered").setLens("thumb").setTransform(image).build()));
+        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource(CdnResource.RENDERED).setLens("thumb").setTransform(image).build()));
     ImageTransformOptions quality = new ImageTransformOptions()
         .dpr(2.0).anim(false).quality(Quality.level("high")).background("#FFAA00").border(new ImageBorder("rgb(0, 0, 0)", null));
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/anim=false,background=ffaa00,border.color=rgb%280%2C%200%2C%200%29,dpr=2,quality=high",

@@ -56,7 +56,7 @@ final class MockServerClientTest extends TestCase
         $now = 1000;
         $mock = new MockServerClient(now: function () use (&$now): int { return $now; });
         $asset = self::image($mock, 'private');
-        $signed = $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id'], 'expiresIn' => 60, 'original' => true, 'resource' => 'original']);
+        $signed = $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id'], 'expiresIn' => 60, 'resource' => 'original']);
         self::assertSame(61000, $signed['expiresAt']);
         $now = $signed['expiresAt'] - 1;
         self::assertSame('png-bytes', (string) $mock->fetchCdn($signed['url'])->getBody());
@@ -70,6 +70,20 @@ final class MockServerClientTest extends TestCase
         } catch (CalmLensException $error) {
             self::assertSame(ErrorCodes::ASSET_HELD, $error->errorCode);
         }
+    }
+
+    /** Only a URL signed for the original serves it, and each URL ends in its resource. */
+    public function testOnlyAUrlSignedForTheOriginalServesIt(): void
+    {
+        $mock = new MockServerClient();
+        $asset = self::image($mock, 'private');
+        $original = $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id'], 'resource' => 'original'])['url'];
+        self::assertStringEndsWith('/original', $original);
+        self::assertSame(200, $mock->fetchCdn($original)->getStatusCode());
+        $rendered = $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id'], 'resource' => 'rendered'])['url'];
+        $refused = $mock->fetchCdn(substr($rendered, 0, -strlen('/rendered')) . '/original');
+        self::assertSame([403, ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED], [$refused->getStatusCode(), json_decode((string) $refused->getBody(), true)['code']]);
+        self::assertSame($asset['id'], $mock->client()->cdn->getAssetInfo($original)['id']);
     }
 
     public static function outcomes(): iterable

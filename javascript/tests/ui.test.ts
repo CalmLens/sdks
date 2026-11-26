@@ -219,6 +219,13 @@ describe("getAssetView", () => {
   });
 });
 
+it("a resource URL beneath an asset URL shows the asset as its asset URL does", () => {
+  for (const resource of ["original", "rendered/@thumbnail", "hls/index.m3u8"])
+    expect(
+      view({}, IMAGE, `${SRC}/${resource}?viewerClaims=%7B%22region%22%3A%22GB%22%7D`),
+    ).toEqual(view({}, IMAGE, `${SRC}?viewerClaims=%7B%22region%22%3A%22GB%22%7D`));
+});
+
 describe("pickAssetSource", () => {
   const shown = view({ image: { widths: [400, 800, 1200] } }, IMAGE) as Extract<
     AssetView,

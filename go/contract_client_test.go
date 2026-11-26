@@ -325,7 +325,8 @@ func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 	options.ProjectID, _ = args["projectId"].(string)
 	options.AssetID, _ = args["assetId"].(string)
 	options.ExternalID, _ = args["externalId"].(string)
-	options.Resource, _ = args["resource"].(string)
+	resource, _ := args["resource"].(string)
+	options.Resource = CDNResource(resource)
 	options.Lens, _ = args["lens"].(string)
 	options.Transform, options.TransformOptions = fixtureTransform(args["transform"])
 	return options
@@ -415,7 +416,6 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		if expiresIn, ok := args["expiresIn"].(float64); ok {
 			options.ExpiresIn = int(expiresIn)
 		}
-		options.Original, _ = args["original"].(bool)
 		return one(c.CDN.SignAssetURL(ctx, options))
 	case "assets.retry":
 		return one(c.Assets.Retry(ctx, into[AssetIDOptions](t, args)))

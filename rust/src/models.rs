@@ -698,8 +698,8 @@ string_enum! {
     /// transform, and the CDN refuses them on rendered PDFs, video and audio with
     /// `transform/invalid`.
     CdnResource {
-        /// The asset's original file, exactly as uploaded. Beneath a signed asset URL only when it
-        /// was signed with `original`.
+        /// The asset's original file, exactly as uploaded. Beneath a signed asset URL only one
+        /// signed for it.
         Original = "original",
         /// The asset's displayable file: an image in the best format the client accepts, a PDF,
         /// or browser-safe video or audio, as `content.rendered` describes.
@@ -2255,11 +2255,8 @@ pub struct SignAssetUrlOptions {
     /// [`DEFAULT_SIGNED_URL_EXPIRES_IN`](crate::DEFAULT_SIGNED_URL_EXPIRES_IN).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_in: Option<u64>,
-    /// Grants the original resource, the exact upload, which the URL refuses otherwise with
-    /// `signed-url/original-not-granted`. Defaults to false.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub original: Option<bool>,
-    /// A resource to return the URL of, beneath the signed asset URL.
+    /// The resource the URL is signed for, and ends in. Only a URL signed for the original serves
+    /// the exact upload; any other refuses it with `signed-url/original-not-granted`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<CdnResource>,
     /// A lens identifier, for the rendered or preview resource.
@@ -2300,13 +2297,8 @@ impl SignAssetUrlOptions {
         self.expires_in = Some(value);
         self
     }
-    /// Grants the original resource, the exact upload, which the URL refuses otherwise with
-    /// `signed-url/original-not-granted`. Defaults to false.
-    pub fn original(mut self, value: bool) -> Self {
-        self.original = Some(value);
-        self
-    }
-    /// A resource to return the URL of, beneath the signed asset URL.
+    /// The resource the URL is signed for, and ends in. Only a URL signed for the original serves
+    /// the exact upload.
     pub fn resource(mut self, value: impl Into<CdnResource>) -> Self {
         self.resource = Some(value.into());
         self

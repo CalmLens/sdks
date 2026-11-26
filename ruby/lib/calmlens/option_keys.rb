@@ -31,7 +31,7 @@ module CalmLens
       'assets.update' => %w[assetId description externalId externalUrl metadata name tags visibility].freeze,
       'assets.uploadPart' => %w[assetId part wait].freeze,
       'cdn.signAssetUrl' => %w[
-        assetId expiresIn externalId lens original projectId resource transform viewerClaims
+        assetId expiresIn externalId lens projectId resource resource transform viewerClaims
       ].freeze,
       'ensureLens' => %w[active description identifier name transform type].freeze,
       'ensureLenses' => %w[lenses].freeze,

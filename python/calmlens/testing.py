@@ -38,7 +38,7 @@ from ._asset_filters import ASSET_FILTER_FIELDS
 from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (AppInfo, RequestAttempt, TransportRequest, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES,
                      DEFAULT_SIGNED_URL_EXPIRES_IN, DEFAULT_TIMEOUT, MAX_SIGNED_URL_EXPIRES_IN, USER_AGENT,
-                     CalmLensServerClient, CDNResponse,
+                     CalmLensServerClient, CDNResponse, _CDN_RESOURCE_PATHS,
                      _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
                      _is_accepted_upload_mime_type, _json, _merge, _normalize_upload_mime_type,
                      _sign_upload_token)
@@ -1725,10 +1725,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _sign_asset_url(self, body: dict[str, Any], now: int) -> dict[str, Any]:
         """Like the API (``POST /projects/:projectId/signed-asset-urls``): a grant to one asset, by ID
-        or external ID, until it expires, serving the original only when asked. The mock's grant is
+        or external ID, until it expires, ending in the resource it was signed for and serving the
+        original only when signed for it. The mock's grant is
         readable (see ``_encode_mock_grant``), unlike the CDN's, and only the mock's CDN accepts it."""
-        # Like the API's schema, none of these fields takes null.
-        for key in ("assetId", "externalId", "expiresIn", "original"):
+        # Like the API's schema, it takes only these fields, and none of them takes null.
+        fields = ("assetId", "externalId", "expiresIn", "resource")
+        unknown = next((key for key in body if key not in fields), None)
+        if unknown is not None:
+            raise _invalid_field("validation/unknown-field", unknown)
+        for key in fields:
             if key in body and body[key] is None:
                 raise _invalid_field("validation/invalid-type", key)
         if ("assetId" in body) == ("externalId" in body):
@@ -1742,9 +1747,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _invalid_field("validation/too-small", "expiresIn")
         if expires_in > MAX_SIGNED_URL_EXPIRES_IN:
             raise _invalid_field("validation/too-big", "expiresIn")
-        original = body.get("original", False)
-        if not isinstance(original, bool):
-            raise _invalid_field("validation/invalid-type", "original")
+        resource = body.get("resource")
+        if resource is not None and resource not in _CDN_RESOURCE_PATHS:
+            raise _invalid_field("validation/invalid-value", "resource")
         if "externalId" in body:
             asset = next((a for a in self._project_assets() if a.get("externalId") == body["externalId"]), None)
             if asset is None:
@@ -1754,8 +1759,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if asset["content"].get("safetyHold"):
             raise _Failure(error_codes.ASSET_HELD)
         expires_at = now + int(expires_in) * 1000
-        grant = _encode_mock_grant(asset["id"], original, expires_at)
-        return {"url": f"{self.cdn_base_url}/assets/{quote(self.project_id or '', safe=_COMPONENT_SAFE)}/{grant}",
+        grant = _encode_mock_grant(asset["id"], resource == "original", expires_at)
+        path = f"/{_CDN_RESOURCE_PATHS[resource]}" if resource is not None else ""
+        return {"url": f"{self.cdn_base_url}/assets/{quote(self.project_id or '', safe=_COMPONENT_SAFE)}/{grant}{path}",
                 "expiresAt": expires_at}
 
     def _folders_list(self, query: dict[str, Any]) -> dict[str, Any]:

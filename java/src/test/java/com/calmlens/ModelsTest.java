@@ -198,10 +198,10 @@ class ModelsTest {
 
     CalmLensServerClient client = CalmLensServerClient.builder().apiKey("key").projectId("project-1").build();
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/format=avif,gravity=entropy,trim.border=true,trim.left=3",
-        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource("rendered").setTransform(transform).build()));
+        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource(CdnResource.RENDERED).setTransform(transform).build()));
     ImageTransformOptions point = new ImageTransformOptions().gravity(Gravity.point("remainder", 0.25, 1.0));
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/gravity.mode=remainder,gravity.x=0.25,gravity.y=1",
-        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource("rendered").setTransform(point).build()));
+        client.cdn().getAssetUrl(CdnRequestParams.builder().setAssetId("a").setResource(CdnResource.RENDERED).setTransform(point).build()));
   }
 
   @Test void reportPolicySnapshotDecodesIntoTypedModels() {

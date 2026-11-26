@@ -56,6 +56,11 @@ module CalmLens
       DEFAULT_PAGE_SIZE = 50
       MAX_PAGE_SIZE = 100
       REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
+      # Where the API's signed URL for each resource ends.
+      SIGNED_RESOURCE_PATHS = {
+        'original' => 'original', 'rendered' => 'rendered', 'preview' => 'preview',
+        'hls' => 'hls/index.m3u8', 'embed' => 'embed', 'placeholder' => 'placeholder', 'info' => 'info'
+      }.freeze
       # The moderation status each `asset.<status>` event announces.
       ANNOUNCED_STATUSES = REVIEW_DECISIONS.to_h { |status| ["asset.#{status}", status] }.freeze
       MAX_DECISION_NOTE_LENGTH = 1499
@@ -1299,11 +1304,14 @@ module CalmLens
       end
 
       # Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to one
-      # asset, by ID or external ID, until it expires, serving the original only when asked. Only the
-      # mock's CDN accepts the grant.
+      # asset, by ID or external ID, until it expires, ending in the resource it was signed for and
+      # serving the original only when signed for it. Only the mock's CDN accepts the grant.
       def sign_asset_url(json)
-        # Like the API's schema, none of these fields takes null.
-        %w[assetId externalId expiresIn original].each do |key|
+        # Like the API's schema, it takes only these fields, and none of them takes null.
+        fields = %w[assetId externalId expiresIn resource]
+        unknown = json.keys.find { |key| !fields.include?(key) }
+        invalid!('validation/unknown-field', unknown) if unknown
+        fields.each do |key|
           invalid!('validation/invalid-type', key) if json.key?(key) && json[key].nil?
         end
         if json.key?('assetId') == json.key?('externalId')
@@ -1315,8 +1323,8 @@ module CalmLens
         invalid!('validation/invalid-type', 'expiresIn') unless expires.is_a?(Integer) || (expires.is_a?(Float) && expires == expires.floor)
         invalid!('validation/too-small', 'expiresIn') if expires < 1
         invalid!('validation/too-big', 'expiresIn') if expires > CDN::MAX_SIGNED_URL_EXPIRES_IN
-        original = json.fetch('original', false)
-        invalid!('validation/invalid-type', 'original') unless [true, false].include?(original)
+        resource = json['resource']
+        invalid!('validation/invalid-value', 'resource') unless resource.nil? || SIGNED_RESOURCE_PATHS.key?(resource)
 
         item = if json.key?('externalId')
                  project_assets.find { |asset| asset['externalId'] == json['externalId'] }
@@ -1327,7 +1335,9 @@ module CalmLens
         fail!(ErrorCodes::ASSET_HELD) if item['content']['safetyHold']
 
         expires_at = @now.call + (expires.to_i * 1000)
-        { 'url' => "#{@cdn_base_url}/assets/#{Internal.component(@project_id)}/#{MockGrant.encode(item['id'], original, expires_at)}",
+        path = resource ? "/#{SIGNED_RESOURCE_PATHS.fetch(resource)}" : ''
+        grant = MockGrant.encode(item['id'], resource == 'original', expires_at)
+        { 'url' => "#{@cdn_base_url}/assets/#{Internal.component(@project_id)}/#{grant}#{path}",
           'expiresAt' => expires_at }
       end
 

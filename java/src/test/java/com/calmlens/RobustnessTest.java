@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import com.calmlens.models.CdnResource;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.calmlens.exception.ApiException;
@@ -184,9 +186,9 @@ class RobustnessTest {
 
   @Test void secretsNeverAppearInStringForms() {
     CalmLensServerClient.Builder builder = CalmLensServerClient.builder().apiKey("sk_live_secret").projectId("project");
-    var transport = new Scripted(reply(200, "{\"url\":\"https://cdn.example/v1/assets/project/sig_secret\",\"expiresAt\":1}"));
+    var transport = new Scripted(reply(200, "{\"url\":\"https://cdn.example/v1/assets/project/sig_secret/rendered\",\"expiresAt\":1}"));
     CalmLensServerClient client = transport.client(builder);
-    SignedAssetUrl signed = client.cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId("a").setResource("rendered")
+    SignedAssetUrl signed = client.cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId("a").setResource(CdnResource.RENDERED)
         .setViewerClaims(ViewerClaims.builder().setAgeConfirmed(true).build()).build());
     assertEquals("https://cdn.example/v1/assets/project/sig_secret/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D", signed.getUrl());
     for (String text : List.of(client.toString(), builder.toString(), transport.requests.get(0).toString(), signed.toString())) {

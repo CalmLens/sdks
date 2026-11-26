@@ -975,8 +975,8 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		a.streamDemo(w, r, id, contentType)
 		return
 	}
-	// Playback uses the rendered file, the clip as browser-safe audio or video, so the grant
-	// needs no original access.
+	// Playback uses the rendered file, the clip as browser-safe audio or video, so the URL is
+	// signed for that resource rather than the original.
 	signed, err := a.client.CDN.SignAssetURL(r.Context(), calmlens.SignAssetURLOptions{AssetID: id, Resource: calmlens.ResourceRendered, ExpiresIn: signedURLSeconds})
 	if err != nil {
 		log.Printf("Signed URL failed: %v", err)

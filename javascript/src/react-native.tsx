@@ -15,7 +15,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { appendAssetLocation } from "./client/CalmLensCdn";
+import { appendAssetLocation, assetUrlOf } from "./client/CalmLensCdn";
 import {
   type AssetOptions,
   AssetSession,
@@ -514,7 +514,7 @@ export function CalmLensAsset(props: CalmLensAssetProps) {
 
   // What the component shows itself: an image, or the still of what it can't show (video and
   // audio without a player, documents, text, spreadsheets and websites), and what that opens.
-  const base = state.src?.split("?", 1)[0];
+  const base = state.src ? assetUrlOf(state.src) : undefined;
   const previewUrl =
     base && state.info?.content?.preview
       ? appendAssetLocation(base, { resource: "preview", viewerClaims })

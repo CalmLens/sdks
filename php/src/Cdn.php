@@ -20,6 +20,7 @@ use CalmLens\Model\SignedAssetUrl;
  *
  * @phpstan-import-type RequestOptions from Types
  * @phpstan-import-type ViewerClaims from Types
+ * @phpstan-import-type CdnResource from Types
  */
 final class Cdn extends Resource
 {
@@ -48,6 +49,21 @@ final class Cdn extends Resource
 
     /** Every resource beneath an asset URL. */
     public const RESOURCES = ['original', 'rendered', 'preview', 'placeholder', 'hls', 'embed', 'info'];
+
+    /**
+     * The asset URL of a path: an asset URL (`…/assets/{projectId}/{asset}`) as it is, and a
+     * resource URL beneath one, such as a URL signed for `original`, cut back to the asset URL its
+     * resources are paths beneath.
+     */
+    private static function assetUrlOf(string $path): string
+    {
+        $path = rtrim($path, '/');
+        $parts = explode('/', $path);
+        $assets = array_search('assets', array_reverse($parts, true), true);
+        return $assets !== false && $assets >= 3 && count($parts) > $assets + 3
+            ? implode('/', array_slice($parts, 0, $assets + 3))
+            : $path;
+    }
 
     /**
      * The resources that take a lens or transform: the rendered file and the preview. The others
@@ -98,20 +114,20 @@ final class Cdn extends Resource
 
     /**
      * Signs a private asset's URL on your server, so browsers and apps can load it without an API
-     * key until it expires. Every resource is a path beneath it, as beneath a public asset URL;
-     * `original` only when signed with `original: true`. With a `resource`, it returns that
-     * resource's URL beneath the grant.
+     * key until it expires. With a `resource`, it is signed for that resource and ends in it; only
+     * a URL signed for `original` serves the exact upload, and any other serves every other
+     * resource beneath its grant.
      *
      * Name the asset by exactly one of `assetId` and `externalId`; `projectId` defaults to the
      * client's project. `expiresIn` is the lifetime in whole seconds, from 1 to 86400
-     * (`DEFAULT_SIGNED_URL_EXPIRES_IN`, 15 minutes, when omitted). `resource`, `lens`, `transform`
-     * and `viewerClaims` aren't part of the grant: they are appended exactly as `getAssetUrl`
-     * appends them, and can be changed later without signing again. The options are checked
+     * (`DEFAULT_SIGNED_URL_EXPIRES_IN`, 15 minutes, when omitted). `lens`, `transform` and
+     * `viewerClaims` aren't part of the grant: they are appended exactly as `getAssetUrl` appends
+     * them, and can be changed later without signing again. The options are checked
      * before anything is sent.
      *
      * @param array{
-     *     assetId?: string, externalId?: string, expiresIn?: int, original?: bool, projectId?: string,
-     *     resource?: string, lens?: string, transform?: string|array<string, mixed>,
+     *     assetId?: string, externalId?: string, expiresIn?: int, projectId?: string,
+     *     resource?: CdnResource, lens?: string, transform?: string|array<string, mixed>,
      *     viewerClaims?: ViewerClaims,
      * } $params
      * @param RequestOptions $requestOptions
@@ -124,21 +140,24 @@ final class Cdn extends Resource
         if (!is_int($expiresIn) || $expiresIn < 1 || $expiresIn > self::MAX_SIGNED_URL_EXPIRES_IN) {
             Values::invalid('expiresIn must be a whole number of seconds from 1 to ' . self::MAX_SIGNED_URL_EXPIRES_IN);
         }
-        $original = $api['original'] ?? false;
-        if (!is_bool($original)) {
-            Values::invalid('original must be a boolean');
-        }
         self::assetSegment($api);
         // The location is appended to the signed URL: check it before signing.
         self::appendLocation('', $api);
         $project = Values::segment($api['projectId'] ?? $this->session->projectId);
         $body = (array_key_exists('assetId', $api) ? ['assetId' => $api['assetId']] : ['externalId' => $api['externalId']])
-            + ['expiresIn' => $expiresIn, 'original' => $original];
+            + ['expiresIn' => $expiresIn]
+            + (array_key_exists('resource', $api) ? ['resource' => $api['resource']] : []);
         $signed = $this->session->request('POST', '/projects/' . $project . '/signed-asset-urls', body: $body, options: $request);
         if (!is_string($signed['url'] ?? null) || $signed['url'] === '') {
             throw CalmLensException::create('sdk/invalid-response', 'The API returned no signed asset URL');
         }
-        return SignedAssetUrl::constructFrom(['url' => self::appendLocation($signed['url'], $api), 'expiresAt' => $signed['expiresAt'] ?? null])
+        // The API returns the URL ending in its resource; the selector and claims follow it.
+        $resourcePath = array_key_exists('resource', $api) ? '/' . self::RESOURCE_PATHS[$api['resource']] : '';
+        if (!str_ends_with($signed['url'], $resourcePath)) {
+            throw CalmLensException::create('sdk/invalid-response', "The signed asset URL doesn't end in the resource it was signed for");
+        }
+        $url = $signed['url'] . substr(self::appendLocation('', $api), strlen($resourcePath));
+        return SignedAssetUrl::constructFrom(['url' => $url, 'expiresAt' => $signed['expiresAt'] ?? null])
             ->withLastResponse($this->session->lastResponse);
     }
 
@@ -182,7 +201,7 @@ final class Cdn extends Resource
                 }
             }
         }
-        $info = $this->session->cdnJson(rtrim($base, '/') . '/info' . self::claimsQuery($claims), $request);
+        $info = $this->session->cdnJson(self::assetUrlOf($base) . '/info' . self::claimsQuery($claims), $request);
         if (!is_string($info['id'] ?? null) || !is_string($info['projectId'] ?? null) || !is_string($info['type'] ?? null)
             || !is_array($info['content'] ?? null) || !in_array($info['availability'] ?? null, self::AVAILABILITIES, true)) {
             throw CalmLensException::create('sdk/invalid-response', 'The CDN returned no asset info');

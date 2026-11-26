@@ -1,3 +1,4 @@
+import { ASSET_RESOURCE_PATHS } from "../client/CalmLensCdn";
 import { CalmLensError, invalidArgument, SDK_ERROR_CODES } from "../client/CalmLensError";
 import {
   API_ERROR_CODES,
@@ -1972,13 +1973,17 @@ export class MockCalmLensApi {
 
   /**
    * Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to one
-   * asset, by ID or external ID, until it expires, serving the original only when asked. The mock's
+   * asset, by ID or external ID, until it expires, ending in the resource it was signed for and
+   * serving the original only when signed for it. The mock's
    * grant is readable (its asset, original access and expiry), unlike the CDN's, and only the
    * mock's CDN accepts it.
    */
   private async signAssetUrl(body: Record<string, unknown>) {
-    // Like the API's schema, none of these fields takes null.
-    for (const key of ["assetId", "externalId", "expiresIn", "original"]) {
+    // Like the API's schema, it takes only these fields, and none of them takes null.
+    const fields = ["assetId", "externalId", "expiresIn", "resource"];
+    const unknown = Object.keys(body).find((key) => !fields.includes(key));
+    if (unknown !== undefined) throw invalidField("validation/unknown-field", unknown);
+    for (const key of fields) {
       if (body[key] === null) throw invalidField("validation/invalid-type", key);
     }
     const { assetId, externalId } = body;
@@ -1998,8 +2003,13 @@ export class MockCalmLensApi {
     }
     if (expiresIn < 1) throw invalidField("validation/too-small", "expiresIn");
     if (expiresIn > 60 * 60 * 24) throw invalidField("validation/too-big", "expiresIn");
-    const original = body.original ?? false;
-    if (typeof original !== "boolean") throw invalidField("validation/invalid-type", "original");
+    const { resource } = body;
+    if (
+      resource !== undefined &&
+      (typeof resource !== "string" || !Object.hasOwn(ASSET_RESOURCE_PATHS, resource))
+    ) {
+      throw invalidField("validation/invalid-value", "resource");
+    }
     let asset: Asset | undefined;
     if (externalId !== undefined) {
       asset = (await this.databaseStorage.listAssets(this.projectId)).find(
@@ -2011,9 +2021,17 @@ export class MockCalmLensApi {
     }
     if (asset.content.safetyHold) throw fail(API_ERROR_CODES.ASSET_HELD);
     const expiresAt = this.now() + expiresIn * 1000;
-    const grant = encodeMockGrant({ assetId: asset.id, original, expiresAt });
+    const grant = encodeMockGrant({
+      assetId: asset.id,
+      original: resource === "original",
+      expiresAt,
+    });
+    const path =
+      resource === undefined
+        ? ""
+        : `/${ASSET_RESOURCE_PATHS[resource as keyof typeof ASSET_RESOURCE_PATHS]}`;
     return {
-      url: `${this.cdnBaseUrl}/assets/${encodeURIComponent(this.projectId)}/${grant}`,
+      url: `${this.cdnBaseUrl}/assets/${encodeURIComponent(this.projectId)}/${grant}${path}`,
       expiresAt,
     };
   }

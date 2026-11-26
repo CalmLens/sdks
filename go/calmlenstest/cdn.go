@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -59,12 +60,30 @@ func decodeMockGrant(segment string) (grant mockGrant, ok bool) {
 	return mockGrant{assetID: match[1], original: match[2] == "1", expiresAt: expiresAt}, true
 }
 
+// signedResourcePaths are where the API's signed URL for each resource ends.
+var signedResourcePaths = map[calmlens.CDNResource]string{
+	calmlens.ResourceOriginal:    "original",
+	calmlens.ResourceRendered:    "rendered",
+	calmlens.ResourcePreview:     "preview",
+	calmlens.ResourcePlaceholder: "placeholder",
+	calmlens.ResourceHLS:         "hls/index.m3u8",
+	calmlens.ResourceEmbed:       "embed",
+	calmlens.ResourceInfo:        "info",
+}
+
 // signAssetURL signs an asset URL like the API (POST /projects/:projectId/signed-asset-urls): a
-// grant to one asset, by ID or external ID, until it expires, serving the original only when
-// asked. Only the mock's CDN accepts the grant.
+// grant to one asset, by ID or external ID, until it expires, ending in the resource it was
+// signed for and serving the original only when signed for it. Only the mock's CDN accepts the
+// grant.
 func (m *MockServerClient) signAssetURL(body calmlens.JSON, now int64) (any, error) {
-	// Like the API's schema, none of these fields takes null.
-	for _, key := range []string{"assetId", "externalId", "expiresIn", "original"} {
+	// Like the API's schema, it takes only these fields, and none of them takes null.
+	fields := []string{"assetId", "externalId", "expiresIn", "resource"}
+	for key := range body {
+		if !slices.Contains(fields, key) {
+			return nil, validation("validation/unknown-field", key)
+		}
+	}
+	for _, key := range fields {
 		if value, ok := body[key]; ok && value == nil {
 			return nil, validation("validation/invalid-type", key)
 		}
@@ -89,13 +108,15 @@ func (m *MockServerClient) signAssetURL(body calmlens.JSON, now int64) (any, err
 	if expiresIn > calmlens.MaxSignedURLExpiresIn {
 		return nil, validation("validation/too-big", "expiresIn")
 	}
-	original := false
-	if value, ok := body["original"]; ok {
-		flag, isBool := value.(bool)
-		if !isBool {
-			return nil, validation("validation/invalid-type", "original")
+	resourcePath := ""
+	resource, hasResource := body["resource"]
+	if hasResource {
+		name, isString := resource.(string)
+		path, known := signedResourcePaths[calmlens.CDNResource(name)]
+		if !isString || !known {
+			return nil, validation("validation/invalid-value", "resource")
 		}
-		original = flag
+		resourcePath = "/" + path
 	}
 	var asset calmlens.JSON
 	if hasExternalID {
@@ -118,8 +139,8 @@ func (m *MockServerClient) signAssetURL(body calmlens.JSON, now int64) (any, err
 		return nil, fail(calmlens.CodeAssetHeld)
 	}
 	expiresAt := now + int64(expiresIn)*1000
-	grant := mockGrant{assetID: text(asset["id"]), original: original, expiresAt: expiresAt}
-	return calmlens.JSON{"url": m.options.CDNBaseURL + "/assets/" + escapeComponent(m.options.ProjectID) + "/" + grant.encode(), "expiresAt": expiresAt}, nil
+	grant := mockGrant{assetID: text(asset["id"]), original: resource == string(calmlens.ResourceOriginal), expiresAt: expiresAt}
+	return calmlens.JSON{"url": m.options.CDNBaseURL + "/assets/" + escapeComponent(m.options.ProjectID) + "/" + grant.encode() + resourcePath, "expiresAt": expiresAt}, nil
 }
 
 // escapeComponent percent-encodes like encodeURIComponent.

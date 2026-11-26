@@ -5,11 +5,17 @@ export function checkSignatures(client: CalmLensServerClient): void {
   // @ts-expect-error assets.retrieve requires assetId
   void client.assets.retrieve({});
   void client.assets.retrieve({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4"});
-  void client.cdn.signAssetUrl({"viewerClaims":{"region":"GB"},"resource":"rendered","assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4"});
+  void client.cdn.signAssetUrl({"viewerClaims":{"region":"GB"},"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4"});
   void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"rendered"});
   void client.cdn.signAssetUrl({"viewerClaims":{"region":"GB"},"resource":"rendered","externalId":"example"});
   void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"rendered","expiresIn":1});
-  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"rendered","original":true});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"original"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"rendered"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"preview"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"placeholder"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"hls"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"embed"});
+  void client.cdn.signAssetUrl({"assetId":"asset_e5Gm2Rk8XqT3wLp9VbN4","viewerClaims":{"region":"GB"},"resource":"info"});
   void client.text.classify({"text":"héllo 🌍"});
   // @ts-expect-error text.classify requires text
   void client.text.classify({});

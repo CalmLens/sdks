@@ -174,7 +174,7 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signed, err := c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID, ExpiresIn: 60, Original: true, Resource: calmlens.ResourceOriginal})
+	signed, err := c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID, ExpiresIn: 60, Resource: calmlens.ResourceOriginal})
 	if err != nil || signed.ExpiresAt != 61000 {
 		t.Fatal(signed, err)
 	}
@@ -488,7 +488,8 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		resource, transform, contentType, body, cache string
+		resource                            calmlens.CDNResource
+		transform, contentType, body, cache string
 	}{
 		{calmlens.ResourceOriginal, "", "audio/wav", "hello", "public, max-age=86400, must-revalidate"},
 		{calmlens.ResourceRendered, "", "audio/mp4", "hello", "public, max-age=86400, must-revalidate"},
@@ -585,7 +586,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
 		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": string(calmlens.SafetyHoldReasonSuspectedIllegalContent)}
 	})
-	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourceHLS, calmlens.ResourceEmbed, calmlens.ResourcePlaceholder} {
+	for _, resource := range []calmlens.CDNResource{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourceHLS, calmlens.ResourceEmbed, calmlens.ResourcePlaceholder} {
 		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: resource}})
 		if err != nil {
 			t.Fatal(err)
@@ -870,12 +871,13 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "name")},
 		{"signed URL null externalId", "POST", signing, "", jsonHeader, `{"externalId":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "externalId")},
 		{"signed URL null expiresIn", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresIn")},
-		{"signed URL null original", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "original")},
+		{"signed URL null resource", "POST", signing, "", jsonHeader, `{"assetId":"missing","resource":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "resource")},
+		{"signed URL original access", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":true}`, calmlens.CodeInvalidRequest, issue("validation/unknown-field", "original")},
 		{"signed URL by ID and external ID", "POST", signing, "", jsonHeader, `{"assetId":"missing","externalId":"post-1"}`, calmlens.CodeInvalidRequest, issue("custom", "")},
 		{"signed URL lifetime of a fraction of a second", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":1.5}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresIn")},
 		{"signed URL lifetime of 0", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":0}`, calmlens.CodeInvalidRequest, issue("validation/too-small", "expiresIn")},
 		{"signed URL lifetime above 24 hours", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":86401}`, calmlens.CodeInvalidRequest, issue("validation/too-big", "expiresIn")},
-		{"signed URL original not a boolean", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":"yes"}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "original")},
+		{"signed URL unknown resource", "POST", signing, "", jsonHeader, `{"assetId":"missing","resource":"thumbnail"}`, calmlens.CodeInvalidRequest, issue("validation/invalid-value", "resource")},
 		{"raw upload of a refused type", "POST", assets, "contentType=application%2Fzip", upload("content"), form(`{"name":"x"}`), calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/zip", "source": "calmlens"}},
 		{"first part of a refused type", "POST", assets, "isFinal=true&contentType=application%2Fx-made-up", upload("part"), form(`{"name":"x"}`), calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
 		{"text of a refused type", "POST", assets, "wait=true", jsonHeader, `{"name":"x","content":{"plainText":"hi","type":"application/x-made-up"}}`, calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},

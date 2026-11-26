@@ -18,7 +18,7 @@ import { parseViewerClaims } from "./CalmLensViewerClaims";
 
 // The CDN's paths (shared/CdnUtils), kept here so the SDK loads none of the shared runtime; the
 // types keep them in step, and every SDK's surface test checks each resource's path.
-const ASSET_RESOURCE_PATHS = {
+export const ASSET_RESOURCE_PATHS = {
   original: "original",
   rendered: "rendered",
   preview: "preview",
@@ -112,6 +112,21 @@ export const appendAssetLocation = (assetUrl: string, location: CdnAssetLocation
   return `${path}${viewerClaimsQuery(viewerClaims)}`;
 };
 
+/**
+ * The lens, transform and viewer claims added to a URL the API signed for `location.resource`,
+ * which already ends in that resource.
+ */
+export const appendSignedLocation = (signedUrl: string, location: CdnAssetLocation): string => {
+  const resourcePath =
+    location.resource === undefined ? "" : `/${ASSET_RESOURCE_PATHS[location.resource]}`;
+  if (!signedUrl.endsWith(resourcePath)) {
+    throw new CalmLensError(SDK_ERROR_CODES.INVALID_RESPONSE, {
+      message: "The signed asset URL doesn't end in the resource it was signed for",
+    });
+  }
+  return `${signedUrl}${appendAssetLocation("", location).slice(resourcePath.length)}`;
+};
+
 /** An asset's public URL beneath a CDN base URL, with any resource, selector and claims. */
 export const buildAssetUrl = (
   cdnBaseUrl: string,
@@ -128,7 +143,7 @@ export const buildAssetUrl = (
 
 /** Checks `signAssetUrl`'s own options as the API does, before anything is sent. */
 export const validateSignAssetUrlOptions = (options: SignAssetUrlOptions): void => {
-  const { expiresIn, original } = options;
+  const { expiresIn } = options;
   if (
     expiresIn !== undefined &&
     (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_SIGNED_URL_EXPIRES_IN)
@@ -137,18 +152,27 @@ export const validateSignAssetUrlOptions = (options: SignAssetUrlOptions): void 
       `expiresIn must be a whole number from 1 to ${MAX_SIGNED_URL_EXPIRES_IN}`,
     );
   }
-  if (original !== undefined && typeof original !== "boolean") {
-    throw invalidArgument("original must be a boolean");
-  }
   getAssetSegment(options);
   // The location is appended to the signed URL: check it before signing.
   appendAssetLocation("", options);
 };
 
+/**
+ * The asset URL of `url`, without its query: an asset URL (`…/assets/{projectId}/{asset}`) as it
+ * is, and a resource URL beneath one, such as a URL signed for `original` or a rendered image's
+ * lens URL, cut back to the asset URL its resources are paths beneath.
+ */
+export const assetUrlOf = (url: string): string => {
+  const path = (url.split("?", 1)[0] ?? "").replace(/\/+$/, "");
+  const parts = path.split("/");
+  const assets = parts.lastIndexOf("assets");
+  return assets >= 3 && parts.length > assets + 3 ? parts.slice(0, assets + 3).join("/") : path;
+};
+
 /** An asset URL without its query: the viewer claims it carried, if any, are returned apart. */
 const splitAssetUrl = (url: string): { base: string; claims?: unknown } => {
-  const [path = "", query] = url.split("?", 2) as [string, string | undefined];
-  const base = path.replace(/\/+$/, "");
+  const query = url.split("?", 2)[1];
+  const base = assetUrlOf(url);
   const raw = query ? new URLSearchParams(query).get("viewerClaims") : null;
   if (raw === null) return { base };
   try {

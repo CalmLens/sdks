@@ -310,7 +310,9 @@ class StatefulMockTest {
     assertIssue(name, "name", "validation/invalid-type");
     // A signed asset URL's body is checked before the asset is looked up.
     String sign = "/projects/project-1/signed-asset-urls";
-    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"original\":null}"), "original", "validation/invalid-type");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"resource\":null}"), "resource", "validation/invalid-type");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"original\":true}"), "original", "validation/unknown-field");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"resource\":\"thumbnail\"}"), "resource", "validation/invalid-value");
     assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":1.5}"), "expiresIn", "validation/invalid-type");
     assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":0}"), "expiresIn", "validation/too-small");
     assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":86401}"), "expiresIn", "validation/too-big");
@@ -377,13 +379,13 @@ class StatefulMockTest {
         .setContent(Content.bytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain"))
         .setProcessingOptions(ProcessingOptionsParams.builder().setRetainContent(true).build()).setVisibility(Visibility.PUBLIC).build());
     for (Asset asset : List.of(audio, note)) {
-      try (CdnResponse embed = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(asset.getId()).setResource("embed").build())) {
+      try (CdnResponse embed = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(asset.getId()).setResource(CdnResource.EMBED).build())) {
         assertEquals(200, embed.status(), asset.getName());
         assertEquals("text/html; charset=utf-8", embed.header("Content-Type"));
         assertTrue(new String(embed.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8).startsWith("<!doctype html>"));
       }
     }
-    try (CdnResponse hls = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(audio.getId()).setResource("hls").build())) {
+    try (CdnResponse hls = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(audio.getId()).setResource(CdnResource.HLS).build())) {
       assertEquals(404, hls.status());
       assertEquals(ErrorCodes.NO_RENDERED_VERSION, JsonParser.parseString(new String(hls.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
           .getAsJsonObject().get("code").getAsString());
@@ -395,9 +397,25 @@ class StatefulMockTest {
     assertEquals("transform/invalid", JsonParser.parseString(new String(refused.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
         .getAsJsonObject().get("code").getAsString());
     mock.decide(note.getId(), Outcome.BLOCKED);
-    try (CdnResponse blocked = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(note.getId()).setResource("embed").build())) {
+    try (CdnResponse blocked = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(note.getId()).setResource(CdnResource.EMBED).build())) {
       assertEquals(403, blocked.status());
     }
+  }
+
+  /** Only a URL signed for the original serves it; each URL ends in its resource and reads its asset's info. */
+  @Test void onlyAUrlSignedForTheOriginalServesIt() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient();
+    Asset asset = mock.client().assets().classify(kept("private.png").setVisibility(Visibility.PRIVATE).build());
+    SignedAssetUrl original = mock.client().cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId(asset.getId()).setResource(CdnResource.ORIGINAL).build());
+    assertTrue(original.getUrl().endsWith("/original"));
+    try (CdnResponse served = mock.fetchCdn(original.getUrl())) {
+      assertEquals(200, served.status());
+    }
+    SignedAssetUrl rendered = mock.client().cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId(asset.getId()).setResource(CdnResource.RENDERED).build());
+    try (CdnResponse refused = mock.fetchCdn(rendered.getUrl().replaceFirst("/rendered$", "/original"))) {
+      assertEquals(403, refused.status());
+    }
+    assertEquals(asset.getId(), mock.client().cdn().getAssetInfo(original.getUrl()).getId());
   }
 
   /** The mock's clock moves a second per reading, so a one-second grant has expired by its first use. */
@@ -443,11 +461,11 @@ class StatefulMockTest {
       hold.addProperty("placedAt", 1_700_000_000_000L);
       storage.assets.get(asset.getId()).getAsJsonObject("content").add("safetyHold", hold);
     });
-    for (String resource : List.of("original", "rendered", "preview", "hls", "embed", "placeholder")) {
+    for (CdnResource resource : List.of(CdnResource.ORIGINAL, CdnResource.RENDERED, CdnResource.PREVIEW, CdnResource.HLS, CdnResource.EMBED, CdnResource.PLACEHOLDER)) {
       try (CdnResponse served = mock.client().cdn().serve(CdnRequestParams.builder().setAssetId(asset.getId()).setResource(resource).build())) {
-        assertEquals(403, served.status(), resource);
+        assertEquals(403, served.status(), resource.getValue());
         assertEquals("asset/not-available", JsonParser.parseString(new String(served.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
-            .getAsJsonObject().get("code").getAsString(), resource);
+            .getAsJsonObject().get("code").getAsString(), resource.getValue());
       }
     }
     ApiException held = assertThrows(ApiException.class, () -> mock.client().assets().listTimeline(asset.getId(), null));

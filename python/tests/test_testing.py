@@ -203,14 +203,20 @@ class MockTests(unittest.TestCase):
         c = MockCalmLensServerClient(mock_options={"now": lambda: clock[0]})
         asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
                                   processing_options={"retainContent": True}, visibility="private")
-        signed = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, original=True)
-        # Every SDK's mock writes the grant as the hex of "{assetId}.{1|0}.{expiresAt}".
+        signed = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, resource="original")
+        # Every SDK's mock writes the grant as the hex of "{assetId}.{1|0}.{expiresAt}", and the URL
+        # ends in the resource it was signed for.
         self.assertEqual(to_json(signed), {"url": f"{c.cdn_base_url}/assets/{c.project_id}/sig_"
-                                         + f"{asset['id']}.1.3000".encode().hex(), "expiresAt": 3000})
-        with c.fetch_cdn(signed["url"] + "/original") as response:
+                                         + f"{asset['id']}.1.3000".encode().hex() + "/original",
+                                         "expiresAt": 3000})
+        with c.fetch_cdn(signed["url"]) as response:
             self.assertEqual((response.status, response.read()), (200, b"png"))
+        # Only a URL signed for the original serves it.
+        rendered = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, resource="rendered")
+        with c.fetch_cdn(rendered["url"].removesuffix("/rendered") + "/original") as response:
+            self.assertEqual(response.status, 403)
         clock[0] = 3000
-        with c.fetch_cdn(signed["url"] + "/original") as response:
+        with c.fetch_cdn(signed["url"]) as response:
             self.assertEqual((response.status, json.loads(response.read())["code"]),
                              (403, error_codes.SIGNED_URL_EXPIRED))
         with self.assertRaises(CalmLensAPIError) as raised:
@@ -341,10 +347,11 @@ class MockTests(unittest.TestCase):
         # The client refuses these first, so the requests go straight to the mock's transport.
         signed = f"projects/{self.client.project_id}/signed-asset-urls"
         cases = [("POST", signed, {"assetId": "missing", "expiresIn": None}, "validation/invalid-type", "expiresIn"),
-                 ("POST", signed, {"externalId": "missing", "original": None}, "validation/invalid-type", "original"),
+                 ("POST", signed, {"externalId": "missing", "resource": None}, "validation/invalid-type", "resource"),
+                 ("POST", signed, {"assetId": "missing", "original": True}, "validation/unknown-field", "original"),
                  ("POST", signed, {"assetId": "missing", "expiresIn": 1.5}, "validation/invalid-type", "expiresIn"),
                  ("POST", signed, {"assetId": "missing", "expiresIn": 86401}, "validation/too-big", "expiresIn"),
-                 ("POST", signed, {"assetId": "missing", "original": "yes"}, "validation/invalid-type", "original"),
+                 ("POST", signed, {"assetId": "missing", "resource": "thumbnail"}, "validation/invalid-value", "resource"),
                  ("POST", signed, {"expiresIn": 60}, "custom", ""),
                  ("PATCH", "assets/missing", {"name": None}, "validation/invalid-type", "name")]
         for method, route, body, code, path in cases:

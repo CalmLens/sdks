@@ -11756,7 +11756,6 @@
             "assetId": {
               "$ref": "a.id"
             },
-            "original": true,
             "resource": "original"
           },
           "save": "original",
@@ -13298,7 +13297,6 @@
           "operation": "cdn.signAssetUrl",
           "args": {
             "externalId": "post/1 ✓",
-            "original": true,
             "resource": "original"
           },
           "save": "signed",

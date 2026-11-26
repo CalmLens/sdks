@@ -360,7 +360,7 @@ module CalmLens
     # The ISO 3166-1 alpha-2 countries a viewer's `region` can be.
     VIEWER_COUNTRIES: Array[String]
     def get_asset_url: (?asset_id: String, ?external_id: String, ?project_id: String, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?viewer_claims: viewer_claims, ?request_options: request_options) -> String
-    def sign_asset_url: (?asset_id: String, ?external_id: String, ?project_id: String, ?expires_in: Integer, ?original: bool, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?viewer_claims: viewer_claims, ?request_options: request_options) -> SignedAssetUrl
+    def sign_asset_url: (?asset_id: String, ?external_id: String, ?project_id: String, ?expires_in: Integer, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?viewer_claims: viewer_claims, ?request_options: request_options) -> SignedAssetUrl
     def get_asset_info: (String url, ?viewer_claims: viewer_claims?) -> AssetInfo
     def serve: (?asset_id: String, ?external_id: String, ?project_id: String, ?viewer_claims: viewer_claims, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] }, ?request_options: request_options) -> Response
              | [T] (?asset_id: String, ?external_id: String, ?project_id: String, ?viewer_claims: viewer_claims, ?resource: cdn_resource, ?lens: String, ?transform: transform_input, ?init: { ?method: "GET" | "HEAD", ?headers: Hash[String, String] }, ?request_options: request_options) { (Response) -> T } -> T

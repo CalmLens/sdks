@@ -789,7 +789,7 @@ public final class Calmmarket {
       }
       // The grant covers the photo; the rendered resource and the card lens are appended beneath it.
       SignedAssetUrl signed = client.cdn().signAssetUrl(CdnSignAssetUrlParams.builder().setAssetId(photo.assetId)
-          .setExpiresIn((long) SIGNED_URL_SECONDS).setResource("rendered").setLens(CARD_LENS).build());
+          .setExpiresIn((long) SIGNED_URL_SECONDS).setResource(CdnResource.RENDERED).setLens(CARD_LENS).build());
       if (!safePreviewUrl(signed.getUrl())) return text(502, "Invalid preview URL");
       Map<String, String> headers = securityHeaders();
       headers.put("location", signed.getUrl());

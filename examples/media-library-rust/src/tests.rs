@@ -822,7 +822,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     mock.enqueue(200, lens_reply(THUMB_LENS));
     mock.enqueue(
         200,
-        json!({"url": "https://cdn.example.com/signed-thumb", "expiresAt": 1}),
+        json!({"url": "https://cdn.example.com/signed-thumb/rendered", "expiresAt": 1}),
     );
     let thumb = app.get("/assets/asset-1/thumb").await;
     assert_eq!(thumb.status, StatusCode::SEE_OTHER);
@@ -843,7 +843,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(requests[2].path, "/projects/project-1/signed-asset-urls");
     assert_eq!(
         body,
-        json!({"assetId": "asset-1", "expiresIn": SIGNED_URL_SECONDS, "original": false})
+        json!({"assetId": "asset-1", "expiresIn": SIGNED_URL_SECONDS, "resource": "rendered"})
     );
 
     // Downloads use the 1600px web lens.
@@ -851,7 +851,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     mock.enqueue(200, lens_reply(WEB_LENS));
     mock.enqueue(
         200,
-        json!({"url": "https://cdn.example.com/signed-web", "expiresAt": 1}),
+        json!({"url": "https://cdn.example.com/signed-web/rendered", "expiresAt": 1}),
     );
     let download = app.get("/assets/asset-1/download").await;
     assert_eq!(download.status, StatusCode::SEE_OTHER);
@@ -869,7 +869,7 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(
         200,
-        json!({"url": "https://cdn.example.com/signed-thumb-2", "expiresAt": 1}),
+        json!({"url": "https://cdn.example.com/signed-thumb-2/rendered", "expiresAt": 1}),
     );
     assert_eq!(
         app.get("/assets/asset-1/thumb").await.status,
@@ -928,7 +928,10 @@ async fn undelivered_statuses_or_unsafe_delivery_never_sign() {
 
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, json!({"lenses": [lens(THUMB_LENS)]}));
-    mock.enqueue(200, json!({"url": "javascript:alert(1)", "expiresAt": 1}));
+    mock.enqueue(
+        200,
+        json!({"url": "javascript:alert(1)/rendered", "expiresAt": 1}),
+    );
     let unsafe_url = app.get("/assets/asset-1/thumb").await;
     assert_eq!(unsafe_url.status, StatusCode::BAD_GATEWAY);
     assert_eq!(unsafe_url.header("location"), None);

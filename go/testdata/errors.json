@@ -246,7 +246,7 @@
       },
       "body": {
         "code": "signed-url/original-not-granted",
-        "message": "This signed asset URL doesn't grant the original file. Sign it with original access.",
+        "message": "This signed asset URL doesn't grant the original file. Sign a URL for the original resource.",
         "requestId": "req-signed-url-original-not-granted",
         "details": {
           "reason": "signed_url_original_not_granted"

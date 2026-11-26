@@ -80,13 +80,13 @@ var surfaceConstants = map[string]string{
 	"CodeSDKInvalidConfig":           string(calmlens.CodeSDKInvalidConfig),
 	"CodeSDKInvalidWebhookSignature": string(calmlens.CodeSDKInvalidWebhookSignature),
 	"CodeSDKInvalidWebhookPayload":   string(calmlens.CodeSDKInvalidWebhookPayload),
-	"ResourceOriginal":               calmlens.ResourceOriginal,
-	"ResourceRendered":               calmlens.ResourceRendered,
-	"ResourcePlaceholder":            calmlens.ResourcePlaceholder,
-	"ResourcePreview":                calmlens.ResourcePreview,
-	"ResourceHLS":                    calmlens.ResourceHLS,
-	"ResourceEmbed":                  calmlens.ResourceEmbed,
-	"ResourceInfo":                   calmlens.ResourceInfo,
+	"ResourceOriginal":               string(calmlens.ResourceOriginal),
+	"ResourceRendered":               string(calmlens.ResourceRendered),
+	"ResourcePlaceholder":            string(calmlens.ResourcePlaceholder),
+	"ResourcePreview":                string(calmlens.ResourcePreview),
+	"ResourceHLS":                    string(calmlens.ResourceHLS),
+	"ResourceEmbed":                  string(calmlens.ResourceEmbed),
+	"ResourceInfo":                   string(calmlens.ResourceInfo),
 }
 
 var surfaceTypes = map[string]reflect.Type{
@@ -264,7 +264,7 @@ func TestSurface(t *testing.T) {
 		case "cdn-resource":
 			value, ok := surfaceConstants[name]
 			if ok && value == capability.Value {
-				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetID: "asset-1", Resource: value})
+				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetID: "asset-1", Resource: calmlens.CDNResource(value)})
 				present = err == nil && strings.HasSuffix(url, "/asset-1/"+capability.Path)
 			}
 		case "error-field":

@@ -878,7 +878,7 @@ func validIdempotencyKey(key string) bool {
 // FailNextRequest.
 func operationsOf(method string, parts []string, q url.Values, cdn bool) []string {
 	if cdn {
-		if len(parts) >= 4 && parts[3] == calmlens.ResourceInfo {
+		if len(parts) >= 4 && parts[3] == string(calmlens.ResourceInfo) {
 			return []string{"cdn.getAssetInfo"}
 		}
 		return []string{"cdn.serve"}
@@ -2817,12 +2817,12 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// percent-encoded) is read; the original and the embed page take none. Beneath /hls/ are the
 	// stream's playlists and segments, not a selector.
 	selectorText := strings.Join(selectorPath, "/")
-	if resource == calmlens.ResourceHLS {
+	if resource == string(calmlens.ResourceHLS) {
 		selectorText = ""
 	}
 	lens, transform, ok := contract.ParseTransformSelector(selectorText)
 	hasSelector := lens != "" || transform != nil
-	if !ok || (resource == calmlens.ResourceOriginal || resource == calmlens.ResourceEmbed || resource == calmlens.ResourceInfo) && hasSelector {
+	if !ok || (resource == string(calmlens.ResourceOriginal) || resource == string(calmlens.ResourceEmbed) || resource == string(calmlens.ResourceInfo)) && hasSelector {
 		return invalidTransform()
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
@@ -2861,7 +2861,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if asset == nil {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
-	if resource == calmlens.ResourceOriginal && grant != nil && !grant.original {
+	if resource == string(calmlens.ResourceOriginal) && grant != nil && !grant.original {
 		return errorBody(http.StatusForbidden, calmlens.CodeSignedURLOriginalNotGranted, "This signed asset URL doesn't grant the original file")
 	}
 	notAvailable := func() (int, []byte, string) {
@@ -2873,16 +2873,16 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	// Like the CDN (isAssetContentNotKept), removed content answers everyone as an unknown asset
 	// does, before any access check and on every resource but /info, which reports it unavailable.
-	if resource != calmlens.ResourceInfo && text(section(asset, "content")["status"]) == string(calmlens.ContentStatusRemoved) {
+	if resource != string(calmlens.ResourceInfo) && text(section(asset, "content")["status"]) == string(calmlens.ContentStatusRemoved) {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
 	// Like the CDN, a private asset answers anyone without a grant or the project's API key as an
 	// unknown asset does, whatever its state. Its placeholder requires download access.
 	if text(asset["visibility"]) != string(calmlens.VisibilityPublic) && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
-		resource != calmlens.ResourceInfo {
+		resource != string(calmlens.ResourceInfo) {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
-	if resource == calmlens.ResourceInfo {
+	if resource == string(calmlens.ResourceInfo) {
 		return m.serveInfo(req, asset, canDownload(), header)
 	}
 	moderation := text(section(section(asset, "classification"), "moderation")["decision"])
@@ -2893,7 +2893,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if content["safetyHold"] != nil {
 		return notAvailable()
 	}
-	if resource == calmlens.ResourcePlaceholder {
+	if resource == string(calmlens.ResourcePlaceholder) {
 		if text(asset["visibility"]) != string(calmlens.VisibilityPublic) && !canDownload() {
 			return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 		}
@@ -2920,7 +2920,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// Like the CDN, delivery checks come first and refuse everyone: content still uploading,
 	// blocked or purged, failed processing, and an original with no bytes.
 	stored := m.ImageStorage.Content[text(asset["id"])]
-	if resource == calmlens.ResourceOriginal && stored == nil || section(asset, "upload")["status"] == "uploading" ||
+	if resource == string(calmlens.ResourceOriginal) && stored == nil || section(asset, "upload")["status"] == "uploading" ||
 		moderation == string(calmlens.ModerationStatusBlocked) || moderation == string(calmlens.ModerationStatusPurged) ||
 		text(section(asset, "classification")["status"]) == string(calmlens.ClassificationStatusFailed) {
 		return notAvailable()
@@ -2938,7 +2938,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	// The embed page shows any asset that may be delivered, as its viewer for the asset's type or
 	// a notice that the type has none.
-	if resource == calmlens.ResourceEmbed {
+	if resource == string(calmlens.ResourceEmbed) {
 		header.Set("Cache-Control", "private, no-store")
 		header.Set("Cache-Tag", tag)
 		header.Set("X-Content-Type-Options", "nosniff")
@@ -2947,12 +2947,12 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// Then whether the asset has the resource (the mock prepares no HLS stream), and whether it is
 	// a still image that takes a lens or transform: the preview always is, the rendered file only
 	// when it is an image.
-	if resource == calmlens.ResourceRendered && content["rendered"] == nil || resource == calmlens.ResourcePreview && content["preview"] == nil ||
-		!contains([]string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview}, resource) {
+	if resource == string(calmlens.ResourceRendered) && content["rendered"] == nil || resource == string(calmlens.ResourcePreview) && content["preview"] == nil ||
+		!contains([]string{string(calmlens.ResourceOriginal), string(calmlens.ResourceRendered), string(calmlens.ResourcePreview)}, resource) {
 		return noRenderedVersion()
 	}
 	renderedImage := text(rendered["kind"]) == string(calmlens.AssetRenderedKindImage)
-	still := resource == calmlens.ResourcePreview || resource == calmlens.ResourceRendered && renderedImage
+	still := resource == string(calmlens.ResourcePreview) || resource == string(calmlens.ResourceRendered) && renderedImage
 	if !still && hasSelector {
 		return invalidTransform()
 	}
@@ -2965,7 +2965,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	// The bytes: the upload, which stands in for its own rendered file and an image's preview,
 	// or the placeholder PNG for a still the mock doesn't make.
-	servesUpload := resource == calmlens.ResourceOriginal || resource == calmlens.ResourceRendered && !renderedImage ||
+	servesUpload := resource == string(calmlens.ResourceOriginal) || resource == string(calmlens.ResourceRendered) && !renderedImage ||
 		text(asset["type"]) == string(calmlens.AssetTypeImage)
 	var data []byte
 	var contentType string
@@ -2982,7 +2982,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 			data = append(data, stored.Parts[index]...)
 		}
 		contentType = stored.Type
-		if resource == calmlens.ResourceRendered {
+		if resource == string(calmlens.ResourceRendered) {
 			contentType = text(rendered["format"])
 		}
 		if contentType == "" {
@@ -3015,7 +3015,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	default:
 		header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, must-revalidate", access, maxAge))
 	}
-	if still || resource == calmlens.ResourceOriginal && text(asset["type"]) == string(calmlens.AssetTypeImage) {
+	if still || resource == string(calmlens.ResourceOriginal) && text(asset["type"]) == string(calmlens.AssetTypeImage) {
 		header.Set("ETag", strconv.Quote(text(asset["id"])))
 	}
 	header.Set("Cache-Tag", tag)

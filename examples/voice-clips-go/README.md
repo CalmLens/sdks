@@ -136,7 +136,7 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   behind an age check; this app has no age check, so it doesn't play those either. `blocked`
   and `purged` clips are never shown (a purged clip's content is deleted). The `/media` route retrieves
   the asset again, then calls `CDN.SignAssetURL` for the clip's `rendered` resource (the
-  browser-safe audio or video, so the grant needs no original access) with a **300-second
+  browser-safe audio or video, not the original) with a **300-second
   expiry** (long enough to play and seek a two-minute clip) and redirects the `<audio>` or
   `<video>` element to it. A failed retrieve, a clip that is pending, failed or not allowed, or a
   non-HTTPS URL never gets one. The signed URL is reused while at least 150 seconds of it

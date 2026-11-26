@@ -512,7 +512,7 @@ export interface IdempotencyOptions {
 
 /**
  * What a resource URL beneath an asset URL serves: the `original` file exactly as uploaded (with a
- * signed URL, only when signed with `original`); the `rendered` file for display (an image in the
+ * signed URL, only one signed for `original`); the `rendered` file for display (an image in the
  * best format the client accepts, a PDF, or browser-safe video or audio); the `preview` still;
  * the blurred `placeholder` PNG (private or blocked assets require a signed URL or download permission); the `hls` stream of audio or video (its
  * master playlist); the `embed` page, which shows the asset in an iframe; or the `info` JSON that
@@ -578,11 +578,14 @@ export type CdnServeOptions = CdnAssetUrlOptions & {
   init?: RequestInit;
 };
 
+/**
+ * `resource` is the resource the URL is signed for, and it ends in it. Only a URL signed for
+ * `original` serves the exact uploaded file; any other, or one without a resource, serves every
+ * other resource beneath its grant.
+ */
 export type SignAssetUrlOptions = CdnAssetUrlOptions & {
   /** How long the URL works, in seconds, from 1 to 86400 (24 hours). Defaults to 900. */
   expiresIn?: number;
-  /** Whether the URL also serves `/original`, the exact uploaded file. Defaults to `false`. */
-  original?: boolean;
 };
 
 /** Options for `getAssetInfo`. */

@@ -80,13 +80,28 @@ fn encode_component(value: &str) -> String {
         .collect()
 }
 
+/// Where the API's signed URL for each resource ends.
+const SIGNED_RESOURCE_PATHS: [(&str, &str); 7] = [
+    ("original", "original"),
+    ("rendered", "rendered"),
+    ("preview", "preview"),
+    ("placeholder", "placeholder"),
+    ("hls", "hls/index.m3u8"),
+    ("embed", "embed"),
+    ("info", "info"),
+];
+
 impl Backend {
     /// Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to
-    /// one asset, by ID or external ID, until it expires, serving the original only when asked.
-    /// Only the mock's CDN accepts the grant.
+    /// one asset, by ID or external ID, until it expires, ending in the resource it was signed for
+    /// and serving the original only when signed for it. Only the mock's CDN accepts the grant.
     pub(super) fn sign_asset_url(&self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
-        // Like the API's schema, none of these fields takes null.
-        for key in ["assetId", "externalId", "expiresIn", "original"] {
+        // Like the API's schema, it takes only these fields, and none of them takes null.
+        const FIELDS: [&str; 4] = ["assetId", "externalId", "expiresIn", "resource"];
+        if let Some(unknown) = body.keys().find(|key| !FIELDS.contains(&key.as_str())) {
+            return Err(validation("unknown-field", unknown));
+        }
+        for key in FIELDS {
             if body.get(key).is_some_and(Value::is_null) {
                 return Err(validation("invalid-type", key));
             }
@@ -120,12 +135,16 @@ impl Backend {
         if expires_in > MAX_SIGNED_URL_EXPIRES_IN as f64 {
             return Err(validation("too-big", "expiresIn"));
         }
-        let original = match body.get("original") {
-            None => false,
-            Some(value) => value
-                .as_bool()
-                .ok_or_else(|| validation("invalid-type", "original"))?,
+        let resource_path = match body.get("resource") {
+            None => None,
+            Some(value) => Some(
+                SIGNED_RESOURCE_PATHS
+                    .iter()
+                    .find(|(name, _)| Some(*name) == value.as_str())
+                    .ok_or_else(|| validation("invalid-value", "resource"))?,
+            ),
         };
+        let original = resource_path.is_some_and(|(name, _)| *name == "original");
         let project = self.options.project_id.as_str();
         let asset =
             match external_id {
@@ -147,10 +166,11 @@ impl Backend {
             expires_at,
         };
         let url = format!(
-            "{}/assets/{}/{}",
+            "{}/assets/{}/{}{}",
             self.options.cdn_base_url,
             encode_component(project),
-            grant.encode()
+            grant.encode(),
+            resource_path.map_or(String::new(), |(_, path)| format!("/{path}"))
         );
         Ok(json!({"url": url, "expiresAt": expires_at}))
     }

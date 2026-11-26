@@ -76,16 +76,15 @@ module CalmLens
     end
 
     # Signs a private asset's URL on your server, so browsers and apps can load it without an API key
-    # until it expires. Every resource is a path beneath it, as beneath a public asset URL; `original`
-    # only when signed with `original: true`. With `resource`, returns that resource's URL beneath the
-    # grant; lenses, transforms and viewer claims are appended as {#get_asset_url} appends them and
+    # until it expires. With `resource`, it is signed for that resource and ends in it; only a URL
+    # signed for `original` serves the exact upload, and any other serves every other resource beneath
+    # its grant. Lenses, transforms and viewer claims are appended as {#get_asset_url} appends them and
     # aren't part of the signature.
     # @option options [String] :asset_id give it or `external_id`, not both
     # @option options [String] :external_id
     # @option options [String] :project_id the client's by default
     # @option options [Integer] :expires_in whole seconds from 1 to 86400; 900 by default
-    # @option options [Boolean] :original whether the URL also serves the exact upload (`original`); false by default
-    # @option options [String] :resource see {#get_asset_url}
+    # @option options [String] :resource the resource the URL is signed for and ends in; see {#get_asset_url}
     # @option options [String] :lens
     # @option options [String, Hash] :transform
     # @option options [Hash] :viewer_claims
@@ -96,13 +95,13 @@ module CalmLens
         project = Internal.segment(api.fetch('projectId', @session.project_id))
         body = api.slice('assetId', 'externalId')
         body['expiresIn'] = api.fetch('expiresIn', DEFAULT_SIGNED_URL_EXPIRES_IN)
-        body['original'] = api.fetch('original', false)
+        body['resource'] = api['resource'] if api.key?('resource')
         signed = request('POST', "/projects/#{project}/signed-asset-urls", body: body, request_options: request)
         unless signed.is_a?(Hash) && signed['url'].is_a?(String) && !signed['url'].empty? && signed['expiresAt'].is_a?(Integer)
           raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'The API returned no signed asset URL')
         end
 
-        build(SignedAssetUrl, signed.merge('url' => append_location(signed['url'], api)))
+        build(SignedAssetUrl, signed.merge('url' => append_signed_location(signed['url'], api)))
       end
     end
 
@@ -110,7 +109,7 @@ module CalmLens
     # size, rendered file, preview and stream, and whether the viewer its claims describe can see it
     # now (`availability`: `available`, `age-restricted` or `unavailable`). It sends no API key, as a
     # browser would, so a private asset's info needs a signed URL.
-    # @param url [String] an asset URL from {#get_asset_url} or {#sign_asset_url}, without a resource
+    # @param url [String] an asset URL from {#get_asset_url} or {#sign_asset_url}, or a resource URL beneath one
     # @param viewer_claims [Hash, nil] the viewer's claims, as for {#get_asset_url}; the URL's own
     #   `viewerClaims` when omitted
     # @return [AssetInfo]
@@ -203,13 +202,24 @@ module CalmLens
       "#{url}#{viewer_claims_query(api['viewerClaims'])}"
     end
 
+    # The lens, transform and viewer claims added to a URL the API signed for `api['resource']`,
+    # which already ends in that resource.
+    def append_signed_location(url, api)
+      resource_path = api['resource'] ? "/#{RESOURCE_PATHS.fetch(api['resource'])}" : ''
+      unless url.end_with?(resource_path)
+        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE,
+                                       "The signed asset URL doesn't end in the resource it was signed for")
+      end
+
+      url + append_location('', api)[resource_path.length..]
+    end
+
     # Checks sign_asset_url's own options as the API does, then the location, before anything is sent.
     def check_signing(api)
       expires = api.fetch('expiresIn', DEFAULT_SIGNED_URL_EXPIRES_IN)
       unless expires.is_a?(Integer) && expires.between?(1, MAX_SIGNED_URL_EXPIRES_IN)
         raise Internal.invalid("expires_in must be a whole number of seconds from 1 to #{MAX_SIGNED_URL_EXPIRES_IN}")
       end
-      raise Internal.invalid('original must be true or false') unless [true, false].include?(api.fetch('original', false))
 
       asset_segment(api)
       append_location('', api)
@@ -243,7 +253,17 @@ module CalmLens
       rescue JSON::ParserError
         raise Internal.invalid("The asset URL's viewerClaims are not JSON")
       end
-      [path.sub(%r{/+\z}, ''), claims]
+      [asset_url_of(path), claims]
+    end
+
+    # The asset URL of a path: an asset URL (`…/assets/{projectId}/{asset}`) as it is, and a resource
+    # URL beneath one, such as a URL signed for `original`, cut back to the asset URL its resources
+    # are paths beneath.
+    def asset_url_of(path)
+      path = path.sub(%r{/+\z}, '')
+      parts = path.split('/', -1)
+      assets = parts.rindex('assets')
+      assets && assets >= 3 && parts.length > assets + 3 ? parts[0, assets + 3].join('/') : path
     end
 
     def asset_info?(info)

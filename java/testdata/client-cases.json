@@ -8480,7 +8480,7 @@
       ]
     },
     {
-      "name": "cdn.signAssetUrl sends the default lifetime and no original access",
+      "name": "cdn.signAssetUrl sends the default lifetime and no resource",
       "area": "options",
       "responses": [
         {
@@ -8528,20 +8528,19 @@
           },
           "body": {
             "assetId": "asset-1",
-            "expiresIn": 900,
-            "original": false
+            "expiresIn": 900
           }
         }
       ]
     },
     {
-      "name": "cdn.signAssetUrl sends the external ID, original access and a lifetime, and appends the resource",
+      "name": "cdn.signAssetUrl sends the external ID, resource and lifetime, and returns the URL the API signed for it",
       "area": "options",
       "responses": [
         {
           "status": 200,
           "body": {
-            "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+            "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/original",
             "expiresAt": 1760000060000
           },
           "headers": {
@@ -8555,7 +8554,6 @@
           "operation": "cdn.signAssetUrl",
           "args": {
             "externalId": "post/1 ✓",
-            "original": true,
             "expiresIn": 60,
             "resource": "original"
           },
@@ -8587,19 +8585,19 @@
           "body": {
             "externalId": "post/1 ✓",
             "expiresIn": 60,
-            "original": true
+            "resource": "original"
           }
         }
       ]
     },
     {
-      "name": "cdn.signAssetUrl signs for another project and appends the selector and viewer claims",
+      "name": "cdn.signAssetUrl signs for another project and resource, and appends the selector and viewer claims",
       "area": "options",
       "responses": [
         {
           "status": 200,
           "body": {
-            "url": "https://cdn.calmlens.com/v1/assets/project-2/sig_Z3JhbnQ",
+            "url": "https://cdn.calmlens.com/v1/assets/project-2/sig_Z3JhbnQ/preview",
             "expiresAt": 1760000900000
           },
           "headers": {
@@ -8652,7 +8650,7 @@
           "body": {
             "assetId": "asset-1",
             "expiresIn": 900,
-            "original": false
+            "resource": "preview"
           }
         }
       ]
@@ -12513,8 +12511,7 @@
           },
           "body": {
             "assetId": "asset-1",
-            "expiresIn": 900,
-            "original": false
+            "expiresIn": 900
           }
         }
       ]

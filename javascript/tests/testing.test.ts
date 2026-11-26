@@ -390,6 +390,23 @@ describe("MockCalmLensServerClient", () => {
     expect(rendered.status).toBe(200);
     expect(rendered.headers.get("content-type")).toBe("image/png");
     expect((await client.fetchCdn(`${signed.url}/original`)).status).toBe(403);
+    // Only a URL signed for the original serves it, and each URL ends in its resource.
+    const original = await client.cdn.signAssetUrl({ assetId: asset.id, resource: "original" });
+    expect(original.url).toEndWith("/original");
+    expect((await client.fetchCdn(original.url)).status).toBe(200);
+    const thumbnail = await client.cdn.signAssetUrl({
+      assetId: asset.id,
+      resource: "rendered",
+      lens: "thumbnail",
+    });
+    expect(thumbnail.url).toEndWith("/rendered/@thumbnail");
+    expect((await client.fetchCdn(thumbnail.url)).status).toBe(200);
+    expect(
+      (await client.fetchCdn(thumbnail.url.replace("/rendered/@thumbnail", "/original"))).status,
+    ).toBe(403);
+    await expect(
+      client.cdn.signAssetUrl({ assetId: asset.id, original: true } as never),
+    ).rejects.toMatchObject({ code: "sdk/invalid-argument" });
     const unsigned = await client.fetchCdn(
       client.cdn.getAssetUrl({ assetId: asset.id, resource: "rendered" }),
     );

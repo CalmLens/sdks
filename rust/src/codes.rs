@@ -14,7 +14,7 @@ error_codes! {
     SignedUrlExpired = "signed-url/expired", 403;
     /// `signed-url/invalid` (HTTP 403): The signed asset URL's grant wasn't signed for this project, or was changed after signing. Use the URL as created, adding only resources, selectors and viewer claims.
     SignedUrlInvalid = "signed-url/invalid", 403;
-    /// `signed-url/original-not-granted` (HTTP 403): This signed asset URL doesn't grant the original file. Sign it with original access.
+    /// `signed-url/original-not-granted` (HTTP 403): This signed asset URL doesn't grant the original file. Sign a URL for the original resource.
     SignedUrlOriginalNotGranted = "signed-url/original-not-granted", 403;
     /// `validation/invalid-request` (HTTP 400): The request's parameters, query or body are invalid. details.issues lists each problem, with its path and issue code.
     InvalidRequest = "validation/invalid-request", 400;

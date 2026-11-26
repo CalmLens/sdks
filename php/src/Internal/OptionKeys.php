@@ -32,7 +32,7 @@ final class OptionKeys
         'assets.search' => ['mode', 'pageSize', 'query'],
         'assets.update' => ['assetId', 'description', 'externalId', 'externalUrl', 'metadata', 'name', 'tags', 'visibility'],
         'assets.uploadPart' => ['assetId', 'part', 'wait'],
-        'cdn.signAssetUrl' => ['assetId', 'expiresIn', 'externalId', 'lens', 'original', 'projectId', 'resource', 'transform', 'viewerClaims'],
+        'cdn.signAssetUrl' => ['assetId', 'expiresIn', 'externalId', 'lens', 'projectId', 'resource', 'resource', 'transform', 'viewerClaims'],
         'ensureLens' => ['active', 'description', 'identifier', 'name', 'transform', 'type'],
         'ensureLenses' => ['lenses'],
         'events.each' => ['assetId', 'cursor', 'pageSize', 'types'],

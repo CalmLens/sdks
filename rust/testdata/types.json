@@ -3230,16 +3230,24 @@
               "type": "integer"
             }
           },
-          "original": {
+          "resource": {
             "location": "body",
             "schema": {
-              "type": "boolean"
+              "type": "string",
+              "enum": [
+                "original",
+                "rendered",
+                "preview",
+                "placeholder",
+                "hls",
+                "embed",
+                "info"
+              ]
             }
           }
         },
         "required": [],
         "clientOptions": [
-          "resource",
           "lens",
           "transform",
           "viewerClaims"

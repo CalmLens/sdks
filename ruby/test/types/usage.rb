@@ -146,7 +146,7 @@ token = client.upload_tokens.sign(upload_preset_id: 'preset-1', external_id: 'po
 url = client.cdn.get_asset_url(asset_id: 'post-1', resource: 'preview', lens: lens.identifier, viewer_claims: { age_confirmed: true })
 renditions = asset.content.hls&.renditions&.map { |rendition| [rendition.kind, rendition.bandwidth] }
 embed = client.cdn.get_asset_url(external_id: 'post-1', project_id: 'project-2', resource: 'embed')
-hls = client.cdn.sign_asset_url(external_id: 'post-1', original: true, resource: 'hls').url
+hls = client.cdn.sign_asset_url(external_id: 'post-1', resource: 'hls').url
 bytes = client.cdn.serve(asset_id: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|
   response.success? ? response.body(limit: 1024) : nil
 end

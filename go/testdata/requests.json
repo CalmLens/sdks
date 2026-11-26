@@ -91,11 +91,11 @@
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -2547,11 +2547,11 @@
       "body": {
         "assetId": "asset-1",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -2574,11 +2574,11 @@
       "body": {
         "assetId": "asset-1",
         "expiresIn": 900,
-        "original": false
+        "resource": "preview"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/preview",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -2590,7 +2590,7 @@
     "operation": "cdn.signAssetUrl",
     "options": {
       "externalId": "a/b?c#d ✓",
-      "original": true,
+      "resource": "original",
       "expiresIn": 86400
     },
     "request": {
@@ -2600,11 +2600,11 @@
       "body": {
         "externalId": "a/b?c#d ✓",
         "expiresIn": 86400,
-        "original": true
+        "resource": "original"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/original",
       "expiresAt": 1760000900000
     }
   },
@@ -2616,8 +2616,7 @@
       "resource": null,
       "lens": null,
       "transform": null,
-      "expiresIn": null,
-      "original": null
+      "expiresIn": null
     },
     "request": {
       "method": "POST",
@@ -2625,8 +2624,7 @@
       "query": {},
       "body": {
         "assetId": "asset-1",
-        "expiresIn": 900,
-        "original": false
+        "expiresIn": 900
       }
     },
     "response": {
@@ -2735,11 +2733,11 @@
       "body": {
         "assetId": "asset-1",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -10949,11 +10947,11 @@
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "example",
+      "url": "example/rendered",
       "expiresAt": 1
     },
     "result": {
@@ -92201,7 +92199,6 @@
       "viewerClaims": {
         "region": "GB"
       },
-      "resource": "rendered",
       "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4"
     },
     "request": {
@@ -92210,8 +92207,7 @@
       "query": {},
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
-        "expiresIn": 900,
-        "original": false
+        "expiresIn": 900
       }
     },
     "response": {
@@ -92219,7 +92215,7 @@
       "expiresAt": 1760000900000
     },
     "result": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
       "expiresAt": 1760000900000
     },
     "inputContract": {
@@ -92243,11 +92239,11 @@
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -92275,11 +92271,11 @@
       "body": {
         "externalId": "example",
         "expiresIn": 900,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -92308,11 +92304,11 @@
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "expiresIn": 1,
-        "original": false
+        "resource": "rendered"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -92331,8 +92327,7 @@
       "viewerClaims": {
         "region": "GB"
       },
-      "resource": "rendered",
-      "original": true
+      "resource": "original"
     },
     "request": {
       "method": "POST",
@@ -92341,11 +92336,43 @@
       "body": {
         "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
         "expiresIn": 900,
-        "original": true
+        "resource": "original"
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/original",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/original?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "rendered"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "rendered"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered",
       "expiresAt": 1760000900000
     },
     "result": {
@@ -92353,7 +92380,167 @@
       "expiresAt": 1760000900000
     },
     "inputContract": {
-      "field": "original",
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "preview"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "preview"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/preview",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/preview?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "placeholder"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "placeholder"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/placeholder",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/placeholder?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "hls"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "hls"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/hls/index.m3u8",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/hls/index.m3u8?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "embed"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "embed"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/embed",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/embed?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
+      "location": "body"
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+      "viewerClaims": {
+        "region": "GB"
+      },
+      "resource": "info"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "assetId": "asset_e5Gm2Rk8XqT3wLp9VbN4",
+        "expiresIn": 900,
+        "resource": "info"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/info",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/info?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
+      "expiresAt": 1760000900000
+    },
+    "inputContract": {
+      "field": "resource",
       "location": "body"
     }
   },

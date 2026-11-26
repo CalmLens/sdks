@@ -1326,33 +1326,36 @@ type MoveAssetOptions struct {
 	Params   `json:"-"`
 }
 
+// CDNResource is a resource beneath an asset's CDN URL.
+type CDNResource string
+
 // CDN resources.
 const (
 	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformOptions.
-	ResourceOriginal = "original"
+	ResourceOriginal CDNResource = "original"
 	// ResourceRendered is the asset's displayable file (an image in the best format
 	// the client accepts, a PDF, or browser-safe video or audio). It takes a Lens, Transform or
 	// TransformOptions only when it is an image; the CDN refuses them otherwise with
 	// transform/invalid.
-	ResourceRendered = "rendered"
+	ResourceRendered CDNResource = "rendered"
 	// ResourcePreview is a still image that stands for the asset, such as a document's first page
 	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
-	ResourcePreview = "preview"
+	ResourcePreview CDNResource = "preview"
 	// ResourceHLS (preview) is the adaptive stream of audio or video, its HLS master playlist at
 	// hls/index.m3u8, once Content.HLS.Status is ready; beneath a signed asset URL, its grant covers every
 	// playlist and segment beneath hls/. It takes no Lens, Transform or TransformOptions.
-	ResourceHLS = "hls"
+	ResourceHLS CDNResource = "hls"
 	// ResourceEmbed (preview) is an HTML page that shows the asset, for an iframe: a player for
 	// audio and video, or the viewer for its type. It takes no Lens, Transform or
 	// TransformOptions.
-	ResourceEmbed = "embed"
+	ResourceEmbed CDNResource = "embed"
 	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
 	// or moderation status. It takes no Lens, Transform or TransformOptions, and needs no age confirmation.
-	ResourcePlaceholder = "placeholder"
+	ResourcePlaceholder CDNResource = "placeholder"
 	// ResourceInfo is the asset's display info as JSON (AssetInfo): its type, size, rendered file,
 	// preview and stream, and whether the viewer its claims describe can see it. CDN.GetAssetInfo
 	// fetches it. It takes no Lens, Transform or TransformOptions.
-	ResourceInfo = "info"
+	ResourceInfo CDNResource = "info"
 )
 
 // Folder is an asset folder.

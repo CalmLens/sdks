@@ -322,7 +322,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	SIGNED_URL_ORIGINAL_NOT_GRANTED: new ErrorCode({
 		id: "signed-url/original-not-granted",
-		defaultMessage: "This signed asset URL doesn't grant the original file. Sign it with original access.",
+		defaultMessage: "This signed asset URL doesn't grant the original file. Sign a URL for the original resource.",
 		status: 403
 	}),
 	INVALID_REQUEST: new ErrorCode({

@@ -462,9 +462,9 @@ class AsyncCDN:
         """:meth:`calmlens.client.CDN.get_asset_url`; it sends nothing, so it isn't awaited."""
         return self._sync.get_asset_url(project_id=project_id, asset_id=asset_id, external_id=external_id, resource=resource, lens=lens, transform=transform, viewer_claims=viewer_claims, options=options)
 
-    async def sign_asset_url(self, *, project_id: str = _UNSET, asset_id: str = _UNSET, external_id: str = _UNSET, expires_in: int = _UNSET, original: bool = _UNSET, resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET, options: RequestOptions | None = None) -> SignedAssetUrl:
+    async def sign_asset_url(self, *, project_id: str = _UNSET, asset_id: str = _UNSET, external_id: str = _UNSET, expires_in: int = _UNSET, resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET, options: RequestOptions | None = None) -> SignedAssetUrl:
         """Like :meth:`calmlens.client.CDN.sign_asset_url`, awaitable."""
-        return await _run(lambda: self._sync.sign_asset_url(project_id=project_id, asset_id=asset_id, external_id=external_id, expires_in=expires_in, original=original, resource=resource, lens=lens, transform=transform, viewer_claims=viewer_claims, options=options))
+        return await _run(lambda: self._sync.sign_asset_url(project_id=project_id, asset_id=asset_id, external_id=external_id, expires_in=expires_in, resource=resource, lens=lens, transform=transform, viewer_claims=viewer_claims, options=options))
 
     async def get_asset_info(self, url: str, *, viewer_claims: ViewerClaims = _UNSET, options: RequestOptions | None = None) -> AssetInfo:
         """Like :meth:`calmlens.client.CDN.get_asset_info`, awaitable."""

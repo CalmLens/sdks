@@ -1656,11 +1656,13 @@ export function checkTypes(): void {
   >();
   noMismatches<
     InputDifferences<
-      Options<
-        CalmLensServerClient["cdn"]["signAssetUrl"],
-        "resource" | "lens" | "transform" | "viewerClaims"
-      >,
-      { assetId?: string; externalId?: string; expiresIn?: number; original?: boolean },
+      Options<CalmLensServerClient["cdn"]["signAssetUrl"], "lens" | "transform" | "viewerClaims">,
+      {
+        assetId?: string;
+        externalId?: string;
+        expiresIn?: number;
+        resource?: "original" | "rendered" | "preview" | "placeholder" | "hls" | "embed" | "info";
+      },
       "cdn.signAssetUrl options $"
     >
   >();

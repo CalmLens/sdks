@@ -31,11 +31,39 @@ const MaxSignedURLExpiresIn = 24 * 60 * 60
 const externalIDSegmentPrefix = "ext:"
 
 // cdnResources are the resources beneath an asset URL, in the order messages list them.
-var cdnResources = []string{ResourceOriginal, ResourceRendered, ResourcePreview, ResourcePlaceholder, ResourceHLS, ResourceEmbed, ResourceInfo}
+var cdnResources = []CDNResource{ResourceOriginal, ResourceRendered, ResourcePreview, ResourcePlaceholder, ResourceHLS, ResourceEmbed, ResourceInfo}
+
+// assetURLOf is the asset URL of u, without its query: an asset URL (…/assets/{projectId}/{asset})
+// as it is, and a resource URL beneath one, such as a URL signed for ResourceOriginal, cut back to
+// the asset URL its resources are paths beneath.
+func assetURLOf(u string) string {
+	path := strings.TrimRight(strings.SplitN(u, "?", 2)[0], "/")
+	parts := strings.Split(path, "/")
+	assets := -1
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "assets" {
+			assets = i
+			break
+		}
+	}
+	if assets >= 3 && len(parts) > assets+3 {
+		return strings.Join(parts[:assets+3], "/")
+	}
+	return path
+}
+
+// joinResources lists resources for a message.
+func joinResources(resources []CDNResource) string {
+	names := make([]string, len(resources))
+	for i, resource := range resources {
+		names[i] = string(resource)
+	}
+	return strings.Join(names, ", ")
+}
 
 // cdnResourcePaths are where each resource is served beneath an asset URL. The adaptive stream
 // is its HLS master playlist; its media playlists and segments are the other files beneath hls/.
-var cdnResourcePaths = map[string]string{
+var cdnResourcePaths = map[CDNResource]string{
 	ResourceOriginal:    "original",
 	ResourceRendered:    "rendered",
 	ResourcePreview:     "preview",
@@ -48,7 +76,7 @@ var cdnResourcePaths = map[string]string{
 // selectableCDNResource reports the resources that take a lens or transform: the rendered file
 // and the preview. The others (the exact upload, the placeholder, the stream, the embed page and
 // the info) take none.
-func selectableCDNResource(resource string) bool {
+func selectableCDNResource(resource CDNResource) bool {
 	return resource == ResourceRendered || resource == ResourcePreview
 }
 
@@ -70,7 +98,7 @@ type CDNAssetURLOptions struct {
 	ProjectID        string
 	AssetID          string
 	ExternalID       string
-	Resource         string
+	Resource         CDNResource
 	Lens             string
 	Transform        string
 	TransformOptions any
@@ -87,19 +115,20 @@ type CDNServeOptions struct {
 
 // SignAssetURLOptions signs a private asset's URL. Name the asset by exactly one of AssetID and
 // ExternalID; ProjectID defaults to the client's project. ExpiresIn is the lifetime in whole
-// seconds, from 1 to MaxSignedURLExpiresIn (0 for DefaultSignedURLExpiresIn). Original grants
-// ResourceOriginal, the exact upload, which the URL refuses otherwise.
+// seconds, from 1 to MaxSignedURLExpiresIn (0 for DefaultSignedURLExpiresIn). Resource is the
+// resource the URL is signed for, and it ends in it: only a URL signed for ResourceOriginal serves
+// the exact upload, and any other, or one without a Resource, serves every other resource beneath
+// its grant.
 //
-// Resource, Lens, Transform, TransformOptions and ViewerClaims aren't part of the grant: they
-// are appended to the signed URL exactly as GetAssetURL appends them (see CDNAssetURLOptions),
-// and can be changed later without signing again.
+// Lens, Transform, TransformOptions and ViewerClaims aren't part of the grant: they are appended
+// to the signed URL exactly as GetAssetURL appends them (see CDNAssetURLOptions), and can be
+// changed later without signing again.
 type SignAssetURLOptions struct {
 	ProjectID        string
 	AssetID          string
 	ExternalID       string
 	ExpiresIn        int
-	Original         bool
-	Resource         string
+	Resource         CDNResource
 	Lens             string
 	Transform        string
 	TransformOptions any
@@ -217,9 +246,10 @@ func viewerClaimsQuery(claims *ViewerClaims) (string, error) {
 
 // assetLocation is what follows an asset URL: a resource, its selector and the viewer claims.
 type assetLocation struct {
-	resource, lens, transform string
-	transformOptions          any
-	claims                    *ViewerClaims
+	resource         CDNResource
+	lens, transform  string
+	transformOptions any
+	claims           *ViewerClaims
 }
 
 // append adds the location to an asset URL, public or signed. Without a resource the URL stays
@@ -229,15 +259,15 @@ func (l assetLocation) append(assetURL string) (string, error) {
 	endpoint := assetURL
 	if l.resource == "" {
 		if selected {
-			return "", invalid(CodeSDKInvalidArgument, "A lens or transform needs a resource, such as "+ResourceRendered)
+			return "", invalid(CodeSDKInvalidArgument, "A lens or transform needs a resource, such as "+string(ResourceRendered))
 		}
 	} else {
 		path, ok := cdnResourcePaths[l.resource]
 		if !ok {
-			return "", invalid(CodeSDKInvalidArgument, "Resource must be one of "+strings.Join(cdnResources, ", "))
+			return "", invalid(CodeSDKInvalidArgument, "Resource must be one of "+joinResources(cdnResources))
 		}
 		if !selectableCDNResource(l.resource) && selected {
-			return "", invalid(CodeSDKInvalidArgument, "The "+l.resource+" resource takes no lens or transform")
+			return "", invalid(CodeSDKInvalidArgument, "The "+string(l.resource)+" resource takes no lens or transform")
 		}
 		endpoint += "/" + path
 		transform, _, err := transformSelector(l.transform, l.transformOptions)
@@ -295,9 +325,9 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 }
 
 // SignAssetURL signs a private asset's URL on your server, so browsers and apps can load it
-// without an API key until it expires. Every resource is a path beneath it, as beneath a public
-// asset URL; ResourceOriginal only when signed with Original. With a Resource, it returns that
-// resource's URL beneath the grant. The options are checked before anything is sent.
+// without an API key until it expires. With a Resource, it is signed for that resource and ends
+// in it; only a URL signed for ResourceOriginal serves the exact upload. The options are checked
+// before anything is sent.
 func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptions) (*SignedAssetURL, error) {
 	ctx, paramsErr := withCall(ctx, "cdn.signAssetUrl", options.Params)
 	if paramsErr != nil {
@@ -323,11 +353,11 @@ func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptio
 		expiresIn = DefaultSignedURLExpiresIn
 	}
 	body := struct {
-		AssetID    string `json:"assetId,omitempty"`
-		ExternalID string `json:"externalId,omitempty"`
-		ExpiresIn  int    `json:"expiresIn"`
-		Original   bool   `json:"original"`
-	}{options.AssetID, options.ExternalID, expiresIn, options.Original}
+		AssetID    string      `json:"assetId,omitempty"`
+		ExternalID string      `json:"externalId,omitempty"`
+		ExpiresIn  int         `json:"expiresIn"`
+		Resource   CDNResource `json:"resource,omitempty"`
+	}{options.AssetID, options.ExternalID, expiresIn, options.Resource}
 	var signed SignedAssetURL
 	if err = s.c.request(ctx, "POST", "/projects/"+project+"/signed-asset-urls", nil, body, &signed); err != nil {
 		return nil, err
@@ -335,11 +365,19 @@ func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptio
 	if signed.URL == "" {
 		return nil, &Error{Code: CodeSDKInvalidResponse, Message: "The API returned no signed asset URL"}
 	}
-	endpoint, err := location.append(signed.URL)
+	// The API returns the URL ending in its resource; the selector and claims follow it.
+	resourcePath := ""
+	if options.Resource != "" {
+		resourcePath = "/" + cdnResourcePaths[options.Resource]
+	}
+	if !strings.HasSuffix(signed.URL, resourcePath) {
+		return nil, &Error{Code: CodeSDKInvalidResponse, Message: "The signed asset URL doesn't end in the resource it was signed for"}
+	}
+	suffix, err := location.append("")
 	if err != nil {
 		return nil, err
 	}
-	return &SignedAssetURL{URL: endpoint, ExpiresAt: signed.ExpiresAt}, nil
+	return &SignedAssetURL{URL: signed.URL + suffix[len(resourcePath):], ExpiresAt: signed.ExpiresAt}, nil
 }
 
 // GetAssetInfo fetches the display info of an asset URL, public or signed ({url}/info): its
@@ -376,7 +414,7 @@ func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options 
 	}
 	ctx, cancel := context.WithTimeout(ctx, s.c.timeout(ctx))
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+"/info"+query, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURLOf(base)+"/info"+query, nil)
 	if err != nil {
 		return nil, argumentError("Could not build the CDN request", err)
 	}

@@ -3,7 +3,7 @@ import type { Folder } from "../contract/Folder.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
 import type { GetEventsResponse, SignAssetUrlResponse } from "../contract/PublicApiSchemas.js";
 import {
-  appendAssetLocation,
+  appendSignedLocation,
   buildAssetUrl,
   DEFAULT_SIGNED_URL_EXPIRES_IN,
   getAssetInfo,
@@ -436,10 +436,10 @@ export default class CalmLensServerClient {
 
       /**
        * Signs a private asset's URL on your server, so browsers and apps can load it without an API
-       * key until it expires. Every resource is a path beneath it, as beneath a public asset URL;
-       * `/original` only when signed with `original: true`. With `resource`, returns that resource's
-       * URL beneath the grant; lenses, transforms and viewer claims are appended as `getAssetUrl`
-       * appends them and aren't part of the signature.
+       * key until it expires. With `resource`, it is signed for that resource and ends in it; only a
+       * URL signed for `original` serves the exact uploaded file, and any other serves every other
+       * resource beneath its grant. Lenses, transforms and viewer claims are appended as
+       * `getAssetUrl` appends them and aren't part of the signature.
        */
       signAssetUrl: async (
         signOptions: SignAssetUrlOptions,
@@ -447,7 +447,7 @@ export default class CalmLensServerClient {
       ): Promise<CalmLensResponse<SignedAssetUrl>> => {
         const options = checked("cdn.signAssetUrl", signOptions);
         validateSignAssetUrlOptions(options);
-        const { projectId, assetId, externalId, expiresIn, original, ...location } = options;
+        const { projectId, assetId, externalId, expiresIn, ...location } = options;
         const project = requireId(projectId ?? this.#settings.projectId, "Project ID");
         const signed = await this.#send<SignAssetUrlResponse>(
           "cdn.signAssetUrl",
@@ -458,7 +458,7 @@ export default class CalmLensServerClient {
             body: {
               ...(assetId !== undefined ? { assetId } : { externalId }),
               expiresIn: expiresIn ?? DEFAULT_SIGNED_URL_EXPIRES_IN,
-              original: original ?? false,
+              ...(location.resource !== undefined ? { resource: location.resource } : {}),
             },
           },
         );
@@ -473,7 +473,7 @@ export default class CalmLensServerClient {
           });
         }
         return copyLastResponse(
-          { url: appendAssetLocation(signed.url, location), expiresAt: signed.expiresAt },
+          { url: appendSignedLocation(signed.url, location), expiresAt: signed.expiresAt },
           signed,
         ) as CalmLensResponse<SignedAssetUrl>;
       },

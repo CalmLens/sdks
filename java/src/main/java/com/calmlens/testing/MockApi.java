@@ -1329,15 +1329,23 @@ final class MockApi {
     }
   }
 
+  /** Where the API's signed URL for each resource ends. */
+  private static final Map<String, String> SIGNED_RESOURCE_PATHS = Map.of(
+      "original", "original", "rendered", "rendered", "preview", "preview", "placeholder", "placeholder",
+      "hls", "hls/index.m3u8", "embed", "embed", "info", "info");
+
   /**
    * Signs an asset URL like the API ({@code POST /projects/:projectId/signed-asset-urls}): a grant
-   * to one asset, by ID or external ID, until it expires, serving the original only when asked.
-   * The mock's grant is readable (its asset, original access and expiry), unlike the CDN's, and
+   * to one asset, by ID or external ID, until it expires, ending in the resource it was signed for
+   * and serving the original only when signed for it. The mock's grant is readable (its asset, original access and expiry), unlike the CDN's, and
    * only the mock's CDN accepts it.
    */
   private JsonObject signAssetUrl(JsonObject body, long now) throws Failure {
-    // Like the API's schema, none of these fields takes null.
-    for (String key : List.of("assetId", "externalId", "expiresIn", "original"))
+    // Like the API's schema, it takes only these fields, and none of them takes null.
+    List<String> fields = List.of("assetId", "externalId", "expiresIn", "resource");
+    for (String key : body.keySet())
+      if (!fields.contains(key)) throw Failure.validation("validation/unknown-field", key);
+    for (String key : fields)
       if (body.has(key) && body.get(key).isJsonNull()) throw Failure.validation("validation/invalid-type", key);
     if (body.has("assetId") == body.has("externalId")) {
       Map<String, Object> issue = new java.util.LinkedHashMap<>();
@@ -1355,12 +1363,14 @@ final class MockApi {
       if (value.getAsDouble() > 24 * 60 * 60) throw Failure.validation("validation/too-big", "expiresIn");
       expiresIn = value.getAsLong();
     }
-    boolean original = false;
-    if (body.has("original")) {
-      JsonElement value = body.get("original");
-      if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) throw Failure.validation("validation/invalid-type", "original");
-      original = value.getAsBoolean();
+    String resource = null;
+    if (body.has("resource")) {
+      JsonElement value = body.get("resource");
+      if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString() || !SIGNED_RESOURCE_PATHS.containsKey(value.getAsString()))
+        throw Failure.validation("validation/invalid-value", "resource");
+      resource = value.getAsString();
     }
+    boolean original = "original".equals(resource);
     JsonObject asset;
     if (body.has("externalId")) {
       JsonElement externalId = body.get("externalId");
@@ -1372,7 +1382,8 @@ final class MockApi {
     if (held(asset)) throw Failure.of(ErrorCodes.ASSET_HELD, Map.of("hold", "safety"));
     long expiresAt = now + expiresIn * 1000;
     JsonObject signed = new JsonObject();
-    signed.addProperty("url", cdnBase + "/assets/" + ClientAccess.Holder.get().encodeComponent(projectId) + "/" + encodeMockGrant(str(asset, "id"), original, expiresAt));
+    signed.addProperty("url", cdnBase + "/assets/" + ClientAccess.Holder.get().encodeComponent(projectId) + "/" + encodeMockGrant(str(asset, "id"), original, expiresAt)
+        + (resource == null ? "" : "/" + SIGNED_RESOURCE_PATHS.get(resource)));
     signed.addProperty("expiresAt", expiresAt);
     return signed;
   }

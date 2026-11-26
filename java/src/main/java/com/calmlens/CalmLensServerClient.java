@@ -103,6 +103,18 @@ public final class CalmLensServerClient implements AutoCloseable {
       "hls", "hls/index.m3u8",
       "embed", "embed",
       "info", "info");
+  /**
+   * The asset URL of a path: an asset URL ({@code …/assets/{projectId}/{asset}}) as it is, and a
+   * resource URL beneath one, such as a URL signed for {@code original}, cut back to the asset URL
+   * its resources are paths beneath.
+   */
+  static String assetUrlOf(String path) {
+    String trimmed = path.replaceAll("/+$", "");
+    List<String> parts = List.of(trimmed.split("/", -1));
+    int assets = parts.lastIndexOf("assets");
+    return assets >= 3 && parts.size() > assets + 3 ? String.join("/", parts.subList(0, assets + 3)) : trimmed;
+  }
+
   /** The resources that take a lens or transform: the rendered file and the preview. */
   private static final Set<String> SELECTABLE_CDN_RESOURCES = Set.of("rendered", "preview");
   /** The asset segment prefix that names an asset by its external ID. */
@@ -3210,20 +3222,20 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Signs a private asset's URL on your server, so browsers and apps can load it without an API
-     * key until it expires. Every resource is a path beneath it, as beneath a public asset URL; the
-     * {@code original} only when signed with {@code setOriginal(true)}. With a {@code resource}, it
-     * returns that resource's URL beneath the grant, with the lens, transform and viewer claims
-     * appended as {@link #getAssetUrl} appends them. The params are checked before anything is
-     * sent; the lifetime defaults to {@link #DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS}.
+     * key until it expires. With a {@code resource}, it is signed for that resource and ends in it,
+     * with the lens, transform and viewer claims appended as {@link #getAssetUrl} appends them; only
+     * a URL signed for {@code original} serves the exact upload, and any other serves every other
+     * resource beneath its grant. The params are checked before anything is sent; the lifetime
+     * defaults to {@link #DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS}.
      *
-     * @param params the asset, lifetime, original access and the location beneath the grant
+     * @param params the asset, lifetime, resource and the location beneath the grant
      * @return the signed URL and its expiry
      * @throws com.calmlens.exception.InvalidArgumentException for invalid params
      */
     public SignedAssetUrl signAssetUrl(CdnSignAssetUrlParams params) { return signAssetUrl(params, null); }
 
     /**
-     * @param params the asset, lifetime, original access and the location beneath the grant
+     * @param params the asset, lifetime, resource and the location beneath the grant
      * @param requestOptions deadlines, retries and headers for this call
      * @return the signed URL and its expiry
      */
@@ -3243,14 +3255,18 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (o.has("assetId")) body.add("assetId", o.get("assetId"));
       else body.add("externalId", o.get("externalId"));
       body.addProperty("expiresIn", expiresIn);
-      body.addProperty("original", flag(o, "original"));
+      if (o.has("resource")) body.add("resource", o.get("resource"));
       String path = "/projects/" + id(str(o, "projectId", projectId)) + "/signed-asset-urls";
       Reply reply = c.json("POST", path, null, body);
       SignedAssetUrl signed = c.decode(reply, SignedAssetUrl.class);
       if (signed.getUrl().isEmpty())
         throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL", null, 200, Map.of(), null, null, null);
+      // The API returns the URL ending in its resource; the selector and claims follow it.
+      String resourcePath = o.has("resource") ? "/" + CDN_RESOURCE_PATHS.get(o.get("resource").getAsString()) : "";
+      if (!signed.getUrl().endsWith(resourcePath))
+        throw CalmLensException.of(ErrorCodes.SDK_INVALID_RESPONSE, "The signed asset URL doesn't end in the resource it was signed for", null, 200, Map.of(), null, null, null);
       JsonObject located = object(reply).deepCopy();
-      located.addProperty("url", appendAssetLocation(signed.getUrl(), o, transform));
+      located.addProperty("url", signed.getUrl() + appendAssetLocation("", o, transform).substring(resourcePath.length()));
       return Json.GSON.fromJson(located, SignedAssetUrl.class);
     }
 
@@ -3258,14 +3274,14 @@ public final class CalmLensServerClient implements AutoCloseable {
      * Fetches the display info of an asset URL, public or signed ({@code {url}/info}), for the
      * viewer claims the URL carries.
      *
-     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, or a resource URL beneath one
      * @return the asset's type, size, rendered file, preview and stream, and whether the viewer can see it
      * @see #getAssetInfo(String, ViewerClaims, RequestOptions)
      */
     public AssetInfo getAssetInfo(String url) { return getAssetInfo(url, null, null); }
 
     /**
-     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, or a resource URL beneath one
      * @param viewerClaims the viewer's claims, replacing those the URL carries; null keeps the URL's
      * @return the display info
      * @see #getAssetInfo(String, ViewerClaims, RequestOptions)
@@ -3279,7 +3295,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * an {@link ApiException} with the CDN's code, such as {@link ErrorCodes#SIGNED_URL_EXPIRED} or
      * {@code asset/not-available}.
      *
-     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, or a resource URL beneath one
      * @param viewerClaims the viewer's claims, replacing those the URL carries; null keeps the URL's
      * @param requestOptions deadlines, retries and headers for this call
      * @return the display info
@@ -3296,7 +3312,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       }
       if (parsed == null || !parsed.isAbsolute() || parsed.getHost() == null) throw argument("url must be an absolute asset URL");
       String[] parts = url.split("#", 2)[0].split("\\?", 2);
-      String base = parts[0].replaceAll("/+$", "");
+      String base = assetUrlOf(parts[0]);
       JsonElement claims = viewerClaims == null ? null : Json.GSON.toJsonTree(viewerClaims);
       if (claims == null && parts.length == 2)
         for (String pair : parts[1].split("&")) {

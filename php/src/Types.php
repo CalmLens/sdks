@@ -98,6 +98,7 @@ namespace CalmLens;
  *     bytes?: string|open-resource|\Psr\Http\Message\StreamInterface, type: string, sizeInBytes?: int,
  *     partNumber?: int, isFinal?: bool,
  * }
+ * @phpstan-type CdnResource 'original'|'rendered'|'preview'|'placeholder'|'hls'|'embed'|'info'
  * @phpstan-type ViewerClaims array{region?: string, ageConfirmed?: bool}
  */
 final class Types

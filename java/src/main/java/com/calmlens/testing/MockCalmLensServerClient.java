@@ -72,8 +72,8 @@ import java.util.function.LongSupplier;
  * ViewerClaims.builder().setAgeConfirmed(true).build()} whatever the key, and serves private ones only to an API key
  * with the {@code assets:download} grant (see {@link #createMockApiKey}) or beneath a URL from
  * {@code cdn.signAssetUrl}. The mock signs asset URLs beneath the client's CDN base URL with a
- * readable grant, which its CDN accepts until it expires; the {@code original} resource only when
- * signed with original access. It also finds assets by external ID ({@code ext:}) and serves the
+ * readable grant, which its CDN accepts until it expires; the {@code original} resource only in a
+ * URL signed for it. It also finds assets by external ID ({@code ext:}) and serves the
  * {@code info} resource. {@link #fetchCdn} loads its CDN URLs as a browser would.
  *
  * <p>Queued responses take precedence, in order: {@link #enqueue(int, Object)}, {@link

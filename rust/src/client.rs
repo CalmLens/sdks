@@ -2745,6 +2745,22 @@ impl TextClient<'_> {
 /// The resources beneath an asset URL, in the order messages list them, with the path each is
 /// served at. The adaptive stream is its HLS master playlist; its media playlists and segments
 /// are the other files beneath `hls/`.
+/// The asset URL of `url`, without its query: an asset URL (`…/assets/{projectId}/{asset}`) as
+/// it is, and a resource URL beneath one, such as a URL signed for the original, cut back to the
+/// asset URL its resources are paths beneath.
+fn asset_url_of(url: &str) -> String {
+    let path = url
+        .split('?')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches('/');
+    let parts: Vec<&str> = path.split('/').collect();
+    match parts.iter().rposition(|part| *part == "assets") {
+        Some(assets) if assets >= 3 && parts.len() > assets + 3 => parts[..assets + 3].join("/"),
+        _ => path.to_owned(),
+    }
+}
+
 const CDN_RESOURCE_PATHS: [(&str, &str); 7] = [
     ("original", "original"),
     ("rendered", "rendered"),
@@ -2901,10 +2917,10 @@ impl CdnClient<'_> {
     }
     /// Signs a private asset's URL on your server (`POST /projects/:projectId/signed-asset-urls`),
     /// so browsers and apps can load it without an API key until it expires (15 minutes by
-    /// default). Every resource is a path beneath it, as beneath a public asset URL; the original
-    /// only when signed with `original`. With a `resource`, it returns that resource's URL beneath
-    /// the grant. The options are checked before anything is sent. Not retried: it carries no
-    /// `Idempotency-Key`.
+    /// default). With a `resource`, it is signed for that resource and ends in it; only a URL
+    /// signed for the original serves the exact upload, and any other serves every other resource
+    /// beneath its grant. The options are checked before anything is sent. Not retried: it carries
+    /// no `Idempotency-Key`.
     pub async fn sign_asset_url(&self, options: SignAssetUrlOptions) -> Result<SignedAssetUrl> {
         if options
             .expires_in
@@ -2936,7 +2952,9 @@ impl CdnClient<'_> {
                 .unwrap_or(DEFAULT_SIGNED_URL_EXPIRES_IN)
                 .into(),
         );
-        body.insert("original".into(), options.original.unwrap_or(false).into());
+        if let Some(resource) = &options.resource {
+            body.insert("resource".into(), resource.as_str().into());
+        }
         let path = format!("/projects/{project}/signed-asset-urls");
         let request = self
             .0
@@ -2949,8 +2967,26 @@ impl CdnClient<'_> {
                 "The API returned no signed asset URL",
             ));
         }
+        // The API returns the URL ending in its resource; the selector and claims follow it.
+        let resource_path = options
+            .resource
+            .as_ref()
+            .and_then(|resource| {
+                CDN_RESOURCE_PATHS
+                    .iter()
+                    .find(|(name, _)| *name == resource.as_str())
+            })
+            .map(|(_, path)| format!("/{path}"))
+            .unwrap_or_default();
+        if !signed.url.ends_with(&resource_path) {
+            return Err(Error::new(
+                ErrorCode::InvalidResponse,
+                "The signed asset URL doesn't end in the resource it was signed for",
+            ));
+        }
+        let suffix = location.append("")?;
         Ok(SignedAssetUrl {
-            url: location.append(&signed.url)?,
+            url: format!("{}{}", signed.url, &suffix[resource_path.len()..]),
             ..signed
         })
     }
@@ -2984,7 +3020,7 @@ impl CdnClient<'_> {
         };
         let info_url = format!(
             "{}/info{}",
-            base.trim_end_matches('/'),
+            asset_url_of(base),
             viewer_claims_query(claims.as_ref())?
         );
         let mut request =

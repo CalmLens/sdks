@@ -162,7 +162,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "signed-url/original-not-granted": {
     status: 403,
-    message: "This signed asset URL doesn't grant the original file. Sign it with original access.",
+    message: "This signed asset URL doesn't grant the original file. Sign a URL for the original resource.",
   },
   "validation/invalid-request": {
     status: 400,

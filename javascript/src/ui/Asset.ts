@@ -2,7 +2,12 @@
 // and the session that fetches the info, refreshes an expired signed URL and follows the CDN's
 // refusals. Framework-free and DOM-free, so React Native uses it too.
 
-import { appendAssetLocation, getAssetInfo, toUrlViewerClaims } from "../client/CalmLensCdn";
+import {
+  appendAssetLocation,
+  assetUrlOf,
+  getAssetInfo,
+  toUrlViewerClaims,
+} from "../client/CalmLensCdn";
 import { CalmLensError } from "../client/CalmLensError";
 import type {
   AssetAvailability,
@@ -204,8 +209,11 @@ const pageLink = (address: string | null | undefined): string | undefined => {
   }
 };
 
-/** The asset URL without any query; claims are added per resource. */
-const baseOf = (src: string) => src.split("?", 1)[0]!.replace(/\/+$/, "");
+/**
+ * The asset URL without any query; claims are added per resource. A resource URL beneath it, such
+ * as a URL signed for `original`, gives the asset URL its resources load beneath.
+ */
+const baseOf = (src: string) => assetUrlOf(src);
 
 /** The viewer claims an asset URL carries in its query, if any. */
 const claimsOf = (src: string): ViewerClaims | undefined => {

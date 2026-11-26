@@ -2,6 +2,7 @@ package com.calmlens.params;
 
 import com.calmlens.internal.Patch;
 import com.calmlens.internal.Required;
+import com.calmlens.models.CdnResource;
 import com.calmlens.models.ImageTransformOptions;
 import org.jspecify.annotations.Nullable;
 
@@ -11,8 +12,7 @@ public final class CdnSignAssetUrlParams extends ApiParams {
   private final @Nullable String assetId;
   private final @Nullable String externalId;
   private final @Nullable Long expiresIn;
-  private final @Nullable Boolean original;
-  private final @Nullable String resource;
+  private final @Nullable CdnResource resource;
   private final @Nullable String lens;
   private final transient @Nullable Object transform;
   private final @Nullable ViewerClaims viewerClaims;
@@ -23,7 +23,6 @@ public final class CdnSignAssetUrlParams extends ApiParams {
     this.assetId = builder.assetId;
     this.externalId = builder.externalId;
     this.expiresIn = builder.expiresIn;
-    this.original = builder.original;
     this.resource = builder.resource;
     this.lens = builder.lens;
     this.transform = builder.transform;
@@ -45,11 +44,8 @@ public final class CdnSignAssetUrlParams extends ApiParams {
   /** @return the grant's lifetime in whole seconds, from 1 to 86400; 3600 when unset; empty when unset */
   public java.util.Optional<Long> getExpiresIn() { return java.util.Optional.ofNullable(expiresIn); }
 
-  /** @return whether the URL serves the {@code original} resource, the exact upload, which it refuses otherwise; empty when unset */
-  public java.util.Optional<Boolean> getOriginal() { return java.util.Optional.ofNullable(original); }
-
-  /** @return a resource beneath the grant to return the URL of; the signed asset URL itself when unset; empty when unset */
-  public java.util.Optional<String> getResource() { return java.util.Optional.ofNullable(resource); }
+  /** @return the resource the URL is signed for and ends in (only a URL signed for {@code original} serves the exact upload); the signed asset URL itself when unset; empty when unset */
+  public java.util.Optional<CdnResource> getResource() { return java.util.Optional.ofNullable(resource); }
 
   /** @return a lens, for the {@code rendered} or {@code preview} resource; empty when unset */
   public java.util.Optional<String> getLens() { return java.util.Optional.ofNullable(lens); }
@@ -66,8 +62,7 @@ public final class CdnSignAssetUrlParams extends ApiParams {
     private @Nullable String assetId;
     private @Nullable String externalId;
     private @Nullable Long expiresIn;
-    private @Nullable Boolean original;
-    private @Nullable String resource;
+    private @Nullable CdnResource resource;
     private @Nullable String lens;
     private @Nullable Object transform;
     private @Nullable ViewerClaims viewerClaims;
@@ -99,16 +94,10 @@ public final class CdnSignAssetUrlParams extends ApiParams {
     public Builder setExpiresIn(@Nullable Long value) { this.expiresIn = value; return this; }
 
     /**
-     * @param value whether the URL serves the {@code original} resource, the exact upload, which it refuses otherwise; null unsets it
+     * @param value the resource the URL is signed for and ends in (only a URL signed for {@code original} serves the exact upload); the signed asset URL itself when unset; null unsets it
      * @return this builder
      */
-    public Builder setOriginal(@Nullable Boolean value) { this.original = value; return this; }
-
-    /**
-     * @param value a resource beneath the grant to return the URL of; the signed asset URL itself when unset; null unsets it
-     * @return this builder
-     */
-    public Builder setResource(@Nullable String value) { this.resource = value; return this; }
+    public Builder setResource(@Nullable CdnResource value) { this.resource = value; return this; }
 
     /**
      * @param value a lens, for the {@code rendered} or {@code preview} resource; null unsets it

@@ -27,7 +27,7 @@ module CalmLens
   # for a private asset unless `api_key` comes from {.create_api_key} with an `assets:download`
   # grant (the default key has no grants), or the URL is signed: {CDN#sign_asset_url} returns
   # `{cdn_base_url}/assets/{project_id}/sig_…`, a readable grant that only the mock's CDN accepts,
-  # which serves `original` only when signed with `original: true`. {#fetch_cdn} loads such a URL
+  # which serves `original` only when signed for it. {#fetch_cdn} loads such a URL
   # without the API key, as a browser would; without the key or a grant, a private asset answers
   # as an unknown one does, `asset/not-found` (404) whatever its state, including its placeholder
   # and display info. {#decide} applies a reviewer's decision, and {Assets#wait_for_decision} takes no real

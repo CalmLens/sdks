@@ -99,6 +99,9 @@ final class MockServerClient
     private const WAVEFORM_SIZE = ['width' => 1200, 'height' => 300];
     /** The resources an asset's CDN path names. */
     private const PATH_RESOURCES = ['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder', 'info'];
+    /** Where the API's signed URL for each resource ends. */
+    private const SIGNED_RESOURCE_PATHS = ['original' => 'original', 'rendered' => 'rendered', 'preview' => 'preview',
+        'placeholder' => 'placeholder', 'hls' => 'hls/index.m3u8', 'embed' => 'embed', 'info' => 'info'];
     /** The page the mock serves at `/embed`, standing in for the CDN's embed page. */
     private const EMBED_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>';
     private const MIB = 1024 * 1024;
@@ -1389,13 +1392,20 @@ final class MockServerClient
      */
     /**
      * Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to
-     * one asset, by ID or external ID, until it expires, serving the original only when asked. The
-     * mock's grant is readable (`encodeGrant`), and only the mock's CDN accepts it.
+     * one asset, by ID or external ID, until it expires, ending in the resource it was signed for and
+     * serving the original only when signed for it. The mock's grant is readable (`encodeGrant`),
+     * and only the mock's CDN accepts it.
      */
     private function signAssetUrl(array $json): array
     {
-        // Like the API's schema, none of these fields takes null.
-        foreach (['assetId', 'externalId', 'expiresIn', 'original'] as $field) {
+        // Like the API's schema, it takes only these fields, and none of them takes null.
+        $fields = ['assetId', 'externalId', 'expiresIn', 'resource'];
+        foreach (array_keys($json) as $key) {
+            if (!in_array($key, $fields, true)) {
+                self::invalid('validation/unknown-field', (string) $key);
+            }
+        }
+        foreach ($fields as $field) {
             if (array_key_exists($field, $json) && $json[$field] === null) {
                 self::invalid('validation/invalid-type', $field);
             }
@@ -1414,9 +1424,9 @@ final class MockServerClient
         if ($expiresIn > Cdn::MAX_SIGNED_URL_EXPIRES_IN) {
             self::invalid('validation/too-big', 'expiresIn');
         }
-        $original = $json['original'] ?? false;
-        if (!is_bool($original)) {
-            self::invalid('validation/invalid-type', 'original');
+        $resource = $json['resource'] ?? null;
+        if ($resource !== null && (!is_string($resource) || !array_key_exists($resource, self::SIGNED_RESOURCE_PATHS))) {
+            self::invalid('validation/invalid-value', 'resource');
         }
         $asset = null;
         if (array_key_exists('externalId', $json)) {
@@ -1437,7 +1447,8 @@ final class MockServerClient
         }
         $expiresAt = ($this->now)() + (int) $expiresIn * 1000;
         return ['url' => $this->cdnBaseUrl . '/assets/' . Values::component($this->projectId) . '/'
-            . self::encodeGrant($asset['id'], $original, $expiresAt), 'expiresAt' => $expiresAt];
+            . self::encodeGrant($asset['id'], $resource === 'original', $expiresAt)
+            . ($resource === null ? '' : '/' . self::SIGNED_RESOURCE_PATHS[$resource]), 'expiresAt' => $expiresAt];
     }
 
     /**

@@ -1327,7 +1327,7 @@
         "python": "original",
         "go": "ResourceOriginal",
         "rust": "CdnResource::Original",
-        "java": "original",
+        "java": "CdnResource.ORIGINAL",
         "ruby": "original",
         "php": "original"
       }
@@ -1343,7 +1343,7 @@
         "python": "rendered",
         "go": "ResourceRendered",
         "rust": "CdnResource::Rendered",
-        "java": "rendered",
+        "java": "CdnResource.RENDERED",
         "ruby": "rendered",
         "php": "rendered"
       }
@@ -1359,7 +1359,7 @@
         "python": "preview",
         "go": "ResourcePreview",
         "rust": "CdnResource::Preview",
-        "java": "preview",
+        "java": "CdnResource.PREVIEW",
         "ruby": "preview",
         "php": "preview"
       }
@@ -1375,7 +1375,7 @@
         "python": "hls",
         "go": "ResourceHLS",
         "rust": "CdnResource::Hls",
-        "java": "hls",
+        "java": "CdnResource.HLS",
         "ruby": "hls",
         "php": "hls"
       }
@@ -1391,7 +1391,7 @@
         "python": "embed",
         "go": "ResourceEmbed",
         "rust": "CdnResource::Embed",
-        "java": "embed",
+        "java": "CdnResource.EMBED",
         "ruby": "embed",
         "php": "embed"
       }
@@ -1407,7 +1407,7 @@
         "python": "placeholder",
         "go": "ResourcePlaceholder",
         "rust": "CdnResource::Placeholder",
-        "java": "placeholder",
+        "java": "CdnResource.PLACEHOLDER",
         "ruby": "placeholder",
         "php": "placeholder"
       }
@@ -1423,7 +1423,7 @@
         "python": "info",
         "go": "ResourceInfo",
         "rust": "CdnResource::Info",
-        "java": "info",
+        "java": "CdnResource.INFO",
         "ruby": "info",
         "php": "info"
       }
@@ -2800,9 +2800,9 @@
       "id": "signedUrlExpiresIn",
       "value": 900,
       "unit": "seconds",
-      "description": "cdn.signAssetUrl's expiresIn when omitted (sent explicitly, with original: false).",
+      "description": "cdn.signAssetUrl's expiresIn when omitted (sent explicitly).",
       "observedBy": [
-        "cdn.signAssetUrl sends the default lifetime and no original access"
+        "cdn.signAssetUrl sends the default lifetime and no resource"
       ]
     },
     {

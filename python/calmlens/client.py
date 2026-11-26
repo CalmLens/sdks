@@ -1710,6 +1710,16 @@ MAX_SIGNED_URL_EXPIRES_IN = 86400
 _CDN_RESOURCE_PATHS: dict[CdnResource, str] = {
     "original": "original", "rendered": "rendered", "preview": "preview", "placeholder": "placeholder",
     "hls": "hls/index.m3u8", "embed": "embed", "info": "info"}
+def _asset_url_of(url: str) -> str:
+    """The asset URL of ``url``, without its query: an asset URL (``…/assets/{projectId}/{asset}``)
+    as it is, and a resource URL beneath one, such as a URL signed for ``original``, cut back to
+    the asset URL its resources are paths beneath."""
+    path = url.split("?", 1)[0].rstrip("/")
+    parts = path.split("/")
+    assets = len(parts) - 1 - parts[::-1].index("assets") if "assets" in parts else -1
+    return "/".join(parts[:assets + 3]) if assets >= 3 and len(parts) > assets + 3 else path
+
+
 #: Every resource beneath an asset URL, as ``cdn.get_asset_url`` and ``cdn.sign_asset_url`` accept them.
 CDN_RESOURCES: tuple[CdnResource, ...] = tuple(_CDN_RESOURCE_PATHS)
 #: The resources that take a lens or transform: the others are served as they are.
@@ -2654,37 +2664,40 @@ class CDN:
 
     def sign_asset_url(self, *, project_id: str = _UNSET,
                        asset_id: str = _UNSET, external_id: str = _UNSET, expires_in: int = _UNSET,
-                       original: bool = _UNSET, resource: CdnResource = _UNSET, lens: str = _UNSET,
+                       resource: CdnResource = _UNSET, lens: str = _UNSET,
                        transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET, options: RequestOptions | None = None) -> SignedAssetUrl:
         """Sign a private asset's URL, so browsers and apps can load it without an API key until it
         expires (``expires_in`` seconds, 1 to 86400, default 900).
 
-        Every resource is a path beneath the signed URL, as beneath a public asset URL;
-        ``original`` only when signed with ``original=True``. With ``resource``, returns that
-        resource's URL beneath the grant; the lens, transform and viewer claims are appended as
-        :meth:`get_asset_url` appends them and are not part of the signature."""
+        With ``resource``, the URL is signed for that resource and ends in it. Only a URL signed for
+        ``original`` serves the exact uploaded file; any other serves every other resource beneath
+        its grant. The lens, transform and viewer claims are appended as :meth:`get_asset_url`
+        appends them and are not part of the signature."""
         merged = _merge("cdn.signAssetUrl", project_id=project_id, asset_id=asset_id,
-                        external_id=external_id, expires_in=expires_in, original=original, resource=resource,
+                        external_id=external_id, expires_in=expires_in, resource=resource,
                         lens=lens, transform=transform, viewer_claims=viewer_claims)
         expires = merged.get("expiresIn", DEFAULT_SIGNED_URL_EXPIRES_IN)
         if isinstance(expires, bool) or not isinstance(expires, (int, float)) or not math.isfinite(expires) \
                 or not float(expires).is_integer() or not 1 <= expires <= MAX_SIGNED_URL_EXPIRES_IN:
             raise _invalid(f"expires_in must be a whole number of seconds from 1 to {MAX_SIGNED_URL_EXPIRES_IN}")
-        grants_original = merged.get("original", False)
-        if not isinstance(grants_original, bool):
-            raise _invalid("original must be a boolean")
         _asset_segment(merged)
         # The location is appended to the signed URL: check it before signing.
         _append_asset_location("", merged)
         project = _id(merged.get("projectId", self._c.project_id), "projectId")
         asset = {"assetId": merged["assetId"]} if "assetId" in merged else {"externalId": merged["externalId"]}
         signed = self._c._request("POST", f"/projects/{project}/signed-asset-urls",
-                                  body={**asset, "expiresIn": int(expires), "original": grants_original})
+                                  body={**asset, "expiresIn": int(expires),
+                                        **({"resource": merged["resource"]} if "resource" in merged else {})})
         if not isinstance(signed, dict) or not isinstance(signed.get("url"), str) or not signed["url"] \
                 or isinstance(signed.get("expiresAt"), bool) or not isinstance(signed.get("expiresAt"), int):
             raise _error(error_codes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL")
-        return _load(SignedAssetUrl, {"url": _append_asset_location(signed["url"], merged),
-                                      "expiresAt": signed["expiresAt"]})
+        # The API returns the URL ending in its resource; the selector and claims follow it.
+        resource_path = f"/{_CDN_RESOURCE_PATHS[merged['resource']]}" if "resource" in merged else ""
+        if not signed["url"].endswith(resource_path):
+            raise _error(error_codes.SDK_INVALID_RESPONSE,
+                         "The signed asset URL doesn't end in the resource it was signed for")
+        location = _append_asset_location("", merged)[len(resource_path):]
+        return _load(SignedAssetUrl, {"url": signed["url"] + location, "expiresAt": signed["expiresAt"]})
 
     def get_asset_info(self, url: str, *,
                        viewer_claims: ViewerClaims = _UNSET, options: RequestOptions | None = None) -> AssetInfo:
@@ -2709,7 +2722,7 @@ class CDN:
                     claims = json.loads(raw[0])
                 except ValueError as error:
                     raise _invalid("The asset URL's viewerClaims are not JSON") from error
-        request = TransportRequest("GET", path.rstrip("/") + "/info" + _viewer_claims_query(claims),
+        request = TransportRequest("GET", _asset_url_of(path) + "/info" + _viewer_claims_query(claims),
                                    {"User-Agent": self._c.user_agent, "Accept": "application/json"})
         limit = self._c.max_response_bytes
         try:

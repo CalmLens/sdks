@@ -119,7 +119,7 @@ MediaSegmentSource = Union[Literal["frame", "speech", "frame-text", "clip"], str
 #: Asset type a lens applies to (request values).
 LensType = Literal["image", "video", "audio", "document", "website"]
 #: A resource beneath an asset's CDN URL: ``original`` (the exact upload; under a signed URL only
-#: when it was signed with ``original=True``), ``rendered`` (the displayable file: an image in the
+#: one signed for it), ``rendered`` (the displayable file: an image in the
 #: best format the client accepts, a PDF, or browser-safe video or audio), ``preview`` (a still
 #: image that stands for the asset), ``placeholder`` (a small blurred PNG made from the preview,
 #: served publicly for every asset whatever its visibility or moderation status), ``hls`` (the HLS
