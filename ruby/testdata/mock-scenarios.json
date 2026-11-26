@@ -14237,7 +14237,6 @@
           },
           "save": "kept",
           "expect": {
-            "httpStatus": 200,
             "result": {
               "classification.moderation.decision": "allowed",
               "classification.ocr": {
@@ -14282,7 +14281,8 @@
                 "type": "string",
                 "content": "Community offer example.com/offer"
               }
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -14304,7 +14304,6 @@
           },
           "save": "unkept",
           "expect": {
-            "httpStatus": 200,
             "result": {
               "classification.ocr": {
                 "status": "evaluated",
@@ -14321,7 +14320,8 @@
                 ]
               },
               "content.extractedText": null
-            }
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -14343,13 +14343,13 @@
           },
           "save": "off",
           "expect": {
-            "httpStatus": 200,
             "result": {
               "classification.moderation.decision": "allowed",
               "classification.ocr": null,
               "classification.linkDetection": null,
               "content.extractedText": null
-            }
+            },
+            "httpStatus": 200
           }
         }
       ]
