@@ -14170,6 +14170,189 @@
           }
         }
       ]
+    },
+    {
+      "name": "a decision's OCR and link findings reach an image that turned the features on",
+      "mock": {
+        "moderate": {
+          "analyzed": {
+            "status": "allowed",
+            "ocr": {
+              "text": "Community offer example.com/offer",
+              "textRegions": [
+                {
+                  "box": {
+                    "left": 0.1,
+                    "top": 0.2,
+                    "width": 0.5,
+                    "height": 0.1
+                  },
+                  "personalInformation": false
+                }
+              ]
+            },
+            "linkDetection": {
+              "qrCodes": [
+                {
+                  "value": "https://example.com/qr",
+                  "box": {
+                    "left": 0.6,
+                    "top": 0.6,
+                    "width": 0.3,
+                    "height": 0.3
+                  }
+                }
+              ],
+              "links": [
+                {
+                  "url": "https://example.com/offer",
+                  "source": "text"
+                },
+                {
+                  "url": "https://example.com/qr",
+                  "source": "qr-code"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "offer.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "retainContent": true,
+              "features": {
+                "ocr": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "save": "kept",
+          "expect": {
+            "httpStatus": 200,
+            "result": {
+              "classification.moderation.decision": "allowed",
+              "classification.ocr": {
+                "status": "evaluated",
+                "textRegions": [
+                  {
+                    "box": {
+                      "left": 0.1,
+                      "top": 0.2,
+                      "width": 0.5,
+                      "height": 0.1
+                    },
+                    "personalInformation": false
+                  }
+                ]
+              },
+              "classification.linkDetection": {
+                "status": "evaluated",
+                "qrCodes": [
+                  {
+                    "value": "https://example.com/qr",
+                    "box": {
+                      "left": 0.6,
+                      "top": 0.6,
+                      "width": 0.3,
+                      "height": 0.3
+                    }
+                  }
+                ],
+                "links": [
+                  {
+                    "url": "https://example.com/offer",
+                    "source": "text"
+                  },
+                  {
+                    "url": "https://example.com/qr",
+                    "source": "qr-code"
+                  }
+                ]
+              },
+              "content.extractedText": {
+                "type": "string",
+                "content": "Community offer example.com/offer"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "offer-unkept.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "retainContent": false,
+              "features": {
+                "ocr": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "save": "unkept",
+          "expect": {
+            "httpStatus": 200,
+            "result": {
+              "classification.ocr": {
+                "status": "evaluated",
+                "textRegions": [
+                  {
+                    "box": {
+                      "left": 0.1,
+                      "top": 0.2,
+                      "width": 0.5,
+                      "height": 0.1
+                    },
+                    "personalInformation": false
+                  }
+                ]
+              },
+              "content.extractedText": null
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "offer-off.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "retainContent": true,
+              "features": {
+                "linkDetection": {
+                  "enabled": false
+                }
+              }
+            }
+          },
+          "save": "off",
+          "expect": {
+            "httpStatus": 200,
+            "result": {
+              "classification.moderation.decision": "allowed",
+              "classification.ocr": null,
+              "classification.linkDetection": null,
+              "content.extractedText": null
+            }
+          }
+        }
+      ]
     }
   ]
 }

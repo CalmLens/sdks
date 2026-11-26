@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'json'
 require_relative 'classification'
 
 module CalmLens
@@ -105,6 +106,45 @@ module CalmLens
       @pending_review = { 'reason' => reason, 'uncertainCategories' => uncertain_categories.map { |category| known_category(category) } }
       self
     end
+
+    # The text OCR finds in an image, for an upload that turns OCR on: `classification.ocr` reports
+    # `text_regions` (each `{ 'box' => { 'left', 'top', 'width', 'height' }, 'personalInformation' }`),
+    # and `content.extractedText` holds `text` when the upload keeps its content.
+    # @param text [String, nil]
+    # @param text_regions [Array<Hash>]
+    # @return [self]
+    def with_ocr(text, text_regions = [])
+      raise Internal.invalid('text must be a String or nil') unless text.nil? || text.is_a?(String)
+      raise Internal.invalid('text_regions must be an Array') unless text_regions.is_a?(Array)
+
+      @ocr = { 'text' => text, 'textRegions' => MockDecision.json_copy(text_regions) }
+      self
+    end
+
+    # The QR codes (`{ 'value', 'box' }`) and links (`{ 'url', 'source' }`, `source` being `text`
+    # or `qr-code`) link detection finds in an image, reported as `classification.linkDetection`
+    # unless the upload turns link detection off.
+    # @param qr_codes [Array<Hash>]
+    # @param links [Array<Hash>]
+    # @return [self]
+    def with_link_detection(qr_codes = [], links = [])
+      raise Internal.invalid('qr_codes and links must be Arrays') unless qr_codes.is_a?(Array) && links.is_a?(Array)
+
+      @link_detection = { 'qrCodes' => MockDecision.json_copy(qr_codes), 'links' => MockDecision.json_copy(links) }
+      self
+    end
+
+    # What {#with_ocr} set, or nil.
+    # @api private
+    def ocr_findings = @ocr && MockDecision.json_copy(@ocr)
+
+    # What {#with_link_detection} set, or nil.
+    # @api private
+    def link_findings = @link_detection && MockDecision.json_copy(@link_detection)
+
+    # A deep copy with String keys, as the API's JSON has.
+    # @api private
+    def self.json_copy(value) = JSON.parse(JSON.generate(value))
 
     # The report a decided asset gets, as the API sends it: every category (unflagged ones
     # evaluated with score 0), the policy's actions, the automated status and `flaggedCategories`.

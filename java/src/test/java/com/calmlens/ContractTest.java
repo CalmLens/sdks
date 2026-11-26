@@ -633,7 +633,7 @@ class ContractTest {
     return Arrays.stream(Outcome.values()).filter(outcome -> outcome.value().equals(value)).findFirst().orElseThrow();
   }
 
-  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags, notEvaluated and pendingReview. */
+  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags, notEvaluated, OCR and link findings and pendingReview. */
   static MockDecision buildDecision(JsonElement spec) {
     if (spec.isJsonPrimitive()) return MockDecision.of(spec.getAsString());
     JsonObject object = spec.getAsJsonObject();
@@ -646,6 +646,32 @@ class ContractTest {
         decision.flag(flag.get("category").getAsString(), flag.get("score").getAsDouble(), qualifiers);
       }
     if (object.has("notEvaluated")) for (JsonElement category : object.getAsJsonArray("notEvaluated")) decision.notEvaluated(category.getAsString());
+    if (object.has("ocr")) {
+      JsonObject ocr = object.getAsJsonObject("ocr");
+      List<MockDecision.TextRegion> regions = new ArrayList<>();
+      if (ocr.has("textRegions"))
+        for (JsonElement item : ocr.getAsJsonArray("textRegions")) {
+          JsonObject region = item.getAsJsonObject(), box = region.getAsJsonObject("box");
+          regions.add(new MockDecision.TextRegion(box.get("left").getAsDouble(), box.get("top").getAsDouble(),
+              box.get("width").getAsDouble(), box.get("height").getAsDouble(), region.get("personalInformation").getAsBoolean()));
+        }
+      decision.withOcr(ocr.get("text").isJsonNull() ? null : ocr.get("text").getAsString(), regions);
+    }
+    if (object.has("linkDetection")) {
+      JsonObject found = object.getAsJsonObject("linkDetection");
+      List<MockDecision.QrCode> codes = new ArrayList<>();
+      if (found.has("qrCodes"))
+        for (JsonElement item : found.getAsJsonArray("qrCodes")) {
+          JsonObject code = item.getAsJsonObject(), box = code.getAsJsonObject("box");
+          codes.add(new MockDecision.QrCode(code.get("value").getAsString(), box.get("left").getAsDouble(),
+              box.get("top").getAsDouble(), box.get("width").getAsDouble(), box.get("height").getAsDouble()));
+        }
+      List<MockDecision.Link> links = new ArrayList<>();
+      if (found.has("links"))
+        for (JsonElement item : found.getAsJsonArray("links"))
+          links.add(new MockDecision.Link(item.getAsJsonObject().get("url").getAsString(), item.getAsJsonObject().get("source").getAsString()));
+      decision.withLinkDetection(codes, links);
+    }
     if (object.has("pendingReview")) {
       JsonObject review = object.getAsJsonObject("pendingReview");
       String reason = review.get("reason").getAsString();

@@ -1249,6 +1249,18 @@ fn build_decision(spec: &Value) -> calmlens::Result<MockDecision> {
             .collect();
         decision = decision.pending_review(review["reason"].as_str().unwrap(), &categories)?;
     }
+    if let Some(ocr) = spec.get("ocr") {
+        let regions: Vec<calmlens::models::TextRegion> =
+            serde_json::from_value(ocr["textRegions"].clone()).unwrap_or_default();
+        decision = decision.with_ocr(ocr["text"].as_str(), &regions);
+    }
+    if let Some(found) = spec.get("linkDetection") {
+        let qr_codes: Vec<calmlens::models::DetectedQrCode> =
+            serde_json::from_value(found["qrCodes"].clone()).unwrap_or_default();
+        let links: Vec<calmlens::models::DetectedLink> =
+            serde_json::from_value(found["links"].clone()).unwrap_or_default();
+        decision = decision.with_link_detection(&qr_codes, &links);
+    }
     Ok(decision)
 }
 

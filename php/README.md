@@ -12,6 +12,11 @@ CVE-2026-109619): 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later, or a distribution bui
 composer require calmlens/sdk guzzlehttp/guzzle
 ```
 
+The SDK works with Guzzle 7 and 8. To pin Guzzle 7, require it in the same command
+(`composer require calmlens/sdk guzzlehttp/guzzle:^7.9`): the SDK alone installs the PSR-7 release
+Guzzle 8 uses, so adding Guzzle 7 afterwards needs `composer require guzzlehttp/guzzle:^7.9 -W` to
+let Composer change it.
+
 The client reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_BASE_URL` when you
 don't pass them. It finds an installed PSR-18 client, or takes one as `httpClient`. With Guzzle, the
 client's `timeout`, `connectTimeout` and `uploadTimeout` apply to each attempt; configure another

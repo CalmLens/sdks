@@ -56,6 +56,30 @@ public final class MockDecision {
   private final Set<String> notEvaluated = new LinkedHashSet<>();
   private String pendingReviewReason;
   private List<String> uncertainCategories = List.of();
+  private String ocrText;
+  private List<TextRegion> textRegions;
+  private List<QrCode> qrCodes;
+  private List<Link> links;
+
+  /**
+   * Where OCR found text in an image, as {@code classification.ocr.textRegions} reports it: a box
+   * as fractions of the image width and height, from 0 to 1, and whether it holds personal
+   * information such as an email address.
+   */
+  public record TextRegion(double left, double top, double width, double height, boolean personalInformation) {}
+
+  /** A QR code link detection decoded: the text it holds and where it is, as fractions from 0 to 1. */
+  public record QrCode(String value, double left, double top, double width, double height) {
+    public QrCode { Objects.requireNonNull(value, "value"); }
+  }
+
+  /** A link link detection found, with its source: {@code text} or {@code qr-code}. */
+  public record Link(String url, String source) {
+    public Link {
+      Objects.requireNonNull(url, "url");
+      if (!"text".equals(source) && !"qr-code".equals(source)) throw invalid("a link's source must be text or qr-code");
+    }
+  }
 
   private MockDecision(MockCalmLensServerClient.Outcome status) { this.status = status; }
 
@@ -157,6 +181,83 @@ public final class MockDecision {
     pendingReviewReason = reason;
     this.uncertainCategories = List.copyOf(uncertainCategories);
     return this;
+  }
+
+  /**
+   * Sets the text OCR finds in an image, for an upload that turns OCR on: {@code
+   * classification.ocr} reports {@code textRegions}, and {@code content.extractedText} holds {@code
+   * text} when the upload keeps its content.
+   *
+   * @param text the text, or null for none
+   * @param textRegions where the text is
+   * @return this decision
+   */
+  public MockDecision withOcr(String text, List<TextRegion> textRegions) {
+    this.ocrText = text;
+    this.textRegions = List.copyOf(Objects.requireNonNull(textRegions, "textRegions"));
+    return this;
+  }
+
+  /**
+   * Sets the QR codes and links link detection finds in an image, reported as {@code
+   * classification.linkDetection} unless the upload turns link detection off.
+   *
+   * @param qrCodes the decoded QR codes
+   * @param links the links found in the image's text and QR codes
+   * @return this decision
+   */
+  public MockDecision withLinkDetection(List<QrCode> qrCodes, List<Link> links) {
+    this.qrCodes = List.copyOf(Objects.requireNonNull(qrCodes, "qrCodes"));
+    this.links = List.copyOf(Objects.requireNonNull(links, "links"));
+    return this;
+  }
+
+  private static JsonObject box(double left, double top, double width, double height) {
+    JsonObject box = new JsonObject();
+    box.addProperty("left", left);
+    box.addProperty("top", top);
+    box.addProperty("width", width);
+    box.addProperty("height", height);
+    return box;
+  }
+
+  /** The OCR text {@link #withOcr} set, or null. */
+  String ocrText() { return ocrText; }
+
+  /** {@code textRegions} as the API's JSON has them: what {@link #withOcr} set, or none. */
+  JsonArray textRegionsJson() {
+    JsonArray regions = new JsonArray();
+    for (TextRegion region : textRegions == null ? List.<TextRegion>of() : textRegions) {
+      JsonObject item = new JsonObject();
+      item.add("box", box(region.left(), region.top(), region.width(), region.height()));
+      item.addProperty("personalInformation", region.personalInformation());
+      regions.add(item);
+    }
+    return regions;
+  }
+
+  /** {@code qrCodes} as the API's JSON has them: what {@link #withLinkDetection} set, or none. */
+  JsonArray qrCodesJson() {
+    JsonArray codes = new JsonArray();
+    for (QrCode code : qrCodes == null ? List.<QrCode>of() : qrCodes) {
+      JsonObject item = new JsonObject();
+      item.addProperty("value", code.value());
+      item.add("box", box(code.left(), code.top(), code.width(), code.height()));
+      codes.add(item);
+    }
+    return codes;
+  }
+
+  /** {@code links} as the API's JSON has them: what {@link #withLinkDetection} set, or none. */
+  JsonArray linksJson() {
+    JsonArray found = new JsonArray();
+    for (Link link : links == null ? List.<Link>of() : links) {
+      JsonObject item = new JsonObject();
+      item.addProperty("url", link.url());
+      item.addProperty("source", link.source());
+      found.add(item);
+    }
+    return found;
   }
 
   private void checkFinding(String category) {

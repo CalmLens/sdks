@@ -1241,6 +1241,10 @@ def _build_decision(spec: Any) -> testing.MockDecision:
     review = spec.get("pendingReview")
     if review is not None:
         decision.pending_review(review["reason"], review.get("uncertainCategories", []))
+    if (ocr := spec.get("ocr")) is not None:
+        decision.with_ocr(ocr["text"], ocr.get("textRegions", []))
+    if (links := spec.get("linkDetection")) is not None:
+        decision.with_link_detection(links.get("qrCodes", []), links.get("links", []))
     return decision
 
 

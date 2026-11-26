@@ -1828,9 +1828,9 @@ func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued b
 }
 
 // decide applies a moderation decision to a processing asset, with its report; a pending
-// decision leaves it processing. Like the API for an image with no text, QR codes or people in
-// it, a decided image reports OCR and person and face detection when its upload turned them on,
-// and link detection unless it turned it off.
+// decision leaves it processing. A decided image reports OCR and person and face detection when
+// its upload turned them on, and link detection unless it turned it off: the OCR and link
+// findings the decision supplies (WithOCR, WithLinkDetection), and no people or faces.
 func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if decision.status == OutcomePending {
 		return
@@ -1842,10 +1842,22 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	}
 	features := asJSON(m.processingOptions[a["id"].(string)]["features"])
 	if enabled, _ := asJSON(features["ocr"])["enabled"].(bool); enabled {
-		classification["ocr"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "textRegions": []any{}}
+		regions := []any{}
+		if ocr := decision.ocr; ocr != nil {
+			regions = cloneJSON(ocr.regions).([]any)
+			if content := section(a, "content"); ocr.text != "" && content["status"] == string(calmlens.ContentStatusStored) {
+				content["extractedText"] = calmlens.JSON{"type": "string", "content": ocr.text}
+			}
+		}
+		classification["ocr"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "textRegions": regions}
 	}
 	if enabled, set := asJSON(features["linkDetection"])["enabled"].(bool); enabled || !set {
-		classification["linkDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "qrCodes": []any{}, "links": []any{}}
+		found := calmlens.JSON{"qrCodes": []any{}, "links": []any{}}
+		if decision.linkDetection != nil {
+			found = cloneJSON(decision.linkDetection).(calmlens.JSON)
+		}
+		found["status"] = string(calmlens.ResultEvaluated)
+		classification["linkDetection"] = found
 	}
 	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
 		classification["personDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "people": []any{}}

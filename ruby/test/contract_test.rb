@@ -120,6 +120,9 @@ class ContractTest < Minitest::Test
     spec.fetch('notEvaluated', []).each { |category| decision.not_evaluated(category) }
     review = spec['pendingReview']
     decision.pending_review(review['reason'], review.fetch('uncertainCategories', [])) if review
+    decision.with_ocr(spec['ocr']['text'], spec['ocr'].fetch('textRegions', [])) if spec['ocr']
+    links = spec['linkDetection']
+    decision.with_link_detection(links.fetch('qrCodes', []), links.fetch('links', [])) if links
     decision
   end
 

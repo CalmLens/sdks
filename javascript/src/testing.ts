@@ -18,9 +18,12 @@ export type {
 export { MockCalmLensServerClient } from "./testing/MockCalmLensServerClient";
 export type {
   MockAssetOutcome,
+  MockDetectedLink,
   MockModerate,
   MockModerationInput,
   MockModerationTrigger,
+  MockQrCode,
+  MockTextRegion,
 } from "./testing/MockDecision";
 export { MockDecision, mockDecision } from "./testing/MockDecision";
 export type {

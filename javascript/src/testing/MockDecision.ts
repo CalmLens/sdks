@@ -37,6 +37,17 @@ const STATUS_ACTION = {
 
 type Category = (typeof MOCK_CATEGORIES)[number];
 
+type EvaluatedFeature<K extends "ocr" | "linkDetection"> = Extract<
+  NonNullable<Asset["classification"][K]>,
+  { status: "evaluated" }
+>;
+/** A region of text OCR found, as `classification.ocr.textRegions` reports one. */
+export type MockTextRegion = EvaluatedFeature<"ocr">["textRegions"][number];
+/** A QR code link detection decoded, as `classification.linkDetection.qrCodes` reports one. */
+export type MockQrCode = EvaluatedFeature<"linkDetection">["qrCodes"][number];
+/** A link found in an image's text or QR codes, as `classification.linkDetection.links` reports one. */
+export type MockDetectedLink = EvaluatedFeature<"linkDetection">["links"][number];
+
 /** Why a decision waits for human review: `sampled`, or `uncertain` about some categories. */
 export type MockPendingReviewReason = "sampled" | "uncertain";
 
@@ -69,6 +80,8 @@ export class MockDecision {
   >();
   readonly #notEvaluated = new Set<Category>();
   #pendingReview?: { reason: MockPendingReviewReason; uncertainCategories: Category[] };
+  #ocr?: { text: string | null; textRegions: MockTextRegion[] };
+  #linkDetection?: { qrCodes: MockQrCode[]; links: MockDetectedLink[] };
 
   constructor(status: MockAssetOutcome) {
     if (!OUTCOMES.includes(status)) {
@@ -135,6 +148,34 @@ export class MockDecision {
     for (const category of uncertainCategories) this.#checkCategory(category);
     this.#pendingReview = { reason, uncertainCategories: [...uncertainCategories] };
     return this;
+  }
+
+  /**
+   * The text OCR finds in an image, for an upload that turns OCR on: `classification.ocr` reports
+   * `textRegions`, and `content.extractedText` holds `text` when the upload keeps its content.
+   */
+  withOcr(text: string | null, textRegions: MockTextRegion[] = []): this {
+    this.#ocr = { text, textRegions: structuredClone(textRegions) };
+    return this;
+  }
+
+  /**
+   * The QR codes and links link detection finds in an image, reported as
+   * `classification.linkDetection` unless the upload turns link detection off.
+   */
+  withLinkDetection(qrCodes: MockQrCode[] = [], links: MockDetectedLink[] = []): this {
+    this.#linkDetection = { qrCodes: structuredClone(qrCodes), links: structuredClone(links) };
+    return this;
+  }
+
+  /** @internal What `withOcr` set, if anything. */
+  get ocrFindings(): { text: string | null; textRegions: MockTextRegion[] } | undefined {
+    return this.#ocr && structuredClone(this.#ocr);
+  }
+
+  /** @internal What `withLinkDetection` set, if anything. */
+  get linkFindings(): { qrCodes: MockQrCode[]; links: MockDetectedLink[] } | undefined {
+    return this.#linkDetection && structuredClone(this.#linkDetection);
   }
 
   #checkCategory(category: string): asserts category is Category {

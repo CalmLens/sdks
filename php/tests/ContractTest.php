@@ -1069,6 +1069,12 @@ final class ContractTest extends TestCase
         if (isset($spec['pendingReview'])) {
             $decision->pendingReview($spec['pendingReview']['reason'], $spec['pendingReview']['uncertainCategories'] ?? []);
         }
+        if (isset($spec['ocr'])) {
+            $decision->withOcr($spec['ocr']['text'], $spec['ocr']['textRegions'] ?? []);
+        }
+        if (isset($spec['linkDetection'])) {
+            $decision->withLinkDetection($spec['linkDetection']['qrCodes'] ?? [], $spec['linkDetection']['links'] ?? []);
+        }
         return $decision;
     }
 

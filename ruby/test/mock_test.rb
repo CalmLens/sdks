@@ -18,6 +18,17 @@ class MockTest < Minitest::Test
     assert mock.state.content.key?(asset['id'])
   end
 
+  def test_typed_responses_fetch_fields_as_a_hash_does
+    mock = CalmLens::MockServerClient.new
+    asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, description: nil)
+    # By reader name or API key, including a field sent as null.
+    assert_equal [asset.id, asset.id, nil], [asset.fetch(:id), asset.fetch('id'), asset.fetch(:description)]
+    assert_equal ['fallback', 'missing nothing_here'],
+                 [asset.fetch(:nothing_here, 'fallback'), asset.fetch(:nothing_here) { |key| "missing #{key}" }]
+    error = assert_raises(KeyError) { asset.fetch(:nothing_here) }
+    assert_equal [asset, :nothing_here], [error.receiver, error.key]
+  end
+
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector_beneath_the_grant
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)

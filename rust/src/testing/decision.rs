@@ -2,7 +2,7 @@
 //! [`MockServerClient::complete_processing`](super::MockServerClient::complete_processing).
 use super::classification::{CATEGORIES, QUALIFIERS};
 use crate::error::ErrorCode;
-use crate::models::Asset;
+use crate::models::{Asset, DetectedLink, DetectedQrCode, TextRegion};
 use crate::{Error, Result};
 use serde_json::{json, Map, Value};
 use std::{fmt, str::FromStr};
@@ -159,6 +159,8 @@ pub struct MockDecision {
     flags: Vec<Flag>,
     not_evaluated: Vec<&'static str>,
     pending_review: Option<PendingReview>,
+    ocr: Option<(Option<String>, Value)>,
+    link_detection: Option<Value>,
 }
 impl From<MockOutcome> for MockDecision {
     fn from(status: MockOutcome) -> Self {
@@ -173,6 +175,8 @@ impl MockDecision {
             flags: Vec::new(),
             not_evaluated: Vec::new(),
             pending_review: None,
+            ocr: None,
+            link_detection: None,
         }
     }
     /// The decision's status.
@@ -261,6 +265,35 @@ impl MockDecision {
             uncertain_categories,
         });
         Ok(self)
+    }
+    /// The text OCR finds in an image, for an upload that turns OCR on: `classification.ocr`
+    /// reports `text_regions`, and `content.extractedText` holds `text` when the upload keeps its
+    /// content.
+    pub fn with_ocr(mut self, text: Option<&str>, text_regions: &[TextRegion]) -> Self {
+        let regions = serde_json::to_value(text_regions).unwrap_or_else(|_| json!([]));
+        self.ocr = Some((text.map(str::to_owned), regions));
+        self
+    }
+    /// The QR codes and links link detection finds in an image, reported as
+    /// `classification.linkDetection` unless the upload turns link detection off.
+    pub fn with_link_detection(
+        mut self,
+        qr_codes: &[DetectedQrCode],
+        links: &[DetectedLink],
+    ) -> Self {
+        self.link_detection = Some(json!({
+            "qrCodes": serde_json::to_value(qr_codes).unwrap_or_else(|_| json!([])),
+            "links": serde_json::to_value(links).unwrap_or_else(|_| json!([])),
+        }));
+        self
+    }
+    /// What `with_ocr` set: the text and `textRegions` JSON.
+    pub(crate) fn ocr_findings(&self) -> Option<&(Option<String>, Value)> {
+        self.ocr.as_ref()
+    }
+    /// What `with_link_detection` set: `{qrCodes, links}` JSON.
+    pub(crate) fn link_findings(&self) -> Option<&Value> {
+        self.link_detection.as_ref()
     }
     /// The known category named `category`, which must not be in this decision yet.
     fn check_new(&self, category: &str) -> Result<&'static str> {

@@ -129,6 +129,8 @@ type DecisionSpec =
       flags?: { category: string; score: number; qualifiers?: Record<string, number> }[];
       notEvaluated?: string[];
       pendingReview?: { reason: string; uncertainCategories?: string[] };
+      ocr?: { text: string | null; textRegions?: unknown[] };
+      linkDetection?: { qrCodes?: unknown[]; links?: unknown[] };
     };
 type Scenario = {
   name: string;
@@ -193,6 +195,13 @@ const buildDecision = (spec: DecisionSpec) => {
   if (spec.pendingReview) {
     const { reason, uncertainCategories } = spec.pendingReview;
     decision.pendingReview(reason as never, uncertainCategories as never);
+  }
+  if (spec.ocr) decision.withOcr(spec.ocr.text, spec.ocr.textRegions as never);
+  if (spec.linkDetection) {
+    decision.withLinkDetection(
+      spec.linkDetection.qrCodes as never,
+      spec.linkDetection.links as never,
+    );
   }
   return decision;
 };

@@ -30,9 +30,9 @@ final class MockDecision
     /** @var ?array{reason: string, uncertainCategories: list<string>} */
     private ?array $pendingReview = null;
 
-    /** @var ?array{text: ?string, textRegions: list<array{box: list<int>, personalInformation: bool}>} */
+    /** @var ?array{text: ?string, textRegions: list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, personalInformation: bool}>} */
     private ?array $ocr = null;
-    /** @var ?array{qrCodes: list<array{value: string, box: list<int>}>, links: list<array{url: string, source: 'qr-code'|'text'}>} */
+    /** @var ?array{qrCodes: list<array{value: string, box: array{left: int|float, top: int|float, width: int|float, height: int|float}}>, links: list<array{url: string, source: 'qr-code'|'text'}>} */
     private ?array $linkDetection = null;
 
     private function __construct(public readonly string $status)
@@ -112,7 +112,7 @@ final class MockDecision
      * Sets evaluated OCR findings for image uploads that enabled OCR. Text is kept only when the
      * mock retains the asset's content.
      *
-     * @param list<array{box: list<int>, personalInformation: bool}> $textRegions
+     * @param list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, personalInformation: bool}> $textRegions
      */
     public function withOcr(?string $text, array $textRegions = []): self
     {
@@ -123,7 +123,7 @@ final class MockDecision
     /**
      * Sets evaluated QR codes and links for image uploads with link detection enabled.
      *
-     * @param list<array{value: string, box: list<int>}> $qrCodes
+     * @param list<array{value: string, box: array{left: int|float, top: int|float, width: int|float, height: int|float}}> $qrCodes
      * @param list<array{url: string, source: 'qr-code'|'text'}> $links
      */
     public function withLinkDetection(array $qrCodes = [], array $links = []): self

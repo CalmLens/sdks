@@ -118,6 +118,8 @@ class MockDecision:
         self._flags: dict[str, tuple[float, list[tuple[str, float]]]] = {}
         self._not_evaluated: set[str] = set()
         self._pending_review: tuple[str, list[str]] | None = None
+        self._ocr: dict[str, Any] | None = None
+        self._link_detection: dict[str, Any] | None = None
 
     def flag(self, category: str, score: float, qualifiers: Mapping[str, float] | None = None) -> MockDecision:
         """Record findings in ``category`` with its ``score`` (0 to 1) and, optionally, scores for
@@ -158,6 +160,23 @@ class MockDecision:
             if category not in CATEGORIES:
                 raise _invalid(f"{category} is not a CalmLens category")
         self._pending_review = (reason, categories)
+        return self
+
+    def with_ocr(self, text: str | None, text_regions: Sequence[Mapping[str, Any]] = ()) -> MockDecision:
+        """The text OCR finds in an image, for an upload that turns OCR on: ``classification.ocr``
+        reports ``text_regions`` (each ``{"box": {"left", "top", "width", "height"},
+        "personalInformation"}``), and ``content.extractedText`` holds ``text`` when the upload
+        keeps its content."""
+        self._ocr = {"text": text, "textRegions": copy.deepcopy([dict(region) for region in text_regions])}
+        return self
+
+    def with_link_detection(self, qr_codes: Sequence[Mapping[str, Any]] = (),
+                            links: Sequence[Mapping[str, Any]] = ()) -> MockDecision:
+        """The QR codes (``{"value", "box"}``) and links (``{"url", "source"}``, ``source`` being
+        ``text`` or ``qr-code``) link detection finds in an image, reported as
+        ``classification.linkDetection`` unless the upload turns link detection off."""
+        self._link_detection = {"qrCodes": copy.deepcopy([dict(code) for code in qr_codes]),
+                                "links": copy.deepcopy([dict(link) for link in links])}
         return self
 
     def _check_finding(self, category: str) -> None:
@@ -1960,18 +1979,24 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return _to_decision(self.moderate(moderation))
 
     def _decided(self, asset: dict[str, Any], decision: MockDecision) -> None:
-        """Decide ``asset`` as ``decision`` says, with its report. Like the API for an image with no
-        text, codes, people or faces in it, a decided image reports the OCR and person and face
-        detection its upload turned on, and link detection unless it was turned off."""
+        """Decide ``asset`` as ``decision`` says, with its report. A decided image reports the OCR
+        and person and face detection its upload turned on, and link detection unless it was
+        turned off: OCR and link findings from :meth:`MockDecision.with_ocr` and
+        :meth:`MockDecision.with_link_detection`, and no people or faces."""
         self._apply_outcome(asset, decision.status, "policy", decision.report(self.now()))
         classification = asset["classification"]
         if classification["status"] != "completed" or asset["type"] != "image":
             return
         features = self._processing_options.get(asset["id"], {}).get("features") or {}
+        # The mock reads nothing in an image: features find only what the decision supplies.
         if (features.get("ocr") or {}).get("enabled") is True:
-            classification["ocr"] = {"status": "evaluated", "textRegions": []}
+            ocr = copy.deepcopy(decision._ocr) or {"text": None, "textRegions": []}
+            classification["ocr"] = {"status": "evaluated", "textRegions": ocr["textRegions"]}
+            if ocr["text"] is not None and asset["content"]["status"] == "stored":
+                asset["content"]["extractedText"] = {"type": "string", "content": ocr["text"]}
         if (features.get("linkDetection") or {}).get("enabled") is not False:
-            classification["linkDetection"] = {"status": "evaluated", "qrCodes": [], "links": []}
+            found = decision._link_detection or {"qrCodes": [], "links": []}
+            classification["linkDetection"] = {"status": "evaluated", **copy.deepcopy(found)}
         if (features.get("personDetection") or {}).get("enabled") is True:
             classification["personDetection"] = {"status": "evaluated", "people": []}
         if (features.get("faceDetection") or {}).get("enabled") is True:

@@ -838,20 +838,33 @@ final class MockApi {
   }
 
   /**
-   * Applies a decided or failed {@code decision} and its report. The mock reads no text, QR codes,
-   * people or faces in an image, so like the API for an image without them, a decided image
-   * reports empty results for OCR, person and face detection when its upload turned them on, and
-   * for link detection unless its upload turned it off.
+   * Applies a decided or failed {@code decision} and its report. The mock reads nothing in an
+   * image, so a decided image reports the OCR and link findings the decision supplies ({@link
+   * MockDecision#withOcr}, {@link MockDecision#withLinkDetection}) and no people or faces: OCR,
+   * person and face detection when its upload turned them on, and link detection unless its upload
+   * turned it off.
    */
   private void decided(JsonObject asset, MockDecision decision) {
     long now = now();
     applyOutcome(asset, decision.status(), "policy", now, decision.report(now));
     JsonObject classification = asset.getAsJsonObject("classification");
     if (!"completed".equals(str(classification, "status")) || !"image".equals(str(asset, "type"))) return;
-    if (feature(asset, "ocr") == Boolean.TRUE) classification.add("ocr", evaluated("textRegions"));
+    if (feature(asset, "ocr") == Boolean.TRUE) {
+      JsonObject ocr = evaluated("textRegions");
+      ocr.add("textRegions", decision.textRegionsJson());
+      classification.add("ocr", ocr);
+      JsonObject content = asset.getAsJsonObject("content");
+      if (decision.ocrText() != null && "stored".equals(str(content, "status"))) {
+        JsonObject extracted = new JsonObject();
+        extracted.addProperty("type", "string");
+        extracted.addProperty("content", decision.ocrText());
+        content.add("extractedText", extracted);
+      }
+    }
     if (feature(asset, "linkDetection") != Boolean.FALSE) {
       JsonObject links = evaluated("qrCodes");
-      links.add("links", new JsonArray());
+      links.add("qrCodes", decision.qrCodesJson());
+      links.add("links", decision.linksJson());
       classification.add("linkDetection", links);
     }
     if (feature(asset, "personDetection") == Boolean.TRUE) classification.add("personDetection", evaluated("people"));

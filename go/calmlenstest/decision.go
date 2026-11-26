@@ -102,11 +102,51 @@ type flag struct {
 // failed decision, or a review PendingReview refuses makes Err return an sdk/invalid-argument
 // *calmlens.Error, and the mock returns that error from the call that uses the decision.
 type Decision struct {
-	status       string
-	flags        map[string]flag
-	notEvaluated map[string]bool
-	review       *pendingReview
-	err          error
+	status        string
+	flags         map[string]flag
+	notEvaluated  map[string]bool
+	review        *pendingReview
+	ocr           *ocrFindings
+	linkDetection calmlens.JSON
+	err           error
+}
+
+// ocrFindings is what WithOCR set: the text and where it was.
+type ocrFindings struct {
+	text    string
+	regions []any
+}
+
+// boxJSON is box as the API's JSON has it.
+func boxJSON(box calmlens.BoundingBox) calmlens.JSON {
+	return calmlens.JSON{"left": box.Left, "top": box.Top, "width": box.Width, "height": box.Height}
+}
+
+// WithOCR sets the text OCR finds in an image, for an upload that turns OCR on:
+// classification.ocr reports textRegions, and content.extractedText holds text when the upload
+// keeps its content (an empty text leaves it null).
+func (d *Decision) WithOCR(text string, textRegions ...calmlens.TextRegion) *Decision {
+	regions := make([]any, 0, len(textRegions))
+	for _, region := range textRegions {
+		regions = append(regions, calmlens.JSON{"box": boxJSON(region.Box), "personalInformation": region.PersonalInformation})
+	}
+	d.ocr = &ocrFindings{text: text, regions: regions}
+	return d
+}
+
+// WithLinkDetection sets the QR codes and links link detection finds in an image, reported as
+// classification.linkDetection unless the upload turns link detection off.
+func (d *Decision) WithLinkDetection(qrCodes []calmlens.DetectedQRCode, links []calmlens.DetectedLink) *Decision {
+	codes := make([]any, 0, len(qrCodes))
+	for _, code := range qrCodes {
+		codes = append(codes, calmlens.JSON{"value": code.Value, "box": boxJSON(code.Box)})
+	}
+	found := make([]any, 0, len(links))
+	for _, link := range links {
+		found = append(found, calmlens.JSON{"url": link.URL, "source": string(link.Source)})
+	}
+	d.linkDetection = calmlens.JSON{"qrCodes": codes, "links": found}
+	return d
 }
 
 // pendingReview is the review a decision waits for.

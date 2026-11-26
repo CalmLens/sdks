@@ -1075,8 +1075,9 @@ module CalmLens
       # Without `moderate`, queued work stays pending until completed, which allows it.
       def default_moderation(trigger, queued) = queued && trigger != 'complete' ? 'pending' : 'allowed'
 
-      # Applies `decision` to `asset` with its report. The mock reads no text, QR codes, people or
-      # faces in an image, so a decided image reports that the features its upload ran found nothing:
+      # Applies `decision` to `asset` with its report. The mock reads nothing in an image, so a
+      # decided image reports what the decision supplies ({MockDecision#with_ocr},
+      # {MockDecision#with_link_detection}) and no people or faces, for the features its upload ran:
       # OCR and person and face detection when turned on, link detection unless turned off.
       def decided(asset, decision)
         apply_outcome(asset, decision.status, 'policy', decision.report(@now.call))
@@ -1086,9 +1087,15 @@ module CalmLens
         processing = @processing_options[asset['id']]
         features = processing.is_a?(Hash) && processing['features'].is_a?(Hash) ? processing['features'] : {}
         setting = ->(name) { features[name].is_a?(Hash) ? features[name]['enabled'] : nil }
-        classification['ocr'] = { 'status' => 'evaluated', 'textRegions' => [] } if setting.call('ocr') == true
+        if setting.call('ocr') == true
+          ocr = decision.ocr_findings || { 'text' => nil, 'textRegions' => [] }
+          classification['ocr'] = { 'status' => 'evaluated', 'textRegions' => ocr['textRegions'] }
+          if !ocr['text'].nil? && asset['content']['status'] == 'stored'
+            asset['content']['extractedText'] = { 'type' => 'string', 'content' => ocr['text'] }
+          end
+        end
         unless setting.call('linkDetection') == false
-          classification['linkDetection'] = { 'status' => 'evaluated', 'qrCodes' => [], 'links' => [] }
+          classification['linkDetection'] = { 'status' => 'evaluated' }.merge(decision.link_findings || { 'qrCodes' => [], 'links' => [] })
         end
         { 'personDetection' => 'people', 'faceDetection' => 'faces' }.each do |feature, list|
           classification[feature] = { 'status' => 'evaluated', list => [] } if setting.call(feature) == true

@@ -2559,16 +2559,25 @@ export class MockCalmLensApi {
     );
     const features = this.processingOptions.get(asset.id)?.features;
     if (next.classification.status !== "completed" || asset.type !== "image") return next;
+    // The mock reads nothing in an image: features find only what the decision supplies
+    // (`withOcr`, `withLinkDetection`), and no people or faces.
+    const ocr = features?.ocr?.enabled === true ? decision.ocrFindings : undefined;
     return {
       ...next,
+      ...(ocr?.text != null &&
+        next.content.status === "stored" && {
+          content: { ...next.content, extractedText: { type: "string", content: ocr.text } },
+        }),
       classification: {
         ...next.classification,
-        // The mock reads no text, QR codes, people or faces in an image: features find nothing.
         ...(features?.ocr?.enabled === true && {
-          ocr: { status: "evaluated", textRegions: [] },
+          ocr: { status: "evaluated", textRegions: ocr?.textRegions ?? [] },
         }),
         ...(features?.linkDetection?.enabled !== false && {
-          linkDetection: { status: "evaluated", qrCodes: [], links: [] },
+          linkDetection: {
+            status: "evaluated",
+            ...(decision.linkFindings ?? { qrCodes: [], links: [] }),
+          },
         }),
         ...(features?.personDetection?.enabled === true && {
           personDetection: { status: "evaluated", people: [] },

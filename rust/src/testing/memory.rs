@@ -1631,14 +1631,26 @@ impl Backend {
             .processing_options
             .get(text(&asset["id"]))
             .map_or(Value::Null, |options| options["features"].clone());
-        // The mock reads no text, QR codes, people or faces in an image: features find nothing.
-        let classification = &mut asset["classification"];
+        // The mock reads nothing in an image: features find only what the decision supplies
+        // (`with_ocr`, `with_link_detection`), and no people or faces.
         if features["ocr"]["enabled"] == true {
-            classification["ocr"] = json!({"status": "evaluated", "textRegions": []});
+            let (text, regions) = decision
+                .ocr_findings()
+                .cloned()
+                .unwrap_or((None, json!([])));
+            if let Some(text) = text.filter(|_| asset["content"]["status"] == "stored") {
+                asset["content"]["extractedText"] = json!({"type": "string", "content": text});
+            }
+            asset["classification"]["ocr"] = json!({"status": "evaluated", "textRegions": regions});
         }
+        let classification = &mut asset["classification"];
         if features["linkDetection"]["enabled"] != false {
-            classification["linkDetection"] =
-                json!({"status": "evaluated", "qrCodes": [], "links": []});
+            let mut found = decision
+                .link_findings()
+                .cloned()
+                .unwrap_or_else(|| json!({"qrCodes": [], "links": []}));
+            found["status"] = json!("evaluated");
+            classification["linkDetection"] = found;
         }
         for (feature, list) in [("personDetection", "people"), ("faceDetection", "faces")] {
             if features[feature]["enabled"] == true {

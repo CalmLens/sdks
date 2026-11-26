@@ -110,6 +110,20 @@ module CalmLens
       rest.empty? || value.nil? ? value : value.dig(*rest)
     end
 
+    # The value of a field, as Hash#fetch reads one: a field the API didn't send returns the block's
+    # value or `default`, or raises KeyError. A field sent as null returns nil.
+    #   asset.fetch(:description, '') # => '' when the API sent no description
+    def fetch(key, *default)
+      raise ArgumentError, "wrong number of arguments (given #{default.size + 1}, expected 1..2)" if default.size > 1
+
+      name = name_of(key)
+      return @values[name] if @values.key?(name)
+      return yield(key) if block_given?
+      return default.first unless default.empty?
+
+      raise KeyError.new("key not found: #{key.inspect}", receiver: self, key: key)
+    end
+
     # The values of several fields, by reader name or API key.
     def values_at(*keys) = keys.map { |key| self[key] }
 
