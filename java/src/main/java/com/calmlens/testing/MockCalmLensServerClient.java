@@ -244,7 +244,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
      * @param value returns a new ID for an object of the kind the prefix names ({@code asset},
      *     {@code fldr}, {@code hl}, {@code hle}, {@code pol}, {@code lens}, {@code evt} or {@code rev}); by
      *     default, like the API, the prefix, {@code _} and 20 random base62 characters, such as
-     *     {@code asset_5Gm2Rk8XqT3wLp9VbN4c}
+     *     {@code asset_e5Gm2Rk8XqT3wLp9VbN4}
      * @return these options
      */
     public Options createId(java.util.function.Function<String, String> value) { createId = Objects.requireNonNull(value, "createId"); return this; }

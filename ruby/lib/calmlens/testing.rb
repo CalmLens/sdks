@@ -160,7 +160,7 @@ module CalmLens
     #   increasing `createdAt` and order predictably. A clock you pass is used as is.
     # @param create_id [#call] receives the prefix of the kind of object (`asset`, `fldr`, `hl`, `hle`, `lens`,
     #   `evt` or `rev`) and returns a new ID. The default is like the API's: the prefix, `_` and 20 random base62
-    #   characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+    #   characters, such as `asset_e5Gm2Rk8XqT3wLp9VbN4`.
     # @param moderate [#call, nil] decides each asset the mock moderates. It receives a
     #   {MockModerationInput} (the stored asset, its content, the trigger and whether the API would
     #   queue the work) and returns a status from {MockDecision::STATUSES} or a {MockDecision}. It is

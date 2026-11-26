@@ -57,7 +57,7 @@ export interface MockCalmLensServerClientOptions
     /**
      * Returns a new ID for an object of the kind `prefix` names (`asset`, `fldr`, `hl`, `hle`,
      * `lens`, `evt` or `rev`). The default is like the API's: the prefix, `_` and 20 random
-     * base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+     * base62 characters, such as `asset_e5Gm2Rk8XqT3wLp9VbN4`.
      */
     createId?: (prefix: IdPrefix) => string;
     /**

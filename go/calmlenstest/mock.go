@@ -103,7 +103,7 @@ type Options struct {
 	ImageStorage    *InMemoryImageStorage
 	// CreateID returns a new ID for an object of the kind prefix names ("asset", "fldr", "hl",
 	// "hle", "lens", "evt" or "rev"). The default is like the API's: the prefix, "_" and 20
-	// random base62 characters, such as asset_5Gm2Rk8XqT3wLp9VbN4c.
+	// random base62 characters, such as asset_e5Gm2Rk8XqT3wLp9VbN4.
 	CreateID func(prefix string) string
 	// Now returns the current time in unix milliseconds. The default clock is the wall clock,
 	// advanced by at least 1 ms per reading so assets created in a row have strictly increasing

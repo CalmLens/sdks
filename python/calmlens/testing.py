@@ -669,7 +669,7 @@ class MockOptions(TypedDict, total=False):
     image_storage: InMemoryMockImageStorage
     #: Returns a new ID for an object of the kind its prefix names: ``asset``, ``fldr``, ``hl``,
     #: ``hle``, ``lens``, ``evt`` or ``rev``. The default is like the API's: the prefix, ``_`` and
-    #: 20 random base62 characters, such as ``asset_5Gm2Rk8XqT3wLp9VbN4c``.
+    #: 20 random base62 characters, such as ``asset_e5Gm2Rk8XqT3wLp9VbN4``.
     create_id: Callable[[str], str]
     #: Returns the current time in milliseconds since the Unix epoch. The default is the
     #: system clock, moved on by at least a millisecond per reading, so assets created in a row

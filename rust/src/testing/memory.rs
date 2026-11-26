@@ -330,7 +330,7 @@ impl MockOptions {
     }
     /// Creates the ID of a new object of the kind its prefix names (`asset`, `fldr`, `hl`, `hle`,
     /// `lens`, `evt`, `rev` or `batch`). The default is like the API's: the prefix, `_` and 20 random
-    /// base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+    /// base62 characters, such as `asset_e5Gm2Rk8XqT3wLp9VbN4`.
     pub fn create_id(mut self, value: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
         self.create_id = Arc::new(value);
         self

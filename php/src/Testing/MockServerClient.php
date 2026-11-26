@@ -199,7 +199,7 @@ final class MockServerClient
      *   downloads of private and age-restricted content; the default key has none.
      * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
      *   `hle`, `pol`, `lens`, `preset`, `evt`, `rev` or `batch`) and returns the ID; by default, like the API, the prefix, `_`
-     *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
+     *   and 20 random base62 characters, such as `asset_e5Gm2Rk8XqT3wLp9VbN4`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
      * @param int|float|null $uploadTimeout the mock's client's binary upload timeout, as for `ServerClient`.

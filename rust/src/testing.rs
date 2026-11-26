@@ -64,7 +64,7 @@ pub struct Request {
     /// Full request URL, including the configured base URL and query string.
     pub url: String,
     /// The path relative to the API (or CDN) base URL, each segment decoded, e.g.
-    /// `/projects/project-1/assets` or `/assets/asset_5Gm2Rk8XqT3wLp9VbN4c`. A request to
+    /// `/projects/project-1/assets` or `/assets/asset_e5Gm2Rk8XqT3wLp9VbN4`. A request to
     /// neither base URL keeps its whole decoded URL path.
     pub path: String,
     /// Decoded query parameters in request order.
