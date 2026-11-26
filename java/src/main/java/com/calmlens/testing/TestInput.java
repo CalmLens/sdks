@@ -59,7 +59,7 @@ public record TestInput(List<RegionalAction> regionalActions, List<String> unass
    *
    * @param category one of the 8 moderation categories, such as {@code harassment}
    * @param score the confidence from 0 to 1, or null for the default
-   * @param action {@code allow}, {@code limit}, {@code age-restrict} or {@code block}, or null to let
+   * @param action {@code limit}, {@code age-restrict} or {@code block}, or null to let
    *     the project's policy decide; either every instance of a scenario has an action or none does
    * @param qualifiers unique qualifiers of the category, at most 64; qualifiers the input type sets,
    *     such as {@code sexual-text}, are added automatically and cannot be listed

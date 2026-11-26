@@ -594,7 +594,7 @@ module CalmLens
   # Signed test inputs: text codes, test images and media phrases signed with a project's secret
   # test input key from the portal.
   module TestInputs
-    type action = "allow" | "limit" | "age-restrict" | "block"
+    type action = "limit" | "age-restrict" | "block"
     type region = moderation_region
     type regional_action = { "region" => region, "action" => "limit" | "age-restrict" | "block" }
     # One qualifying instance; set an action on every instance or on none.

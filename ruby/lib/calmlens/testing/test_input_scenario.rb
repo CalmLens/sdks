@@ -9,7 +9,7 @@ module CalmLens
     # Checks test input scenarios and writes them as the backend's canonical JSON.
     # @api private
     module Scenario
-      ACTIONS = %w[allow limit age-restrict block].freeze
+      ACTIONS = %w[limit age-restrict block].freeze
       REGIONAL_ACTIONS = %w[limit age-restrict block].freeze
       # The qualifiers a scenario may list for each category: all but those the input type sets.
       ALLOWED_QUALIFIERS = MockClassification::QUALIFIERS.transform_values do |list|

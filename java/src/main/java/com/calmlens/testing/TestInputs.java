@@ -127,7 +127,7 @@ public final class TestInputs {
       .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey,
           entry -> entry.getValue().stream().filter(q -> !MockClassification.INPUT_QUALIFIERS.contains(q)).toList()));
 
-  private static final List<String> ACTIONS = List.of("allow", "limit", "age-restrict", "block");
+  private static final List<String> ACTIONS = List.of("limit", "age-restrict", "block");
   private static final List<String> REGIONS = List.of("DE", "AT", "FR", "GB", "EU", "AU", "BR");
   private static final List<String> REGIONAL_ACTIONS = List.of("limit", "age-restrict", "block");
   private static final Pattern KEY = Pattern.compile("[a-f0-9]{32}");

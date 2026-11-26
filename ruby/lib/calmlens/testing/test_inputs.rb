@@ -17,7 +17,7 @@ module CalmLens
   # 'instances' => [{ 'category' => 'harassment', 'score' => 0.9, 'action' => 'block', 'qualifiers' => ['harassment-abuse'] }] }`.
   # `instances` (at most 128) and each instance's `qualifiers` (unique qualifiers of its category, at
   # most 64; input-type qualifiers such as `sexual-text` are automatic) are required; `score` (0 to
-  # 1) and `action` (`allow`, `limit`, `age-restrict` or `block`, on every instance or none) are
+  # 1) and `action` (`limit`, `age-restrict` or `block`, on every instance or none) are
   # optional. `unassessedCategories` lists categories reported as not assessed, none with instances;
   # `regionalActions` gives up to one `limit`, `age-restrict` or `block` action for each of
   # {REGIONS}. `detections` (optional, `people` and `faces` each optional) sets the person and face

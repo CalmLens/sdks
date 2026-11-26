@@ -235,7 +235,7 @@ pub struct TestInputInstance {
     /// The score from 0 to 1.
     #[serde(default)]
     pub score: Option<f64>,
-    /// The policy action: `allow`, `limit`, `age-restrict` or `block`. Set it on every
+    /// The policy action: `limit`, `age-restrict` or `block`. Set it on every
     /// instance or on none.
     #[serde(default)]
     pub action: Option<String>,
@@ -467,7 +467,7 @@ pub const MEDIA_TEST_SIGNALS: &[&str] = &[
 ];
 
 const REGIONS: &[&str] = &["DE", "AT", "FR", "GB", "EU", "AU", "BR"];
-const ACTIONS: &[&str] = &["allow", "limit", "age-restrict", "block"];
+const ACTIONS: &[&str] = &["limit", "age-restrict", "block"];
 const HEX_WORDS: [&str; 16] = [
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "alpha",
     "bravo", "charlie", "delta", "echo", "foxtrot",
@@ -727,7 +727,7 @@ fn validate(input: &TestInput) -> Result<()> {
     if regional.len() > REGIONS.len()
         || regional.iter().enumerate().any(|(index, entry)| {
             !REGIONS.contains(&entry.region.as_str())
-                || !ACTIONS[1..].contains(&entry.action.as_str())
+                || !ACTIONS.contains(&entry.action.as_str())
                 || regional[..index].iter().any(|e| e.region == entry.region)
         })
     {

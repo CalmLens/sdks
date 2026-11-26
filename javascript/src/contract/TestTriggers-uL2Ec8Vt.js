@@ -498,7 +498,6 @@ const TEST_INPUT_SCHEMA = /* @__PURE__ */ lazySchema(() => z.object({
 		category: z.enum(CLASSIFICATION_CATEGORIES),
 		score: z.number().min(0).max(1).optional(),
 		action: z.enum([
-			"allow",
 			"limit",
 			"age-restrict",
 			"block"

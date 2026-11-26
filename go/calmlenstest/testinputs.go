@@ -38,7 +38,7 @@ type TestInstance struct {
 	Category string `json:"category"`
 	// Score is the confidence from 0 to 1, or nil for the default.
 	Score *float64 `json:"score,omitempty"`
-	// Action is "allow", "limit", "age-restrict" or "block", or empty to let the project's policy
+	// Action is "limit", "age-restrict" or "block", or empty to let the project's policy
 	// decide. Either every instance of a scenario has an action or none does.
 	Action string `json:"action,omitempty"`
 	// Qualifiers are unique qualifiers of the category, at most 64. Qualifiers set by the input
@@ -214,7 +214,7 @@ func testInputQualifiers() map[string][]string {
 }
 
 var (
-	testInputActions    = []string{"allow", "limit", "age-restrict", "block"}
+	testInputActions    = []string{"limit", "age-restrict", "block"}
 	testRegions         = []string{"DE", "AT", "FR", "GB", "EU", "AU", "BR"}
 	regionalTestActions = []string{"limit", "age-restrict", "block"}
 )

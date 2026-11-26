@@ -85,7 +85,7 @@ final class TestInputs
     /** The signals `generateMediaTestCode` accepts. */
     public const MEDIA_SIGNALS = [...Classification::CATEGORIES, 'violence.graphic'];
 
-    private const ACTIONS = ['allow', 'limit', 'age-restrict', 'block'];
+    private const ACTIONS = ['limit', 'age-restrict', 'block'];
     private const REGIONS = ['DE', 'AT', 'FR', 'GB', 'EU', 'AU', 'BR'];
     private const REGIONAL_ACTIONS = ['limit', 'age-restrict', 'block'];
     /** Category colours, carried in a test image's chroma only. */

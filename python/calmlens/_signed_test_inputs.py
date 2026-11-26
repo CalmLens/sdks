@@ -20,7 +20,7 @@ from .client import _invalid
 from .types import ClassificationCategory
 
 #: A scenario instance's policy action.
-SignedTestAction = Literal["allow", "limit", "age-restrict", "block"]
+SignedTestAction = Literal["limit", "age-restrict", "block"]
 #: A regional action's region.
 SignedTestRegion = Literal["DE", "AT", "FR", "GB", "EU", "AU", "BR"]
 #: A regional action's action.
@@ -110,7 +110,7 @@ class PaintedTestImage:
     png: bytes
 
 
-_ACTIONS = ("allow", "limit", "age-restrict", "block")
+_ACTIONS = ("limit", "age-restrict", "block")
 _REGIONS = ("DE", "AT", "FR", "GB", "EU", "AU", "BR")
 _REGIONAL_ACTIONS = ("limit", "age-restrict", "block")
 _KEY = re.compile(r"[a-f0-9]{32}")
