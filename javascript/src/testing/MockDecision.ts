@@ -45,9 +45,9 @@ export type MockTextRegion = EvaluatedFeature<"ocr">["textRegions"][number];
 export type MockQrCode = EvaluatedFeature<"linkDetection">["qrCodes"][number];
 /** A link found in an image's text or QR codes, as `classification.linkDetection.links` reports one. */
 export type MockDetectedLink = EvaluatedFeature<"linkDetection">["links"][number];
-/** A person person detection found, as `classification.personDetection.people` reports one. */
+/** A person that person detection found, as `classification.personDetection.people` reports one. */
 export type MockDetectedPerson = EvaluatedFeature<"personDetection">["people"][number];
-/** A face face detection found, as `classification.faceDetection.faces` reports one. */
+/** A face that face detection found, as `classification.faceDetection.faces` reports one. */
 export type MockDetectedFace = EvaluatedFeature<"faceDetection">["faces"][number];
 
 /** Why a decision waits for human review: `sampled`, or `uncertain` about some categories. */
@@ -173,7 +173,7 @@ export class MockDecision {
   }
 
   /**
-   * The people person detection finds in an image, reported as `classification.personDetection`
+   * The people that person detection finds in an image, reported as `classification.personDetection`
    * when the upload turns person detection on. Without them, it finds nobody.
    */
   withPersonDetection(people: MockDetectedPerson[]): this {
@@ -182,7 +182,7 @@ export class MockDecision {
   }
 
   /**
-   * The faces face detection finds in an image, reported as `classification.faceDetection` when
+   * The faces that face detection finds in an image, reported as `classification.faceDetection` when
    * the upload turns face detection on; each face's `ageRange` only when the upload also asks for
    * age estimation. Without them, it finds no faces.
    */

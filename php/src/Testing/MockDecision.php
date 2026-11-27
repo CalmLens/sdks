@@ -137,7 +137,7 @@ final class MockDecision
     }
 
     /**
-     * Sets the people person detection finds, for image uploads that enabled person detection:
+     * Sets the people that person detection finds, for image uploads that enabled person detection:
      * each a box as fractions of the image width and height, from 0 to 1, and a confidence from
      * 0 to 1. Without them, the mock finds nobody.
      *
@@ -150,7 +150,7 @@ final class MockDecision
     }
 
     /**
-     * Sets the faces face detection finds, for image uploads that enabled face detection: each a
+     * Sets the faces that face detection finds, for image uploads that enabled face detection: each a
      * box, a confidence and, optionally, an `ageRange`, reported only when the upload also asked
      * for age estimation. Without them, the mock finds no faces.
      *

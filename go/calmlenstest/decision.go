@@ -151,7 +151,7 @@ func (d *Decision) WithLinkDetection(qrCodes []calmlens.DetectedQRCode, links []
 	return d
 }
 
-// WithPersonDetection sets the people person detection finds in an image, reported as
+// WithPersonDetection sets the people that person detection finds in an image, reported as
 // classification.personDetection when the upload turns person detection on. Without it, the
 // mock finds nobody.
 func (d *Decision) WithPersonDetection(people ...calmlens.DetectedPerson) *Decision {
@@ -162,7 +162,7 @@ func (d *Decision) WithPersonDetection(people ...calmlens.DetectedPerson) *Decis
 	return d
 }
 
-// WithFaceDetection sets the faces face detection finds in an image, reported as
+// WithFaceDetection sets the faces that face detection finds in an image, reported as
 // classification.faceDetection when the upload turns face detection on; a face's AgeRange only
 // when the upload also asks for age estimation. Without it, the mock finds no faces.
 func (d *Decision) WithFaceDetection(faces ...calmlens.DetectedFace) *Decision {

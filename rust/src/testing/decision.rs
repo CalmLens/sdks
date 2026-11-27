@@ -293,14 +293,14 @@ impl MockDecision {
         }));
         self
     }
-    /// The people person detection finds in an image, reported as
+    /// The people that person detection finds in an image, reported as
     /// `classification.personDetection` when the upload turns person detection on. Without them,
     /// the mock finds nobody.
     pub fn with_person_detection(mut self, people: &[DetectedPerson]) -> Self {
         self.people = Some(serde_json::to_value(people).unwrap_or_else(|_| json!([])));
         self
     }
-    /// The faces face detection finds in an image, reported as `classification.faceDetection`
+    /// The faces that face detection finds in an image, reported as `classification.faceDetection`
     /// when the upload turns face detection on; a face's `age_range` only when the upload also
     /// asks for age estimation. Without them, the mock finds no faces.
     pub fn with_face_detection(mut self, faces: &[DetectedFace]) -> Self {

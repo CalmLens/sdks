@@ -84,13 +84,13 @@ public final class MockDecision {
   }
 
   /**
-   * A person person detection found, as {@code classification.personDetection.people} reports one:
+   * A person that person detection found, as {@code classification.personDetection.people} reports one:
    * a box as fractions of the image width and height, from 0 to 1, and the confidence from 0 to 1.
    */
   public record Person(double left, double top, double width, double height, double confidence) {}
 
   /**
-   * A face face detection found, as {@code classification.faceDetection.faces} reports one: a box
+   * A face that face detection found, as {@code classification.faceDetection.faces} reports one: a box
    * as fractions of the image width and height, from 0 to 1, the confidence from 0 to 1 and the
    * estimated age range, or null for none.
    */
@@ -236,7 +236,7 @@ public final class MockDecision {
   }
 
   /**
-   * Sets the people person detection finds in an image, reported as {@code
+   * Sets the people that person detection finds in an image, reported as {@code
    * classification.personDetection} when the upload turns person detection on. Without them, the
    * mock finds nobody.
    *
@@ -249,7 +249,7 @@ public final class MockDecision {
   }
 
   /**
-   * Sets the faces face detection finds in an image, reported as {@code
+   * Sets the faces that face detection finds in an image, reported as {@code
    * classification.faceDetection} when the upload turns face detection on; a face's age range
    * only when the upload also asks for age estimation. Without them, the mock finds no faces.
    *
