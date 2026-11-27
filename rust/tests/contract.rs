@@ -1261,6 +1261,16 @@ fn build_decision(spec: &Value) -> calmlens::Result<MockDecision> {
             serde_json::from_value(found["links"].clone()).unwrap_or_default();
         decision = decision.with_link_detection(&qr_codes, &links);
     }
+    if let Some(found) = spec.get("personDetection") {
+        let people: Vec<calmlens::models::DetectedPerson> =
+            serde_json::from_value(found["people"].clone()).unwrap();
+        decision = decision.with_person_detection(&people);
+    }
+    if let Some(found) = spec.get("faceDetection") {
+        let faces: Vec<calmlens::models::DetectedFace> =
+            serde_json::from_value(found["faces"].clone()).unwrap();
+        decision = decision.with_face_detection(&faces);
+    }
     Ok(decision)
 }
 

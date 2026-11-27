@@ -483,8 +483,12 @@ final class MockServerClient
         return is_array($grants) && array_is_list($grants) ? $grants : [];
     }
 
-    /** The client methods that send a request like this one, named like `assets.create`. */
-    private function operations(RequestInterface $request, bool $cdn, array $parts, array $query): array
+    /**
+     * The client methods that send a request like this one, named like `assets.create`. A text
+     * upload (a JSON body with `content.plainText`) is `text.classify`'s request alone, and a file
+     * or URL upload `assets.classify`'s.
+     */
+    private function operations(RequestInterface $request, bool $cdn, array $parts, array $query, string $body): array
     {
         if ($cdn) {
             return rawurldecode($this->cdnSegments($request)[3] ?? '') === 'info' ? ['cdn.getAssetInfo'] : ['cdn.serve'];
@@ -519,7 +523,8 @@ final class MockServerClient
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
                 'POST signed-asset-urls' => ['cdn.signAssetUrl'],
-                'POST assets' => self::waits($query) ? ['assets.classify', 'text.classify'] : ['assets.create'],
+                'POST assets' => !self::waits($query) ? ['assets.create']
+                    : (self::isTextUpload($request, $body) ? ['text.classify'] : ['assets.classify']),
                 default => [],
             };
         }
@@ -593,7 +598,7 @@ final class MockServerClient
     {
         parse_str($request->getUri()->getQuery(), $query);
         $parts = RecordedRequest::segments($path);
-        $operations = $this->operations($request, $cdn, $parts, $query);
+        $operations = $this->operations($request, $cdn, $parts, $query, $body);
         foreach ($this->failures as $index => $failure) {
             if ($failure['operation'] === null || in_array($failure['operation'], $operations, true)) {
                 array_splice($this->failures, $index, 1);
@@ -1057,7 +1062,7 @@ final class MockServerClient
                     'explanationComplete' => null, 'categories' => null, 'flaggedCategories' => [], 'regions' => [], 'raw' => null,
                     'linkSafety' => null, 'timeline' => null],
                 // Like the API, a feature's result is null until it has run.
-                'ocr' => null, 'linkDetection' => null],
+                'ocr' => null, 'linkDetection' => null, 'personDetection' => null, 'faceDetection' => null],
         ];
         if ($bytes !== null && $final) {
             $asset['content'] = array_replace($asset['content'], self::rendering($asset, false));
@@ -1155,14 +1160,16 @@ final class MockServerClient
     {
         $bytes = $asset['content']['status'] === 'removed' ? null : ($this->content[$asset['id']]['bytes'] ?? null);
         $text = $bytes !== null && $asset['type'] === 'plaintext-document' ? mb_scrub($bytes, 'UTF-8') : null;
-        return MockDecision::from(($this->moderate)(new MockModerationInput($asset, new MockModerationContent($bytes, $text), $trigger, $queued)));
+        return MockDecision::from(($this->moderate)(new MockModerationInput(Asset::constructFrom($asset), new MockModerationContent($bytes, $text), $trigger, $queued)));
     }
 
     /**
-     * Stores `$asset` decided as `$decision` says, with its report. Like the API for an image with
-     * no text, QR codes, links, people or faces in it, a decided image reports the features its
-     * upload turned on as finding nothing: OCR and person and face detection when requested, link
-     * detection unless turned off.
+     * Stores `$asset` decided as `$decision` says, with its report. The mock reads nothing in an
+     * image, so a decided image reports the findings the decision supplies (`withOcr`,
+     * `withLinkDetection`, `withPersonDetection`, `withFaceDetection`), and nothing without them,
+     * for the features its upload turned on: OCR and person and face detection when requested,
+     * link detection unless turned off. Like the API, a face has its `ageRange` only when the
+     * upload asked for age estimation.
      */
     private function decided(array $asset, MockDecision $decision): array
     {
@@ -1184,10 +1191,14 @@ final class MockServerClient
                 + ($decision->linkFindings() ?? ['qrCodes' => [], 'links' => []]);
         }
         if (($features['personDetection']['enabled'] ?? null) === true) {
-            $next['classification']['personDetection'] = ['status' => 'evaluated', 'people' => []];
+            $next['classification']['personDetection'] = ['status' => 'evaluated', 'people' => $decision->personFindings() ?? []];
         }
         if (($features['faceDetection']['enabled'] ?? null) === true) {
-            $next['classification']['faceDetection'] = ['status' => 'evaluated', 'faces' => []];
+            $ages = ($features['faceDetection']['ageEstimation'] ?? null) === true;
+            $next['classification']['faceDetection'] = ['status' => 'evaluated', 'faces' => array_map(
+                static fn (array $face) => $ages ? $face : array_diff_key($face, ['ageRange' => true]),
+                $decision->faceFindings() ?? [],
+            )];
         }
         return $this->assets[$next['id']] = $next;
     }
@@ -1555,10 +1566,37 @@ final class MockServerClient
         return $record;
     }
 
+    /** Whether a request is a text upload: a JSON body whose `content.plainText` is text, as `text->classify` sends. */
+    private static function isTextUpload(RequestInterface $request, string $body): bool
+    {
+        if ($request->getHeaderLine('X-CalmLens-Upload') !== '' || !str_starts_with($request->getHeaderLine('Content-Type'), 'application/json')) {
+            return false;
+        }
+        $json = json_decode($body, true);
+        return is_array($json) && is_array($json['content'] ?? null) && is_string($json['content']['plainText'] ?? null);
+    }
+
+    /**
+     * A URL upload's type: the type of its path's file extension (`MockUrlAssetTypes`), compared
+     * lower-case without the query or fragment, or `website` for any other extension or none. The
+     * mock fetches nothing, so the extension stands in for the fetched content's type.
+     */
+    private static function urlAssetType(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path)) {
+            $path = preg_split('/[?#]/', $url, 2)[0] ?? '';
+        }
+        $slash = strrpos($path, '/');
+        $segment = $slash === false ? $path : substr($path, $slash + 1);
+        $dot = strrpos($segment, '.');
+        return $dot === false ? 'website' : (MockUrlAssetTypes::EXTENSIONS[strtolower(substr($segment, $dot + 1))] ?? 'website');
+    }
+
     private static function kind(string $mime, ?string $url): string
     {
         return match (true) {
-            $url !== null => 'website',
+            $url !== null => self::urlAssetType($url),
             str_starts_with($mime, 'image/') => 'image',
             str_starts_with($mime, 'video/') => 'video',
             str_starts_with($mime, 'audio/') => 'audio',

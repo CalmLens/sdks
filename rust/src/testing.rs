@@ -24,6 +24,7 @@ mod image_grid;
 mod inputs;
 mod memory;
 mod placeholder;
+mod url_asset_types;
 
 pub use decision::{
     IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
@@ -249,7 +250,9 @@ impl MockTransport {
         let reply = match state.replies.pop_front() {
             Some(reply) => Some(reply),
             None => state.backend.as_mut().map(|backend| {
-                let Some(queued) = backend.take_failure(&attempt.method, url) else {
+                let Some(queued) =
+                    backend.take_failure(&attempt.method, url, &attempt.headers, &body)
+                else {
                     return match backend.handle(&attempt.method, url, &attempt.headers, &body) {
                         Ok(response) => Reply::Response(response),
                         Err(error) => Reply::Error(error),
@@ -533,8 +536,9 @@ impl MockServerClient {
     /// takes the next queued failure or reaches the API; queue several to fail several requests.
     /// The operation is the JavaScript SDK's method path, such as `assets.create`,
     /// `assets.uploadPart` or `cdn.serve`; a convenience fails with the request it sends
-    /// (`assets.waitForDecision` with `assets.retrieve`, `text.classify` with
-    /// `assets.classify`, `ensureLens` with `ensureLenses`, iterators with their list). Fails
+    /// (`assets.waitForDecision` with `assets.retrieve`, `ensureLens` with `ensureLenses`,
+    /// iterators with their list). A text upload is `text.classify`'s request alone, and a file
+    /// or URL upload `assets.classify`'s. Fails
     /// with `sdk/invalid-argument`, queueing nothing, for an unknown operation or for `details`
     /// or `retry_after` with a transport error or timeout.
     ///

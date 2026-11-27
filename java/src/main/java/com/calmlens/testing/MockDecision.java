@@ -60,6 +60,8 @@ public final class MockDecision {
   private List<TextRegion> textRegions;
   private List<QrCode> qrCodes;
   private List<Link> links;
+  private List<Person> people;
+  private List<Face> faces;
 
   /**
    * Where OCR found text in an image, as {@code classification.ocr.textRegions} reports it: a box
@@ -80,6 +82,27 @@ public final class MockDecision {
       if (!"text".equals(source) && !"qr-code".equals(source)) throw invalid("a link's source must be text or qr-code");
     }
   }
+
+  /**
+   * A person person detection found, as {@code classification.personDetection.people} reports one:
+   * a box as fractions of the image width and height, from 0 to 1, and the confidence from 0 to 1.
+   */
+  public record Person(double left, double top, double width, double height, double confidence) {}
+
+  /**
+   * A face face detection found, as {@code classification.faceDetection.faces} reports one: a box
+   * as fractions of the image width and height, from 0 to 1, the confidence from 0 to 1 and the
+   * estimated age range, or null for none.
+   */
+  public record Face(double left, double top, double width, double height, double confidence, AgeRange ageRange) {
+    /** A face without an age range. */
+    public Face(double left, double top, double width, double height, double confidence) {
+      this(left, top, width, height, confidence, null);
+    }
+  }
+
+  /** A face's estimated age range in years. */
+  public record AgeRange(int low, int high) {}
 
   private MockDecision(MockCalmLensServerClient.Outcome status) { this.status = status; }
 
@@ -210,6 +233,65 @@ public final class MockDecision {
     this.qrCodes = List.copyOf(Objects.requireNonNull(qrCodes, "qrCodes"));
     this.links = List.copyOf(Objects.requireNonNull(links, "links"));
     return this;
+  }
+
+  /**
+   * Sets the people person detection finds in an image, reported as {@code
+   * classification.personDetection} when the upload turns person detection on. Without them, the
+   * mock finds nobody.
+   *
+   * @param people the people found
+   * @return this decision
+   */
+  public MockDecision withPersonDetection(List<Person> people) {
+    this.people = List.copyOf(Objects.requireNonNull(people, "people"));
+    return this;
+  }
+
+  /**
+   * Sets the faces face detection finds in an image, reported as {@code
+   * classification.faceDetection} when the upload turns face detection on; a face's age range
+   * only when the upload also asks for age estimation. Without them, the mock finds no faces.
+   *
+   * @param faces the faces found
+   * @return this decision
+   */
+  public MockDecision withFaceDetection(List<Face> faces) {
+    this.faces = List.copyOf(Objects.requireNonNull(faces, "faces"));
+    return this;
+  }
+
+  /** {@code people} as the API's JSON has them: what {@link #withPersonDetection} set, or none. */
+  JsonArray peopleJson() {
+    JsonArray found = new JsonArray();
+    for (Person person : people == null ? List.<Person>of() : people) {
+      JsonObject item = new JsonObject();
+      item.add("box", box(person.left(), person.top(), person.width(), person.height()));
+      item.addProperty("confidence", person.confidence());
+      found.add(item);
+    }
+    return found;
+  }
+
+  /**
+   * {@code faces} as the API's JSON has them: what {@link #withFaceDetection} set, or none; with
+   * their age ranges when {@code ages}.
+   */
+  JsonArray facesJson(boolean ages) {
+    JsonArray found = new JsonArray();
+    for (Face face : faces == null ? List.<Face>of() : faces) {
+      JsonObject item = new JsonObject();
+      item.add("box", box(face.left(), face.top(), face.width(), face.height()));
+      item.addProperty("confidence", face.confidence());
+      if (ages && face.ageRange() != null) {
+        JsonObject range = new JsonObject();
+        range.addProperty("low", face.ageRange().low());
+        range.addProperty("high", face.ageRange().high());
+        item.add("ageRange", range);
+      }
+      found.add(item);
+    }
+    return found;
   }
 
   private static JsonObject box(double left, double top, double width, double height) {

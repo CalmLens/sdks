@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CalmLens\Testing;
 
+use CalmLens\Model\Asset;
+
 /** What `MockServerClient`'s `moderate` callable receives for each asset the mock moderates. */
 final class MockModerationInput
 {
@@ -15,7 +17,8 @@ final class MockModerationInput
     public const COMPLETE = 'complete';
 
     /**
-     * @param array $asset the asset as stored, still processing.
+     * @param Asset $asset the asset as stored, still processing, as the client's own responses
+     *   return one: read fields as properties (`$asset->name`) or array keys (`$asset['name']`).
      * @param MockModerationContent $content the stored content: its bytes and, for a
      *   `plaintext-document`, its text, both null without stored content, such as a website.
      * @param string $trigger why the asset is moderated: `upload`, `retry` or `complete`.
@@ -23,7 +26,7 @@ final class MockModerationInput
      *   decision: queued uploads, retries and `completeProcessing`.
      */
     public function __construct(
-        public readonly array $asset,
+        public readonly Asset $asset,
         public readonly MockModerationContent $content,
         public readonly string $trigger,
         public readonly bool $queued,

@@ -197,8 +197,22 @@ final class MockApi {
   /**
    * The client operations a request can come from, by their JavaScript method paths, for {@code
    * failNextRequest}. A request answers both a method and the helper that calls it, such as {@code
-   * assets.retrieve} and {@code assets.waitForDecision}.
+   * assets.retrieve} and {@code assets.waitForDecision}. A text upload is {@code text.classify}'s
+   * request alone, and a file or URL upload {@code assets.classify}'s.
    */
+  /** Whether a request is a text upload: a JSON body whose {@code content.plainText} is text, as {@code text.classify} sends. */
+  private static boolean isTextUpload(MockCalmLensServerClient.Request request) {
+    String type = request.header("Content-Type");
+    if (request.body() == null || type == null || !type.startsWith("application/json") || request.header("X-CalmLens-Upload") != null) return false;
+    try {
+      JsonElement body = JsonParser.parseString(request.bodyText());
+      if (!body.isJsonObject() || !(body.getAsJsonObject().get("content") instanceof JsonObject content)) return false;
+      return content.get("plainText") instanceof JsonPrimitive text && text.isString();
+    } catch (RuntimeException invalid) {
+      return false;
+    }
+  }
+
   Set<String> operations(MockCalmLensServerClient.Request request) {
     String url = request.url().split("\\?", 2)[0];
     if (isCdn(url)) {
@@ -235,7 +249,8 @@ final class MockApi {
         case "GET assets" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
         case "POST signed-asset-urls" -> Set.of("cdn.signAssetUrl");
-        case "POST assets" -> "false".equals(request.query().get("wait")) ? Set.of("assets.create") : Set.of("assets.classify", "text.classify");
+        case "POST assets" -> "false".equals(request.query().get("wait")) ? Set.of("assets.create")
+            : isTextUpload(request) ? Set.of("text.classify") : Set.of("assets.classify");
         default -> Set.of();
       };
     }
@@ -574,6 +589,24 @@ final class MockApi {
     return storage.folders.values().stream().filter(f -> projectId.equals(str(f, "projectId"))).collect(Collectors.toList());
   }
 
+  /**
+   * A URL upload's type: the type of its path's file extension ({@link MockUrlAssetTypes}),
+   * compared lower-case without the query or fragment, or {@code website} for any other extension
+   * or none. The mock fetches nothing, so the extension stands in for the fetched content's type.
+   */
+  static String urlAssetType(String url) {
+    String path;
+    try {
+      path = Objects.requireNonNullElse(java.net.URI.create(url).getRawPath(), "");
+    } catch (IllegalArgumentException invalid) {
+      path = url.split("[?#]", 2)[0];
+    }
+    String segment = path.substring(path.lastIndexOf('/') + 1);
+    int dot = segment.lastIndexOf('.');
+    if (dot == -1) return "website";
+    return MockUrlAssetTypes.EXTENSIONS.getOrDefault(segment.substring(dot + 1).toLowerCase(Locale.ROOT), "website");
+  }
+
   private static String assetType(String mime) {
     return mime.startsWith("image/") || List.of("jpg", "jpeg", "png", "gif", "webp", "avif").contains(mime) ? "image"
         : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio"
@@ -633,7 +666,7 @@ final class MockApi {
       o = withUploadPreset(o, rawUpload ? mime : null, presetSize);
     }
     String url = rawUpload ? null : str(o, "url");
-    String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
+    String kind = url != null ? urlAssetType(url) : assetType(mime.toLowerCase(Locale.ROOT));
     // wait=false queues the upload; the SDKs send wait=true to wait for the decision.
     boolean queue = isFalse(q, "wait"), last = !multipart || bool(t, "isFinal");
     if (multipart) {
@@ -729,6 +762,8 @@ final class MockApi {
     // Like the API, a feature's result is null until it has run.
     classification.add("ocr", JsonNull.INSTANCE);
     classification.add("linkDetection", JsonNull.INSTANCE);
+    classification.add("personDetection", JsonNull.INSTANCE);
+    classification.add("faceDetection", JsonNull.INSTANCE);
     asset.add("classification", classification);
 
     if (rawUpload && raw != null) {
@@ -839,10 +874,12 @@ final class MockApi {
 
   /**
    * Applies a decided or failed {@code decision} and its report. The mock reads nothing in an
-   * image, so a decided image reports the OCR and link findings the decision supplies ({@link
-   * MockDecision#withOcr}, {@link MockDecision#withLinkDetection}) and no people or faces: OCR,
-   * person and face detection when its upload turned them on, and link detection unless its upload
-   * turned it off.
+   * image, so a decided image reports the findings the decision supplies ({@link
+   * MockDecision#withOcr}, {@link MockDecision#withLinkDetection}, {@link
+   * MockDecision#withPersonDetection}, {@link MockDecision#withFaceDetection}), and no people or
+   * faces without them: OCR, person and face detection when its upload turned them on, and link
+   * detection unless its upload turned it off. Like the API, a face has its {@code ageRange} only
+   * when the upload asked for age estimation.
    */
   private void decided(JsonObject asset, MockDecision decision) {
     long now = now();
@@ -867,8 +904,18 @@ final class MockApi {
       links.add("links", decision.linksJson());
       classification.add("linkDetection", links);
     }
-    if (feature(asset, "personDetection") == Boolean.TRUE) classification.add("personDetection", evaluated("people"));
-    if (feature(asset, "faceDetection") == Boolean.TRUE) classification.add("faceDetection", evaluated("faces"));
+    if (feature(asset, "personDetection") == Boolean.TRUE) {
+      JsonObject people = evaluated("people");
+      people.add("people", decision.peopleJson());
+      classification.add("personDetection", people);
+    }
+    if (feature(asset, "faceDetection") == Boolean.TRUE) {
+      JsonObject uploaded = processingOptions.get(str(asset, "id"));
+      JsonElement ages = uploaded == null ? null : path(uploaded, "features.faceDetection.ageEstimation");
+      JsonObject faces = evaluated("faces");
+      faces.add("faces", decision.facesJson(ages != null && ages.isJsonPrimitive() && ages.getAsJsonPrimitive().isBoolean() && ages.getAsBoolean()));
+      classification.add("faceDetection", faces);
+    }
   }
 
   /** The asset's {@code processingOptions.features.<feature>.enabled} as uploaded, or null when it wasn't set. */

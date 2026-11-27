@@ -14351,6 +14351,434 @@
           }
         }
       ]
+    },
+    {
+      "name": "a decision's people and faces reach an image that turned the features on",
+      "mock": {
+        "moderate": {
+          "byName": {
+            "plain.png": "allowed"
+          },
+          "analyzed": {
+            "status": "allowed",
+            "personDetection": {
+              "people": [
+                {
+                  "box": {
+                    "left": 0.1,
+                    "top": 0.2,
+                    "width": 0.3,
+                    "height": 0.6
+                  },
+                  "confidence": 0.9
+                }
+              ]
+            },
+            "faceDetection": {
+              "faces": [
+                {
+                  "box": {
+                    "left": 0.15,
+                    "top": 0.25,
+                    "width": 0.1,
+                    "height": 0.1
+                  },
+                  "confidence": 0.8,
+                  "ageRange": {
+                    "low": 25,
+                    "high": 35
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "group.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "features": {
+                "personDetection": {
+                  "enabled": true
+                },
+                "faceDetection": {
+                  "enabled": true,
+                  "ageEstimation": true
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.decision": "allowed",
+              "classification.personDetection": {
+                "status": "evaluated",
+                "people": [
+                  {
+                    "box": {
+                      "left": 0.1,
+                      "top": 0.2,
+                      "width": 0.3,
+                      "height": 0.6
+                    },
+                    "confidence": 0.9
+                  }
+                ]
+              },
+              "classification.faceDetection": {
+                "status": "evaluated",
+                "faces": [
+                  {
+                    "box": {
+                      "left": 0.15,
+                      "top": 0.25,
+                      "width": 0.1,
+                      "height": 0.1
+                    },
+                    "confidence": 0.8,
+                    "ageRange": {
+                      "low": 25,
+                      "high": 35
+                    }
+                  }
+                ]
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "no-ages.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "features": {
+                "faceDetection": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.personDetection": null,
+              "classification.faceDetection": {
+                "status": "evaluated",
+                "faces": [
+                  {
+                    "box": {
+                      "left": 0.15,
+                      "top": 0.25,
+                      "width": 0.1,
+                      "height": 0.1
+                    },
+                    "confidence": 0.8
+                  }
+                ]
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "off.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.personDetection": null,
+              "classification.faceDetection": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "plain.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "features": {
+                "personDetection": {
+                  "enabled": true
+                },
+                "faceDetection": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.personDetection": {
+                "status": "evaluated",
+                "people": []
+              },
+              "classification.faceDetection": {
+                "status": "evaluated",
+                "faces": []
+              }
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a URL upload's type follows its path's file extension",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/photos/Cat.JPG?size=large#top"
+          },
+          "expect": {
+            "result": {
+              "type": "image",
+              "externalUrl": "https://example.com/photos/Cat.JPG?size=large#top"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/files/report.pdf"
+          },
+          "expect": {
+            "result": {
+              "type": "multimedia-document",
+              "externalUrl": "https://example.com/files/report.pdf"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/clips/intro.mp4"
+          },
+          "expect": {
+            "result": {
+              "type": "video",
+              "externalUrl": "https://example.com/clips/intro.mp4"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/sounds/theme.flac"
+          },
+          "expect": {
+            "result": {
+              "type": "audio",
+              "externalUrl": "https://example.com/sounds/theme.flac"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/notes/readme.md"
+          },
+          "expect": {
+            "result": {
+              "type": "plaintext-document",
+              "externalUrl": "https://example.com/notes/readme.md"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/posts/9"
+          },
+          "expect": {
+            "result": {
+              "type": "website",
+              "externalUrl": "https://example.com/posts/9"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/index.html"
+          },
+          "expect": {
+            "result": {
+              "type": "website",
+              "externalUrl": "https://example.com/index.html"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/archive.zip"
+          },
+          "expect": {
+            "result": {
+              "type": "website",
+              "externalUrl": "https://example.com/archive.zip"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/page?file=photo.png"
+          },
+          "expect": {
+            "result": {
+              "type": "website",
+              "externalUrl": "https://example.com/page?file=photo.png"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "linked",
+            "url": "https://example.com/images.png/"
+          },
+          "expect": {
+            "result": {
+              "type": "website",
+              "externalUrl": "https://example.com/images.png/"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a classify failure fails only the operation it names",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.classify"
+          }
+        },
+        {
+          "operation": "text.classify",
+          "args": {
+            "text": "hello"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "photo.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null,
+              "kind": "connection"
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "text.classify"
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "photo.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "post",
+            "url": "https://example.com/posts/9"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "text.classify",
+          "args": {
+            "text": "hello"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null,
+              "kind": "connection"
+            }
+          }
+        },
+        {
+          "operation": "text.classify",
+          "args": {
+            "text": "hello"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        }
+      ]
     }
   ]
 }

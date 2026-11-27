@@ -1078,7 +1078,7 @@ describe("MockCalmLensServerClient", () => {
     expect(
       client.calls.map(({ operation, method, path, status }) => [operation, method, path, status]),
     ).toEqual([
-      ["assets.classify", "POST", `/projects/${projectId}/assets`, 200],
+      ["text.classify", "POST", `/projects/${projectId}/assets`, 200],
       ["assets.retrieve", "GET", `/assets/${moderated.id}`, 200],
       ["ensureLenses", "PUT", `/projects/${projectId}/lenses`, 200],
       ["events.list", "GET", `/projects/${projectId}/events`, 200],

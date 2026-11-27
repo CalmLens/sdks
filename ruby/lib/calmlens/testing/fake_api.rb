@@ -7,6 +7,7 @@ require 'uri'
 require_relative 'placeholder'
 require_relative 'mock_decision'
 require_relative 'rsql'
+require_relative 'url_asset_types'
 
 module CalmLens
   module Testing
@@ -828,12 +829,26 @@ module CalmLens
       end
 
       def kind(mime, url)
-        return 'website' if url
+        return url_asset_type(url) if url
         return mime.split('/').first if mime.start_with?('image/', 'video/', 'audio/')
         return 'plaintext-document' if mime.start_with?('text/')
         return 'multimedia-document' if mime.include?('pdf') || mime.include?('document')
 
         'file'
+      end
+
+      # A URL upload's type: the type of its path's file extension ({MOCK_URL_EXTENSION_TYPES}),
+      # compared lower-case without the query or fragment, or `website` for any other extension or
+      # none. The mock fetches nothing, so the extension stands in for the fetched content's type.
+      def url_asset_type(url)
+        path = begin
+          URI.parse(url.to_s).path.to_s
+        rescue URI::InvalidURIError
+          url.to_s.split(/[?#]/, 2).first.to_s
+        end
+        segment = path.split('/', -1).last.to_s
+        dot = segment.rindex('.')
+        dot ? MOCK_URL_EXTENSION_TYPES.fetch(segment[(dot + 1)..].downcase, 'website') : 'website'
       end
 
       def create_asset(options, queue, url: nil, data: nil, open: false)
@@ -1082,8 +1097,11 @@ module CalmLens
 
       # Applies `decision` to `asset` with its report. The mock reads nothing in an image, so a
       # decided image reports what the decision supplies ({MockDecision#with_ocr},
-      # {MockDecision#with_link_detection}) and no people or faces, for the features its upload ran:
-      # OCR and person and face detection when turned on, link detection unless turned off.
+      # {MockDecision#with_link_detection}, {MockDecision#with_person_detection},
+      # {MockDecision#with_face_detection}), and no people or faces without them, for the features
+      # its upload ran: OCR and person and face detection when turned on, link detection unless
+      # turned off. Like the API, a face has its `ageRange` only when the upload asked for age
+      # estimation.
       def decided(asset, decision)
         apply_outcome(asset, decision.status, 'policy', decision.report(@now.call))
         classification = asset['classification']
@@ -1102,8 +1120,13 @@ module CalmLens
         unless setting.call('linkDetection') == false
           classification['linkDetection'] = { 'status' => 'evaluated' }.merge(decision.link_findings || { 'qrCodes' => [], 'links' => [] })
         end
-        { 'personDetection' => 'people', 'faceDetection' => 'faces' }.each do |feature, list|
-          classification[feature] = { 'status' => 'evaluated', list => [] } if setting.call(feature) == true
+        if setting.call('personDetection') == true
+          classification['personDetection'] = { 'status' => 'evaluated', 'people' => decision.person_findings || [] }
+        end
+        if setting.call('faceDetection') == true
+          ages = features['faceDetection']['ageEstimation'] == true
+          faces = (decision.face_findings || []).map { |face| ages ? face : face.except('ageRange') }
+          classification['faceDetection'] = { 'status' => 'evaluated', 'faces' => faces }
         end
         asset
       end

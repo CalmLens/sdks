@@ -633,7 +633,7 @@ class ContractTest {
     return Arrays.stream(Outcome.values()).filter(outcome -> outcome.value().equals(value)).findFirst().orElseThrow();
   }
 
-  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags, notEvaluated, OCR and link findings and pendingReview. */
+  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags, notEvaluated, OCR, link, person and face findings and pendingReview. */
   static MockDecision buildDecision(JsonElement spec) {
     if (spec.isJsonPrimitive()) return MockDecision.of(spec.getAsString());
     JsonObject object = spec.getAsJsonObject();
@@ -671,6 +671,25 @@ class ContractTest {
         for (JsonElement item : found.getAsJsonArray("links"))
           links.add(new MockDecision.Link(item.getAsJsonObject().get("url").getAsString(), item.getAsJsonObject().get("source").getAsString()));
       decision.withLinkDetection(codes, links);
+    }
+    if (object.has("personDetection")) {
+      List<MockDecision.Person> people = new ArrayList<>();
+      for (JsonElement item : object.getAsJsonObject("personDetection").getAsJsonArray("people")) {
+        JsonObject person = item.getAsJsonObject(), box = person.getAsJsonObject("box");
+        people.add(new MockDecision.Person(box.get("left").getAsDouble(), box.get("top").getAsDouble(),
+            box.get("width").getAsDouble(), box.get("height").getAsDouble(), person.get("confidence").getAsDouble()));
+      }
+      decision.withPersonDetection(people);
+    }
+    if (object.has("faceDetection")) {
+      List<MockDecision.Face> faces = new ArrayList<>();
+      for (JsonElement item : object.getAsJsonObject("faceDetection").getAsJsonArray("faces")) {
+        JsonObject face = item.getAsJsonObject(), box = face.getAsJsonObject("box"), age = face.getAsJsonObject("ageRange");
+        faces.add(new MockDecision.Face(box.get("left").getAsDouble(), box.get("top").getAsDouble(),
+            box.get("width").getAsDouble(), box.get("height").getAsDouble(), face.get("confidence").getAsDouble(),
+            age == null ? null : new MockDecision.AgeRange(age.get("low").getAsInt(), age.get("high").getAsInt())));
+      }
+      decision.withFaceDetection(faces);
     }
     if (object.has("pendingReview")) {
       JsonObject review = object.getAsJsonObject("pendingReview");

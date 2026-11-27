@@ -131,6 +131,8 @@ type DecisionSpec =
       pendingReview?: { reason: string; uncertainCategories?: string[] };
       ocr?: { text: string | null; textRegions?: unknown[] };
       linkDetection?: { qrCodes?: unknown[]; links?: unknown[] };
+      personDetection?: { people: unknown[] };
+      faceDetection?: { faces: unknown[] };
     };
 type Scenario = {
   name: string;
@@ -203,6 +205,8 @@ const buildDecision = (spec: DecisionSpec) => {
       spec.linkDetection.links as never,
     );
   }
+  if (spec.personDetection) decision.withPersonDetection(spec.personDetection.people as never);
+  if (spec.faceDetection) decision.withFaceDetection(spec.faceDetection.faces as never);
   return decision;
 };
 

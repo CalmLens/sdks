@@ -1075,6 +1075,12 @@ final class ContractTest extends TestCase
         if (isset($spec['linkDetection'])) {
             $decision->withLinkDetection($spec['linkDetection']['qrCodes'] ?? [], $spec['linkDetection']['links'] ?? []);
         }
+        if (isset($spec['personDetection'])) {
+            $decision->withPersonDetection($spec['personDetection']['people']);
+        }
+        if (isset($spec['faceDetection'])) {
+            $decision->withFaceDetection($spec['faceDetection']['faces']);
+        }
         return $decision;
     }
 

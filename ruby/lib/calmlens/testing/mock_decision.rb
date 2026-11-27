@@ -134,6 +134,40 @@ module CalmLens
       self
     end
 
+    # The people person detection finds in an image (each `{ 'box' => { 'left', 'top', 'width',
+    # 'height' }, 'confidence' }`, as fractions from 0 to 1), reported as
+    # `classification.personDetection` when the upload turns person detection on. Without them, the
+    # mock finds nobody.
+    # @param people [Array<Hash>]
+    # @return [self]
+    def with_person_detection(people)
+      raise Internal.invalid('people must be an Array') unless people.is_a?(Array)
+
+      @people = MockDecision.json_copy(people)
+      self
+    end
+
+    # The faces face detection finds in an image (each `{ 'box', 'confidence' }` with an optional
+    # `'ageRange' => { 'low', 'high' }`), reported as `classification.faceDetection` when the upload
+    # turns face detection on; `ageRange` only when the upload also asks for age estimation. Without
+    # them, the mock finds no faces.
+    # @param faces [Array<Hash>]
+    # @return [self]
+    def with_face_detection(faces)
+      raise Internal.invalid('faces must be an Array') unless faces.is_a?(Array)
+
+      @faces = MockDecision.json_copy(faces)
+      self
+    end
+
+    # What {#with_person_detection} set, or nil.
+    # @api private
+    def person_findings = @people && MockDecision.json_copy(@people)
+
+    # What {#with_face_detection} set, or nil.
+    # @api private
+    def face_findings = @faces && MockDecision.json_copy(@faces)
+
     # What {#with_ocr} set, or nil.
     # @api private
     def ocr_findings = @ocr && MockDecision.json_copy(@ocr)

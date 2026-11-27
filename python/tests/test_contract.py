@@ -1245,6 +1245,10 @@ def _build_decision(spec: Any) -> testing.MockDecision:
         decision.with_ocr(ocr["text"], ocr.get("textRegions", []))
     if (links := spec.get("linkDetection")) is not None:
         decision.with_link_detection(links.get("qrCodes", []), links.get("links", []))
+    if (people := spec.get("personDetection")) is not None:
+        decision.with_person_detection(people["people"])
+    if (faces := spec.get("faceDetection")) is not None:
+        decision.with_face_detection(faces["faces"])
     return decision
 
 

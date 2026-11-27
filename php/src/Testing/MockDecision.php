@@ -34,6 +34,10 @@ final class MockDecision
     private ?array $ocr = null;
     /** @var ?array{qrCodes: list<array{value: string, box: array{left: int|float, top: int|float, width: int|float, height: int|float}}>, links: list<array{url: string, source: 'qr-code'|'text'}>} */
     private ?array $linkDetection = null;
+    /** @var ?list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, confidence: int|float}> */
+    private ?array $people = null;
+    /** @var ?list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, confidence: int|float, ageRange?: array{low: int, high: int}}> */
+    private ?array $faces = null;
 
     private function __construct(public readonly string $status)
     {
@@ -130,6 +134,44 @@ final class MockDecision
     {
         $this->linkDetection = ['qrCodes' => $qrCodes, 'links' => $links];
         return $this;
+    }
+
+    /**
+     * Sets the people person detection finds, for image uploads that enabled person detection:
+     * each a box as fractions of the image width and height, from 0 to 1, and a confidence from
+     * 0 to 1. Without them, the mock finds nobody.
+     *
+     * @param list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, confidence: int|float}> $people
+     */
+    public function withPersonDetection(array $people): self
+    {
+        $this->people = array_values($people);
+        return $this;
+    }
+
+    /**
+     * Sets the faces face detection finds, for image uploads that enabled face detection: each a
+     * box, a confidence and, optionally, an `ageRange`, reported only when the upload also asked
+     * for age estimation. Without them, the mock finds no faces.
+     *
+     * @param list<array{box: array{left: int|float, top: int|float, width: int|float, height: int|float}, confidence: int|float, ageRange?: array{low: int, high: int}}> $faces
+     */
+    public function withFaceDetection(array $faces): self
+    {
+        $this->faces = array_values($faces);
+        return $this;
+    }
+
+    /** @internal */
+    public function personFindings(): ?array
+    {
+        return $this->people;
+    }
+
+    /** @internal */
+    public function faceFindings(): ?array
+    {
+        return $this->faces;
     }
 
     /** @internal */

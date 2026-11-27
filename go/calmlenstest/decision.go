@@ -108,6 +108,8 @@ type Decision struct {
 	review        *pendingReview
 	ocr           *ocrFindings
 	linkDetection calmlens.JSON
+	people        []any
+	faces         []any
 	err           error
 }
 
@@ -146,6 +148,32 @@ func (d *Decision) WithLinkDetection(qrCodes []calmlens.DetectedQRCode, links []
 		found = append(found, calmlens.JSON{"url": link.URL, "source": string(link.Source)})
 	}
 	d.linkDetection = calmlens.JSON{"qrCodes": codes, "links": found}
+	return d
+}
+
+// WithPersonDetection sets the people person detection finds in an image, reported as
+// classification.personDetection when the upload turns person detection on. Without it, the
+// mock finds nobody.
+func (d *Decision) WithPersonDetection(people ...calmlens.DetectedPerson) *Decision {
+	d.people = make([]any, 0, len(people))
+	for _, person := range people {
+		d.people = append(d.people, calmlens.JSON{"box": boxJSON(person.Box), "confidence": person.Confidence})
+	}
+	return d
+}
+
+// WithFaceDetection sets the faces face detection finds in an image, reported as
+// classification.faceDetection when the upload turns face detection on; a face's AgeRange only
+// when the upload also asks for age estimation. Without it, the mock finds no faces.
+func (d *Decision) WithFaceDetection(faces ...calmlens.DetectedFace) *Decision {
+	d.faces = make([]any, 0, len(faces))
+	for _, face := range faces {
+		found := calmlens.JSON{"box": boxJSON(face.Box), "confidence": face.Confidence}
+		if age := face.AgeRange; age != nil {
+			found["ageRange"] = calmlens.JSON{"low": age.Low, "high": age.High}
+		}
+		d.faces = append(d.faces, found)
+	}
 	return d
 }
 

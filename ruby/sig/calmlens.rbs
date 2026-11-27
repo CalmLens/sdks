@@ -553,6 +553,13 @@ module CalmLens
     def with_link_detection: (?Array[Hash[String | Symbol, untyped]] qr_codes, ?Array[Hash[String | Symbol, untyped]] links) -> self
     def ocr_findings: () -> Hash[String, untyped]?
     def link_findings: () -> Hash[String, untyped]?
+    # The people person detection finds in an image (`classification.personDetection`).
+    def with_person_detection: (Array[Hash[String | Symbol, untyped]] people) -> self
+    # The faces face detection finds in an image (`classification.faceDetection`); `ageRange`
+    # only when the upload asks for age estimation.
+    def with_face_detection: (Array[Hash[String | Symbol, untyped]] faces) -> self
+    def person_findings: () -> Array[Hash[String, untyped]]?
+    def face_findings: () -> Array[Hash[String, untyped]]?
     def self.json_copy: (untyped value) -> untyped
     # The `categories`, `score` and `policy` a decided asset gets; nil for `pending` and `failed`.
     # `requested_at` is when a pending review joined the queue, in epoch milliseconds.

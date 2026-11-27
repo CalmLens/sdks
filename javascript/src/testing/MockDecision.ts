@@ -37,16 +37,18 @@ const STATUS_ACTION = {
 
 type Category = (typeof MOCK_CATEGORIES)[number];
 
-type EvaluatedFeature<K extends "ocr" | "linkDetection"> = Extract<
-  NonNullable<Asset["classification"][K]>,
-  { status: "evaluated" }
->;
+type EvaluatedFeature<K extends "ocr" | "linkDetection" | "personDetection" | "faceDetection"> =
+  Extract<NonNullable<Asset["classification"][K]>, { status: "evaluated" }>;
 /** A region of text OCR found, as `classification.ocr.textRegions` reports one. */
 export type MockTextRegion = EvaluatedFeature<"ocr">["textRegions"][number];
 /** A QR code link detection decoded, as `classification.linkDetection.qrCodes` reports one. */
 export type MockQrCode = EvaluatedFeature<"linkDetection">["qrCodes"][number];
 /** A link found in an image's text or QR codes, as `classification.linkDetection.links` reports one. */
 export type MockDetectedLink = EvaluatedFeature<"linkDetection">["links"][number];
+/** A person person detection found, as `classification.personDetection.people` reports one. */
+export type MockDetectedPerson = EvaluatedFeature<"personDetection">["people"][number];
+/** A face face detection found, as `classification.faceDetection.faces` reports one. */
+export type MockDetectedFace = EvaluatedFeature<"faceDetection">["faces"][number];
 
 /** Why a decision waits for human review: `sampled`, or `uncertain` about some categories. */
 export type MockPendingReviewReason = "sampled" | "uncertain";
@@ -82,6 +84,8 @@ export class MockDecision {
   #pendingReview?: { reason: MockPendingReviewReason; uncertainCategories: Category[] };
   #ocr?: { text: string | null; textRegions: MockTextRegion[] };
   #linkDetection?: { qrCodes: MockQrCode[]; links: MockDetectedLink[] };
+  #people?: MockDetectedPerson[];
+  #faces?: MockDetectedFace[];
 
   constructor(status: MockAssetOutcome) {
     if (!OUTCOMES.includes(status)) {
@@ -166,6 +170,35 @@ export class MockDecision {
   withLinkDetection(qrCodes: MockQrCode[] = [], links: MockDetectedLink[] = []): this {
     this.#linkDetection = { qrCodes: structuredClone(qrCodes), links: structuredClone(links) };
     return this;
+  }
+
+  /**
+   * The people person detection finds in an image, reported as `classification.personDetection`
+   * when the upload turns person detection on. Without them, it finds nobody.
+   */
+  withPersonDetection(people: MockDetectedPerson[]): this {
+    this.#people = structuredClone(people);
+    return this;
+  }
+
+  /**
+   * The faces face detection finds in an image, reported as `classification.faceDetection` when
+   * the upload turns face detection on; each face's `ageRange` only when the upload also asks for
+   * age estimation. Without them, it finds no faces.
+   */
+  withFaceDetection(faces: MockDetectedFace[]): this {
+    this.#faces = structuredClone(faces);
+    return this;
+  }
+
+  /** @internal What `withPersonDetection` set, if anything. */
+  get personFindings(): MockDetectedPerson[] | undefined {
+    return this.#people && structuredClone(this.#people);
+  }
+
+  /** @internal What `withFaceDetection` set, if anything. */
+  get faceFindings(): MockDetectedFace[] | undefined {
+    return this.#faces && structuredClone(this.#faces);
   }
 
   /** @internal What `withOcr` set, if anything. */

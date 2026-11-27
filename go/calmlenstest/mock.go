@@ -199,6 +199,36 @@ const (
 	FailureTimeout calmlens.ErrorCode = "timeout"
 )
 
+// urlAssetType is a URL upload's type: the type of its path's file extension
+// (mockURLExtensionTypes), compared lower-case without the query or fragment, or website for any
+// other extension or none. The mock fetches nothing, so the extension stands in for the fetched
+// content's type.
+func urlAssetType(rawURL string) string {
+	path := rawURL
+	if parsed, err := url.Parse(rawURL); err == nil {
+		path = parsed.Path
+	} else if end := strings.IndexAny(path, "?#"); end != -1 {
+		path = path[:end]
+	}
+	segment := path[strings.LastIndex(path, "/")+1:]
+	dot := strings.LastIndex(segment, ".")
+	if dot == -1 {
+		return string(calmlens.AssetTypeWebsite)
+	}
+	if kind, ok := mockURLExtensionTypes[strings.ToLower(segment[dot+1:])]; ok {
+		return kind
+	}
+	return string(calmlens.AssetTypeWebsite)
+}
+
+// detections copies the people or faces a decision supplies: none when it supplies none.
+func detections(found []any) []any {
+	if len(found) == 0 {
+		return []any{}
+	}
+	return cloneJSON(found).([]any)
+}
+
 // RequestFailure is how FailNextRequest fails a request.
 type RequestFailure struct {
 	// Code is FailureTransportError, FailureTimeout or an API error code, such as
@@ -778,7 +808,7 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	m.requests = append(m.requests, captured)
 	m.requestCount++
 	header := http.Header{"X-Request-Id": {fmt.Sprintf("req_mock_%d", m.requestCount)}}
-	operations := operationsOf(req.Method, parts, req.URL.Query(), cdn)
+	operations := operationsOf(req.Method, parts, req.URL.Query(), captured.Body, cdn)
 	for index, queued := range m.failures {
 		if queued.Operation != "" && !contains(operations, queued.Operation) {
 			continue
@@ -875,8 +905,9 @@ func validIdempotencyKey(key string) bool {
 }
 
 // operationsOf names the JavaScript client methods a request can come from, for
-// FailNextRequest.
-func operationsOf(method string, parts []string, q url.Values, cdn bool) []string {
+// FailNextRequest. body is the request's decoded JSON body, if any: a text upload (its
+// content.plainText) is text.classify's request alone, and a file or URL upload assets.classify's.
+func operationsOf(method string, parts []string, q url.Values, body calmlens.JSON, cdn bool) []string {
 	if cdn {
 		if len(parts) >= 4 && parts[3] == string(calmlens.ResourceInfo) {
 			return []string{"cdn.getAssetInfo"}
@@ -932,7 +963,10 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		case route == "assets" && q.Get("wait") == "false":
 			return []string{"assets.create"}
 		case route == "assets":
-			return []string{"assets.classify", "text.classify"}
+			if _, isText := asJSON(body["content"])["plainText"].(string); isText {
+				return []string{"text.classify"}
+			}
+			return []string{"assets.classify"}
 		}
 		return nil
 	}
@@ -1579,7 +1613,7 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	lower := strings.ToLower(mime)
 	kind := string(calmlens.AssetTypeFile)
 	if options["url"] != nil {
-		kind = string(calmlens.AssetTypeWebsite)
+		kind = urlAssetType(text(options["url"]))
 	} else {
 		for _, prefix := range []string{"image", "video", "audio"} {
 			if strings.HasPrefix(lower, prefix+"/") {
@@ -1829,8 +1863,10 @@ func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued b
 
 // decide applies a moderation decision to a processing asset, with its report; a pending
 // decision leaves it processing. A decided image reports OCR and person and face detection when
-// its upload turned them on, and link detection unless it turned it off: the OCR and link
-// findings the decision supplies (WithOCR, WithLinkDetection), and no people or faces.
+// its upload turned them on, and link detection unless it turned it off: the findings the
+// decision supplies (WithOCR, WithLinkDetection, WithPersonDetection, WithFaceDetection), and no
+// people or faces without them. Like the API, a face has its ageRange only when the upload asked
+// for age estimation.
 func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if decision.status == OutcomePending {
 		return
@@ -1860,10 +1896,17 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 		classification["linkDetection"] = found
 	}
 	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
-		classification["personDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "people": []any{}}
+		classification["personDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "people": detections(decision.people)}
 	}
 	if enabled, _ := asJSON(features["faceDetection"])["enabled"].(bool); enabled {
-		classification["faceDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "faces": []any{}}
+		ages, _ := asJSON(features["faceDetection"])["ageEstimation"].(bool)
+		faces := detections(decision.faces)
+		for _, face := range faces {
+			if !ages {
+				delete(face.(map[string]any), "ageRange")
+			}
+		}
+		classification["faceDetection"] = calmlens.JSON{"status": string(calmlens.ResultEvaluated), "faces": faces}
 	}
 }
 

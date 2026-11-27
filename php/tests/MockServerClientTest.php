@@ -276,7 +276,7 @@ final class MockServerClientTest extends TestCase
     public function testFiltersSupportOrWildcardsAndValueLists(): void
     {
         $time = 1;
-        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->asset['description'], now: function () use (&$time) { return $time++; });
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->asset->description, now: function () use (&$time) { return $time++; });
         $client = $mock->client();
         foreach (['allowed' => 'note-a.txt', 'blocked' => 'photo.png', 'purged' => 'note-b.txt'] as $status => $name) {
             $client->text->classify(['name' => $name, 'description' => $status, 'text' => 'x']);

@@ -4,6 +4,7 @@ use super::decision::{
     IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
     MockModerationTrigger, MockOutcome,
 };
+use super::url_asset_types::MOCK_URL_EXTENSION_TYPES;
 use super::MockResponse;
 use crate::contract_checks::{
     check_transform_options, invalid_upload_mime_type, is_accepted_upload_mime_type,
@@ -555,6 +556,28 @@ fn normalize_mime(mime: &str) -> String {
     mime.split(';').next().unwrap_or("").trim().to_lowercase()
 }
 /// The asset type the API infers from a content type.
+/// A URL upload's type: the type of its path's file extension
+/// ([`MOCK_URL_EXTENSION_TYPES`]), compared lower-case without the query or fragment, or `website`
+/// for any other extension or none. The mock fetches nothing, so the extension stands in for the
+/// fetched content's type.
+fn url_asset_type(url: &str) -> &'static str {
+    let path = reqwest::Url::parse(url).map_or_else(
+        |_| url.split(['?', '#']).next().unwrap_or("").to_owned(),
+        |parsed| parsed.path().to_owned(),
+    );
+    let segment = path.rsplit('/').next().unwrap_or("");
+    segment
+        .rsplit_once('.')
+        .and_then(|(_, extension)| {
+            let extension = extension.to_ascii_lowercase();
+            MOCK_URL_EXTENSION_TYPES
+                .iter()
+                .find(|(known, _)| *known == extension)
+                .map(|(_, kind)| *kind)
+        })
+        .unwrap_or("website")
+}
+
 fn asset_type(mime: &str) -> &'static str {
     if mime.starts_with("image/") {
         "image"
@@ -1414,7 +1437,7 @@ impl Backend {
         };
         // Like the API: a new folder, hash list, entry or policy is 201 Created, a queued batch 202
         // Accepted. Adding a hash a list already holds returns the entry with 200.
-        let operation = self.operation(method, url);
+        let operation = self.operation(method, url, headers, raw);
         let entries = self.storage.hash_list_entries.len();
         let outcome = self.dispatch(method, &parts, &query, body, raw, headers);
         let status = match operation {
@@ -1632,7 +1655,8 @@ impl Backend {
             .get(text(&asset["id"]))
             .map_or(Value::Null, |options| options["features"].clone());
         // The mock reads nothing in an image: features find only what the decision supplies
-        // (`with_ocr`, `with_link_detection`), and no people or faces.
+        // (`with_ocr`, `with_link_detection`, `with_person_detection`, `with_face_detection`).
+        // Like the API, a face has its `ageRange` only when the upload asked for age estimation.
         if features["ocr"]["enabled"] == true {
             let (text, regions) = decision
                 .ocr_findings()
@@ -1652,10 +1676,20 @@ impl Backend {
             found["status"] = json!("evaluated");
             classification["linkDetection"] = found;
         }
-        for (feature, list) in [("personDetection", "people"), ("faceDetection", "faces")] {
-            if features[feature]["enabled"] == true {
-                classification[feature] = json!({"status": "evaluated", list: []});
+        if features["personDetection"]["enabled"] == true {
+            let people = decision.person_findings().cloned().unwrap_or(json!([]));
+            classification["personDetection"] = json!({"status": "evaluated", "people": people});
+        }
+        if features["faceDetection"]["enabled"] == true {
+            let mut faces = decision.face_findings().cloned().unwrap_or(json!([]));
+            if features["faceDetection"]["ageEstimation"] != true {
+                for face in faces.as_array_mut().into_iter().flatten() {
+                    if let Some(face) = face.as_object_mut() {
+                        face.remove("ageRange");
+                    }
+                }
             }
+            classification["faceDetection"] = json!({"status": "evaluated", "faces": faces});
         }
     }
 
@@ -2337,7 +2371,11 @@ impl Backend {
             failure.details = json!({ "mimeType": mime, "source": "calmlens" });
             return Err(failure);
         }
-        let kind = if website { "website" } else { asset_type(mime) };
+        let kind = if website {
+            url_asset_type(options.get("url").map_or("", text))
+        } else {
+            asset_type(mime)
+        };
         if multipart {
             // Like the API: a declared total is checked before anything is stored, then a
             // single final part as the whole upload, then the part itself.
@@ -3126,8 +3164,10 @@ impl Backend {
         &mut self,
         method: &Method,
         url: &reqwest::Url,
+        headers: &HeaderMap,
+        body: &[u8],
     ) -> Option<QueuedFailure> {
-        let operation = self.operation(method, url);
+        let operation = self.operation(method, url, headers, body);
         let index = self.failures.iter().position(|queued| {
             queued
                 .options
@@ -3137,8 +3177,16 @@ impl Backend {
         })?;
         Some(self.failures.remove(index))
     }
-    /// The operation a request belongs to, by its route: an operation name in [`OPERATIONS`].
-    fn operation(&self, method: &Method, url: &reqwest::Url) -> Option<&'static str> {
+    /// The operation a request belongs to, by its route: an operation name in [`OPERATIONS`]. A
+    /// text upload (a JSON body with `content.plainText`) is `text.classify`'s request alone, and
+    /// a file or URL upload `assets.classify`'s.
+    fn operation(
+        &self,
+        method: &Method,
+        url: &reqwest::Url,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Option<&'static str> {
         if let Some(rest) = under(url, &self.options.cdn_base_url) {
             let info = rest.split('/').filter(|part| !part.is_empty()).nth(3) == Some("info");
             return Some(if info {
@@ -3168,6 +3216,7 @@ impl Backend {
             ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
             ("POST", ["projects", _, "signed-asset-urls"]) => "cdn.signAssetUrl",
             ("POST", ["projects", _, "assets"]) if no_wait => "assets.create",
+            ("POST", ["projects", _, "assets"]) if is_text_upload(headers, body) => "text.classify",
             ("POST", ["projects", _, "assets"]) => "assets.classify",
             ("GET", ["assets", _]) => "assets.retrieve",
             ("PATCH", ["assets", _]) => "assets.update",
@@ -3213,14 +3262,21 @@ impl Backend {
     }
 }
 
+/// Whether a request is a text upload: a JSON body (not a raw upload) whose `content.plainText` is
+/// text, as `text.classify` sends.
+fn is_text_upload(headers: &HeaderMap, body: &[u8]) -> bool {
+    header(headers, "x-calmlens-upload").is_empty()
+        && serde_json::from_slice::<Value>(body)
+            .is_ok_and(|body| body["content"]["plainText"].is_string())
+}
+
 /// Whether a failure queued for operation `target` applies to a request of `operation`:
 /// conveniences fail with the request they send.
 fn covers(target: &str, operation: &str) -> bool {
     target == operation
         || matches!(
             (target, operation),
-            ("text.classify", "assets.classify")
-                | ("assets.waitForDecision", "assets.retrieve")
+            ("assets.waitForDecision", "assets.retrieve")
                 | ("assets.iterate", "assets.list")
                 | ("assets.iterateChildren", "assets.listChildren")
                 | ("assets.iterateTimeline", "assets.listTimeline")

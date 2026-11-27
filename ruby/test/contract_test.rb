@@ -123,6 +123,8 @@ class ContractTest < Minitest::Test
     decision.with_ocr(spec['ocr']['text'], spec['ocr'].fetch('textRegions', [])) if spec['ocr']
     links = spec['linkDetection']
     decision.with_link_detection(links.fetch('qrCodes', []), links.fetch('links', [])) if links
+    decision.with_person_detection(spec['personDetection']['people']) if spec['personDetection']
+    decision.with_face_detection(spec['faceDetection']['faces']) if spec['faceDetection']
     decision
   end
 

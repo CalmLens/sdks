@@ -53,6 +53,7 @@ import {
   type MockModerationTrigger,
 } from "./MockDecision";
 import type { MockDatabaseStorage, MockImageStorage } from "./MockStorage";
+import { MOCK_URL_EXTENSION_TYPES } from "./MockUrlAssetTypes";
 import {
   createPage,
   DEFAULT_PAGE_SIZE,
@@ -151,10 +152,10 @@ export type MockCalmLensOperation = (typeof MOCK_OPERATIONS)[number];
 
 /**
  * One request a mock client sent, as the in-memory API received it. `operation` is the client
- * method that sends it; requests several methods send are recorded under the first: `text.classify`
- * as `assets.classify`, `ensureLens` as `ensureLenses`, `assets.waitForDecision` polls as
- * `assets.retrieve`, and so on. `callsTo` matches all of
- * them. Methods that send nothing, such as `uploadTokens.sign` or a cached `ensureLens`, are not
+ * method that sends it; requests several methods send are recorded under the first: `ensureLens`
+ * as `ensureLenses`, `assets.waitForDecision` polls as `assets.retrieve`, and so on. `callsTo`
+ * matches all of them. A text upload is `text.classify`'s and a file or URL upload
+ * `assets.classify`'s, never both. Methods that send nothing, such as `uploadTokens.sign` or a cached `ensureLens`, are not
  * recorded.
  */
 export interface MockCalmLensCall {
@@ -438,9 +439,26 @@ const mockRendering = (
   }
 };
 
-/** An asset's type from its content type, or `website` for a URL. */
-const inferAssetType = (contentType: string | undefined): AssetType => {
-  if (contentType === undefined) return "website";
+/**
+ * A URL upload's type: the type of its path's file extension (`MOCK_URL_EXTENSION_TYPES`),
+ * compared lower-case without the query or fragment, or `website` for any other extension or none.
+ * The mock fetches nothing, so the extension stands in for the fetched content's type.
+ */
+const urlAssetType = (url: string): AssetType => {
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    path = url.split(/[?#]/, 1)[0]!;
+  }
+  const segment = path.slice(path.lastIndexOf("/") + 1);
+  const dot = segment.lastIndexOf(".");
+  if (dot === -1) return "website";
+  return MOCK_URL_EXTENSION_TYPES[segment.slice(dot + 1).toLowerCase()] ?? "website";
+};
+
+/** An asset's type from its content type. */
+const inferAssetType = (contentType: string): AssetType => {
   const type = contentType.toLowerCase();
   if (type.startsWith("image/")) return "image";
   if (type.startsWith("video/")) return "video";
@@ -734,7 +752,9 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       case "assets":
         if (method === "GET") return ["assets.list"];
         if (query.get("wait") === "false") return ["assets.create"];
-        return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
+        // A text upload is text.classify's request alone, and a file or URL upload
+        // assets.classify's, so a failure queued for one never fails the other.
+        return isTextUpload(request) ? ["text.classify"] : ["assets.classify"];
     }
     if (segments[2] === "assets" && segments[4] === "timeline" && segments.length === 5) {
       return ["assets.listTimeline"];
@@ -2304,7 +2324,8 @@ export class MockCalmLensApi {
         details: { mimeType: contentType, source: "calmlens" },
       });
     }
-    const type = inferAssetType(fields.url === undefined ? (contentType ?? "") : undefined);
+    const type =
+      fields.url === undefined ? inferAssetType(contentType ?? "") : urlAssetType(fields.url);
     if (part) {
       if (part.partNumber > 1) throw fail(API_ERROR_CODES.USE_UPLOAD_PART);
       // Like the API, a declared total is checked before anything is stored, then a single final
@@ -2425,6 +2446,8 @@ export class MockCalmLensApi {
         // Like the API, a feature's result is `null` until it has run.
         ocr: null,
         linkDetection: null,
+        personDetection: null,
+        faceDetection: null,
       },
     } as unknown as Asset;
 
@@ -2578,8 +2601,10 @@ export class MockCalmLensApi {
     const features = this.processingOptions.get(asset.id)?.features;
     if (next.classification.status !== "completed" || asset.type !== "image") return next;
     // The mock reads nothing in an image: features find only what the decision supplies
-    // (`withOcr`, `withLinkDetection`), and no people or faces.
+    // (`withOcr`, `withLinkDetection`, `withPersonDetection`, `withFaceDetection`). Like the API,
+    // a face has its age range only when the upload asked for age estimation.
     const ocr = features?.ocr?.enabled === true ? decision.ocrFindings : undefined;
+    const ages = features?.faceDetection?.ageEstimation === true;
     return {
       ...next,
       ...(ocr?.text != null &&
@@ -2598,10 +2623,15 @@ export class MockCalmLensApi {
           },
         }),
         ...(features?.personDetection?.enabled === true && {
-          personDetection: { status: "evaluated", people: [] },
+          personDetection: { status: "evaluated", people: decision.personFindings ?? [] },
         }),
         ...(features?.faceDetection?.enabled === true && {
-          faceDetection: { status: "evaluated", faces: [] },
+          faceDetection: {
+            status: "evaluated",
+            faces: (decision.faceFindings ?? []).map(({ ageRange, ...face }) =>
+              ages && ageRange ? { ...face, ageRange } : face,
+            ),
+          },
         }),
       },
     };

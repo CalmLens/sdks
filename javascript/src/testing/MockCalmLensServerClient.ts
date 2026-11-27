@@ -183,8 +183,8 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
 
   /**
    * Requests `operation` sends, oldest first. A request several methods send matches each of
-   * them: `callsTo("text.classify")` also lists `assets.classify` text uploads, and
-   * `callsTo("assets.waitForDecision")` the `assets.retrieve` requests it polls with.
+   * them: `callsTo("assets.waitForDecision")` lists the `assets.retrieve` requests it polls
+   * with. A text upload is `text.classify`'s request and a file or URL upload `assets.classify`'s.
    */
   callsTo(operation: MockCalmLensOperation): MockCalmLensCall[] {
     return this.#api.calls

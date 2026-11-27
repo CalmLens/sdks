@@ -380,7 +380,8 @@ func toAny[T any](values map[string]T) map[string]any {
 // packages/sdk-contract/mockScenarios.ts writes them and every SDK's offline mock replays them.
 
 // decisionSpec is a decision as the builder makes it: a status, or a status with Flag,
-// NotEvaluated, PendingReview, WithOCR and WithLinkDetection calls.
+// NotEvaluated, PendingReview, WithOCR, WithLinkDetection, WithPersonDetection and
+// WithFaceDetection calls.
 type decisionSpec struct {
 	Status string
 	Flags  []struct {
@@ -401,6 +402,8 @@ type decisionSpec struct {
 		QRCodes []calmlens.DetectedQRCode `json:"qrCodes"`
 		Links   []calmlens.DetectedLink
 	}
+	PersonDetection *struct{ People []calmlens.DetectedPerson }
+	FaceDetection   *struct{ Faces []calmlens.DetectedFace }
 }
 
 func (spec *decisionSpec) UnmarshalJSON(data []byte) error {
@@ -442,6 +445,12 @@ func (spec decisionSpec) build() *Decision {
 	}
 	if links := spec.LinkDetection; links != nil {
 		decision.WithLinkDetection(links.QRCodes, links.Links)
+	}
+	if people := spec.PersonDetection; people != nil {
+		decision.WithPersonDetection(people.People...)
+	}
+	if faces := spec.FaceDetection; faces != nil {
+		decision.WithFaceDetection(faces.Faces...)
 	}
 	return decision
 }

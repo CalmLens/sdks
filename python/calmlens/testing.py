@@ -36,6 +36,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from . import error_codes
 from ._asset_filters import ASSET_FILTER_FIELDS
 from ._mock_classification import CATEGORIES, QUALIFIERS
+from ._mock_url_asset_types import MOCK_URL_EXTENSION_TYPES
 from .client import (AppInfo, RequestAttempt, TransportRequest, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES,
                      DEFAULT_SIGNED_URL_EXPIRES_IN, DEFAULT_TIMEOUT, MAX_SIGNED_URL_EXPIRES_IN, USER_AGENT,
                      CalmLensServerClient, CDNResponse, _CDN_RESOURCE_PATHS,
@@ -120,6 +121,8 @@ class MockDecision:
         self._pending_review: tuple[str, list[str]] | None = None
         self._ocr: dict[str, Any] | None = None
         self._link_detection: dict[str, Any] | None = None
+        self._people: list[dict[str, Any]] | None = None
+        self._faces: list[dict[str, Any]] | None = None
 
     def flag(self, category: str, score: float, qualifiers: Mapping[str, float] | None = None) -> MockDecision:
         """Record findings in ``category`` with its ``score`` (0 to 1) and, optionally, scores for
@@ -177,6 +180,22 @@ class MockDecision:
         ``classification.linkDetection`` unless the upload turns link detection off."""
         self._link_detection = {"qrCodes": copy.deepcopy([dict(code) for code in qr_codes]),
                                 "links": copy.deepcopy([dict(link) for link in links])}
+        return self
+
+    def with_person_detection(self, people: Sequence[Mapping[str, Any]]) -> MockDecision:
+        """The people person detection finds in an image (each ``{"box": {"left", "top", "width",
+        "height"}, "confidence"}``, as fractions from 0 to 1), reported as
+        ``classification.personDetection`` when the upload turns person detection on. Without
+        them, it finds nobody."""
+        self._people = copy.deepcopy([dict(person) for person in people])
+        return self
+
+    def with_face_detection(self, faces: Sequence[Mapping[str, Any]]) -> MockDecision:
+        """The faces face detection finds in an image (each ``{"box", "confidence"}`` with an
+        optional ``"ageRange": {"low", "high"}``), reported as ``classification.faceDetection``
+        when the upload turns face detection on; ``ageRange`` only when the upload also asks for
+        age estimation. Without them, it finds no faces."""
+        self._faces = copy.deepcopy([dict(face) for face in faces])
         return self
 
     def _check_finding(self, category: str) -> None:
@@ -958,6 +977,15 @@ def _invalid_field(code: str, path: str) -> _Failure:
                     {"issues": [{"path": path, "message": f"Invalid {path}", "code": code}]})
 
 
+def _url_asset_type(url: Any) -> str:
+    """A URL upload's type: the type of its path's file extension (``MOCK_URL_EXTENSION_TYPES``),
+    compared lower-case without the query or fragment, or ``website`` for any other extension or
+    none. The mock fetches nothing, so the extension stands in for the fetched content's type."""
+    segment = urlsplit(url).path.rsplit("/", 1)[-1] if isinstance(url, str) else ""
+    _, dot, extension = segment.rpartition(".")
+    return MOCK_URL_EXTENSION_TYPES.get(extension.lower(), "website") if dot else "website"
+
+
 def _check_metadata(metadata: Any) -> None:
     """Refuse ``metadata`` the API's schema refuses: it is ``None`` or a list of ``{id, value}``
     objects with a string ``id`` and any JSON ``value``."""
@@ -1230,9 +1258,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         to raise. Each queued failure fails one request, so a client retry takes the next queued
         failure or reaches the API.
 
-        A request counts for every method that sends it: ``text.classify`` uploads also count as
-        ``assets.classify``, ``ensureLens`` as ``ensureLenses``, ``assets.waitForDecision`` polls
-        as ``assets.retrieve`` and ``assets.iterate`` pages as ``assets.list``. An unknown
+        A request counts for every method that sends it: ``ensureLens`` as ``ensureLenses``, ``assets.waitForDecision`` polls
+        as ``assets.retrieve`` and ``assets.iterate`` pages as ``assets.list``. A text upload is
+        ``text.classify``'s request alone, and a file or URL upload ``assets.classify``'s. An unknown
         operation, or ``details`` or ``retry_after`` with a transport error, timeout or exception,
         raises ``sdk/invalid-argument``."""
         if isinstance(failure, str) and failure not in ("transport-error", "timeout") \
@@ -1458,7 +1486,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     return ["assets.create"]
                 content = body.get("content") if isinstance(body, dict) else None
                 text = isinstance(content, dict) and "plainText" in content and content.get("type") == "text/plain"
-                return ["assets.classify", "text.classify"] if text else ["assets.classify"]
+                return ["text.classify"] if text else ["assets.classify"]
             return []
         resource = parts[0]
         suffix = parts[2] if len(parts) > 2 else ""
@@ -1838,7 +1866,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             # Like the API: an upload of a type CalmLens can't moderate is refused before it is stored.
             refused = _invalid_upload_mime_type(mime)
             raise _Failure(refused.code, refused.message, details=refused.details)
-        kind = "website" if "url" in options else next(
+        kind = _url_asset_type(options["url"]) if "url" in options else next(
             (k for k in ("image", "video", "audio") if mime.startswith(k + "/")),
             "plaintext-document" if mime.startswith("text/") else
             "multimedia-document" if "pdf" in mime or "document" in mime else "file")
@@ -1987,8 +2015,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def _decided(self, asset: dict[str, Any], decision: MockDecision) -> None:
         """Decide ``asset`` as ``decision`` says, with its report. A decided image reports the OCR
         and person and face detection its upload turned on, and link detection unless it was
-        turned off: OCR and link findings from :meth:`MockDecision.with_ocr` and
-        :meth:`MockDecision.with_link_detection`, and no people or faces."""
+        turned off: the findings from :meth:`MockDecision.with_ocr`,
+        :meth:`MockDecision.with_link_detection`, :meth:`MockDecision.with_person_detection` and
+        :meth:`MockDecision.with_face_detection`, and no people or faces without them. Like the API,
+        a face has its ``ageRange`` only when the upload asked for age estimation."""
         self._apply_outcome(asset, decision.status, "policy", decision.report(self.now()))
         classification = asset["classification"]
         if classification["status"] != "completed" or asset["type"] != "image":
@@ -2004,9 +2034,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
             found = decision._link_detection or {"qrCodes": [], "links": []}
             classification["linkDetection"] = {"status": "evaluated", **copy.deepcopy(found)}
         if (features.get("personDetection") or {}).get("enabled") is True:
-            classification["personDetection"] = {"status": "evaluated", "people": []}
-        if (features.get("faceDetection") or {}).get("enabled") is True:
-            classification["faceDetection"] = {"status": "evaluated", "faces": []}
+            classification["personDetection"] = {"status": "evaluated",
+                                                 "people": copy.deepcopy(decision._people or [])}
+        face_detection = features.get("faceDetection") or {}
+        if face_detection.get("enabled") is True:
+            ages = face_detection.get("ageEstimation") is True
+            classification["faceDetection"] = {"status": "evaluated", "faces": [
+                {key: value for key, value in face.items() if ages or key != "ageRange"}
+                for face in copy.deepcopy(decision._faces or [])]}
 
     def _moderate_stored(self, asset: dict[str, Any], trigger: MockModerationTrigger,
                          decision: MockDecision | None = None) -> None:

@@ -2,7 +2,9 @@
 //! [`MockServerClient::complete_processing`](super::MockServerClient::complete_processing).
 use super::classification::{CATEGORIES, QUALIFIERS};
 use crate::error::ErrorCode;
-use crate::models::{Asset, DetectedLink, DetectedQrCode, TextRegion};
+use crate::models::{
+    Asset, DetectedFace, DetectedLink, DetectedPerson, DetectedQrCode, TextRegion,
+};
 use crate::{Error, Result};
 use serde_json::{json, Map, Value};
 use std::{fmt, str::FromStr};
@@ -161,6 +163,8 @@ pub struct MockDecision {
     pending_review: Option<PendingReview>,
     ocr: Option<(Option<String>, Value)>,
     link_detection: Option<Value>,
+    people: Option<Value>,
+    faces: Option<Value>,
 }
 impl From<MockOutcome> for MockDecision {
     fn from(status: MockOutcome) -> Self {
@@ -177,6 +181,8 @@ impl MockDecision {
             pending_review: None,
             ocr: None,
             link_detection: None,
+            people: None,
+            faces: None,
         }
     }
     /// The decision's status.
@@ -286,6 +292,28 @@ impl MockDecision {
             "links": serde_json::to_value(links).unwrap_or_else(|_| json!([])),
         }));
         self
+    }
+    /// The people person detection finds in an image, reported as
+    /// `classification.personDetection` when the upload turns person detection on. Without them,
+    /// the mock finds nobody.
+    pub fn with_person_detection(mut self, people: &[DetectedPerson]) -> Self {
+        self.people = Some(serde_json::to_value(people).unwrap_or_else(|_| json!([])));
+        self
+    }
+    /// The faces face detection finds in an image, reported as `classification.faceDetection`
+    /// when the upload turns face detection on; a face's `age_range` only when the upload also
+    /// asks for age estimation. Without them, the mock finds no faces.
+    pub fn with_face_detection(mut self, faces: &[DetectedFace]) -> Self {
+        self.faces = Some(serde_json::to_value(faces).unwrap_or_else(|_| json!([])));
+        self
+    }
+    /// What `with_person_detection` set: `people` JSON.
+    pub(crate) fn person_findings(&self) -> Option<&Value> {
+        self.people.as_ref()
+    }
+    /// What `with_face_detection` set: `faces` JSON.
+    pub(crate) fn face_findings(&self) -> Option<&Value> {
+        self.faces.as_ref()
     }
     /// What `with_ocr` set: the text and `textRegions` JSON.
     pub(crate) fn ocr_findings(&self) -> Option<&(Option<String>, Value)> {
