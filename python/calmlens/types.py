@@ -959,9 +959,9 @@ class AssetClassification(CalmLensObject):
     moderation: AssetModeration
     #: What OCR found in an image; ``None`` until it has run or when it wasn't requested.
     ocr: Optional[OcrResult]
-    #: Preview. The people person detection found; ``None`` until it has run or when it wasn't requested.
+    #: Preview. The people that person detection found; ``None`` until it has run or when it wasn't requested.
     person_detection: Optional[PersonDetectionResult]
-    #: Preview. The faces face detection found; ``None`` until it has run or when it wasn't requested.
+    #: Preview. The faces that face detection found; ``None`` until it has run or when it wasn't requested.
     face_detection: Optional[FaceDetectionResult]
     #: The QR codes and web links link detection found; ``None`` until it has run or when it is off.
     link_detection: Optional[LinkDetectionResult]
